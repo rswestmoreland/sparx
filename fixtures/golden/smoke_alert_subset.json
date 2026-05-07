@@ -1,0 +1,6 @@
+{
+  "tenant_id": "smoke",
+  "device_key": "fixture-derived",
+  "expected_labels": ["outlier"],
+  "notes": "Smoke fixture should yield at least one alert with provenance after baseline warmup."
+}

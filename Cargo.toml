@@ -1,0 +1,27 @@
+[package]
+name = "sparx"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "sparx"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+blake3 = "1"
+flate2 = "1"
+chrono = "0.4"
+serde_json = "1"
+csv = "1"
+postcard = { version = "1", features = ["use-std"] }
+fjall = "=3.1.2"
+ctrlc = "3"
+
+[dev-dependencies]
+tempfile = "3"

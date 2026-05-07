@@ -1,0 +1,5 @@
+<34>1 2024-01-05T13:00:05Z host1 sshd 111 ID47 - src_ip=10.2.3.4 user=alice action=login result=success
+<34>1 2024-01-05T13:00:25Z host1 sshd 111 ID47 - src_ip=10.2.3.4 user=alice action=login result=success
+<34>1 2024-01-05T13:01:10Z host1 sshd 111 ID47 - src_ip=10.2.3.4 user=alice action=login result=success
+<34>1 2024-01-05T13:01:40Z host1 sshd 111 ID47 - src_ip=10.2.3.4 user=alice action=login result=success
+<34>1 2024-01-05T13:02:05Z host1 appx 222 ID47 - src_ip=203.0.113.9 user=bob cmd=/tmp/run-malware-7788 sha256=abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890 result=failed
