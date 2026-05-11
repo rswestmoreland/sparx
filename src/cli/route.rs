@@ -993,18 +993,21 @@ fn load_filtered_alerts_v1(
 
         if let Some(alert_ids) = indexed_ids {
             for alert_id in alert_ids {
-                if let Some(alert) = db.read_primary_alert_v1(&alert_id)? {
-                    out.push(alert);
+                match db.read_primary_alert_v1(&alert_id) {
+                    Ok(Some(alert)) => out.push(alert),
+                    Ok(None) => {}
+                    Err(_) => {}
                 }
             }
             return Ok(out);
         }
 
         for alert_id in db.list_primary_alert_ids_v1()? {
-            if let Some(alert) = db.read_primary_alert_v1(&alert_id)? {
-                if alert_matches_query_filters_v1(&alert, filters) {
+            match db.read_primary_alert_v1(&alert_id) {
+                Ok(Some(alert)) if alert_matches_query_filters_v1(&alert, filters) => {
                     out.push(alert);
                 }
+                Ok(Some(_)) | Ok(None) | Err(_) => {}
             }
         }
         Ok(out)
@@ -5160,113 +5163,113 @@ fn process_line_oneshot_v1(
         .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
     let result = acc
         .apply_line_v1(
-                line_ts,
-                line_ts,
-                usize::try_from(byte_len).unwrap_or(usize::MAX),
-                &emitted,
-                dict,
-            )
-            .map_err(|e| format!("apply line failed: {:?}", e))?;
-        match result {
-            WindowApplyLineResultV1::Applied(applied) => {
-                runtime
-                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                        apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
-                        apply_window_checkpoint_writes_to_db_v1(
-                            db,
-                            &acc.checkpoint_writes_v1().map_err(|e| {
-                                DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
-                            })?,
-                        )
-                    })
-                    .map_err(|e| e.to_string())?;
-                update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
-                if source_stream_enabled {
-                    update_active_source_stream_observation_v1(
-                        active_source_streams,
-                        device,
-                        file,
-                        cursor.inode,
-                        offset_start,
-                        offset_end,
-                        byte_len,
-                    )?;
-                }
-                *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
-                runtime
-                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                        db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
-                    })
-                    .map_err(|e| e.to_string())?;
-                return Ok(0);
-            }
-            WindowApplyLineResultV1::DifferentWindow {
-                line_window_start_ts,
-            } => {
-                let (plan, next) = acc
-                    .finalize_and_advance_v1(line_window_start_ts, line_ts)
-                    .map_err(|e| format!("finalize and advance failed: {:?}", e))?;
-                let finalized_row = plan.finalized_row.clone();
-                let finalize_result = runtime
-                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                        let finalize_result = finalize_window_oneshot_v1(
-                            db,
-                            &device.tenant_id,
-                            device,
-                            dict,
-                            take_file_spans_from_active_v1(active_spans),
-                            take_source_stream_observations_v1(active_source_streams),
-                            source_stream_enabled,
-                            sink,
-                            finalized_row,
-                            df_cfg,
-                            centroid_cfg,
-                            alert_cfg,
-                        )?;
-                        apply_window_finalize_mutations_to_db_v1(db, &plan.mutations)?;
-                        Ok(finalize_result)
-                    })
-                    .map_err(|e| e.to_string())?;
-                persist_tenant_recovery_emit_outcome_v1(
-                    runtime,
-                    tenant_recovery_metrics_cache,
-                    &finalize_result.emit_outcome,
-                )
+            line_ts,
+            line_ts,
+            usize::try_from(byte_len).unwrap_or(usize::MAX),
+            &emitted,
+            dict,
+        )
+        .map_err(|e| format!("apply line failed: {:?}", e))?;
+    match result {
+        WindowApplyLineResultV1::Applied(applied) => {
+            runtime
+                .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                    apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
+                    apply_window_checkpoint_writes_to_db_v1(
+                        db,
+                        &acc.checkpoint_writes_v1().map_err(|e| {
+                            DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
+                        })?,
+                    )
+                })
                 .map_err(|e| e.to_string())?;
-                let finalized_alerts_emitted = finalize_result.alerts_emitted;
-                sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
-                source_stream_windows.extend(finalize_result.source_stream_windows);
-                *acc_opt = Some(next);
-                return Ok(
-                    finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
-                        runtime,
-                        cfg,
-                        dict,
-                        acc_opt,
-                        active_spans,
-                        active_source_streams,
-                        sharp_drop_windows,
-                        source_stream_windows,
-                        cursor,
-                        sink,
-                        tenant_recovery_metrics_cache,
+            update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
+            if source_stream_enabled {
+                update_active_source_stream_observation_v1(
+                    active_source_streams,
+                    device,
+                    file,
+                    cursor.inode,
+                    offset_start,
+                    offset_end,
+                    byte_len,
+                )?;
+            }
+            *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
+            runtime
+                .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                    db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
+                })
+                .map_err(|e| e.to_string())?;
+            return Ok(0);
+        }
+        WindowApplyLineResultV1::DifferentWindow {
+            line_window_start_ts,
+        } => {
+            let (plan, next) = acc
+                .finalize_and_advance_v1(line_window_start_ts, line_ts)
+                .map_err(|e| format!("finalize and advance failed: {:?}", e))?;
+            let finalized_row = plan.finalized_row.clone();
+            let finalize_result = runtime
+                .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                    let finalize_result = finalize_window_oneshot_v1(
+                        db,
+                        &device.tenant_id,
                         device,
-                        file,
-                        line,
-                        offset_start,
-                        offset_end,
-                        byte_len,
-                        since,
-                        until,
+                        dict,
+                        take_file_spans_from_active_v1(active_spans),
+                        take_source_stream_observations_v1(active_source_streams),
                         source_stream_enabled,
+                        sink,
+                        finalized_row,
                         df_cfg,
                         centroid_cfg,
                         alert_cfg,
-                        now_ts,
-                    )?),
-                );
-            }
+                    )?;
+                    apply_window_finalize_mutations_to_db_v1(db, &plan.mutations)?;
+                    Ok(finalize_result)
+                })
+                .map_err(|e| e.to_string())?;
+            persist_tenant_recovery_emit_outcome_v1(
+                runtime,
+                tenant_recovery_metrics_cache,
+                &finalize_result.emit_outcome,
+            )
+            .map_err(|e| e.to_string())?;
+            let finalized_alerts_emitted = finalize_result.alerts_emitted;
+            sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
+            source_stream_windows.extend(finalize_result.source_stream_windows);
+            *acc_opt = Some(next);
+            return Ok(
+                finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
+                    runtime,
+                    cfg,
+                    dict,
+                    acc_opt,
+                    active_spans,
+                    active_source_streams,
+                    sharp_drop_windows,
+                    source_stream_windows,
+                    cursor,
+                    sink,
+                    tenant_recovery_metrics_cache,
+                    device,
+                    file,
+                    line,
+                    offset_start,
+                    offset_end,
+                    byte_len,
+                    since,
+                    until,
+                    source_stream_enabled,
+                    df_cfg,
+                    centroid_cfg,
+                    alert_cfg,
+                    now_ts,
+                )?),
+            );
         }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

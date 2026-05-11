@@ -1,0 +1,458 @@
+Validation run date: 2026-05-11T18:34:54Z
+Working directory: /workspace/sparx
+== rustc --version ==
+rustc 1.90.0 (1159e78c4 2025-09-14)
+== cargo --version ==
+cargo 1.90.0 (840b83a10 2025-07-30)
+
+== cargo fmt --check ==
+\n== cargo check ==
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+    Checking cfg-if v1.0.4
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.186
+   Compiling syn v2.0.117
+   Compiling serde v1.0.228
+    Checking scopeguard v1.2.0
+   Compiling crossbeam-utils v0.8.21
+   Compiling serde_derive v1.0.228
+    Checking lock_api v0.4.14
+    Checking equivalent v1.0.2
+    Checking bitflags v2.11.1
+   Compiling getrandom v0.4.2
+   Compiling semver v1.0.28
+   Compiling rustix v1.1.4
+   Compiling rustc_version v0.4.1
+    Checking spin v0.9.8
+   Compiling cfg_aliases v0.2.1
+   Compiling thiserror v2.0.18
+    Checking once_cell v1.21.4
+   Compiling autocfg v1.5.0
+   Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.9
+   Compiling parking_lot_core v0.9.12
+    Checking linux-raw-sys v0.12.1
+   Compiling cc v1.2.62
+   Compiling num-traits v0.2.19
+   Compiling nix v0.31.3
+   Compiling heapless v0.7.17
+    Checking crossbeam-epoch v0.9.18
+   Compiling thiserror-impl v2.0.18
+    Checking byteorder-lite v0.1.0
+    Checking hashbrown v0.17.1
+    Checking twox-hash v2.1.2
+    Checking smallvec v1.15.1
+    Checking compare v0.0.6
+   Compiling zmij v1.0.21
+    Checking xxhash-rust v0.8.15
+    Checking byteorder v1.5.0
+    Checking log v0.4.29
+    Checking fastrand v2.4.1
+   Compiling crc32fast v1.5.0
+    Checking hashbrown v0.16.1
+    Checking memchr v2.8.0
+    Checking quick_cache v0.6.21
+    Checking tempfile v3.27.0
+    Checking sfa v1.0.0
+    Checking hash32 v0.2.1
+    Checking interval-heap v0.0.5
+    Checking indexmap v2.14.0
+    Checking lz4_flex v0.13.1
+   Compiling enum_dispatch v0.3.13
+    Checking crossbeam-skiplist v0.1.3
+   Compiling blake3 v1.8.5
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+    Checking rustc-hash v2.1.2
+    Checking winnow v0.7.15
+    Checking simd-adler32 v0.3.9
+    Checking self_cell v1.2.2
+    Checking byteview v0.10.1
+   Compiling serde_json v1.0.149
+    Checking hashbrown v0.14.5
+    Checking toml_write v0.1.2
+    Checking varint-rs v2.2.0
+    Checking itoa v1.0.18
+    Checking adler2 v2.0.1
+    Checking stable_deref_trait v1.2.1
+    Checking miniz_oxide v0.8.9
+    Checking lsm-tree v3.1.4
+    Checking toml_edit v0.22.27
+    Checking dashmap v6.1.0
+    Checking cobs v0.3.0
+    Checking csv-core v0.1.13
+    Checking flume v0.12.0
+    Checking ryu v1.0.23
+    Checking arrayvec v0.7.6
+    Checking arrayref v0.3.9
+    Checking constant_time_eq v0.4.2
+    Checking cpufeatures v0.3.0
+    Checking iana-time-zone v0.1.65
+    Checking chrono v0.4.44
+    Checking fjall v3.1.2
+    Checking csv v1.4.0
+    Checking flate2 v1.1.9
+    Checking ctrlc v3.5.2
+    Checking postcard v1.1.3
+    Checking toml v0.8.23
+    Checking sparx v0.0.0 (/workspace/sparx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 49.84s
+\n== cargo test ==
+   Compiling cfg-if v1.0.4
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.186
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling equivalent v1.0.2
+   Compiling serde v1.0.228
+   Compiling bitflags v2.11.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling once_cell v1.21.4
+   Compiling spin v0.9.8
+   Compiling linux-raw-sys v0.12.1
+   Compiling getrandom v0.4.2
+   Compiling crossbeam-epoch v0.9.18
+   Compiling rustix v1.1.4
+   Compiling hashbrown v0.16.1
+   Compiling twox-hash v2.1.2
+   Compiling byteorder-lite v0.1.0
+   Compiling smallvec v1.15.1
+   Compiling xxhash-rust v0.8.15
+   Compiling fastrand v2.4.1
+   Compiling byteorder v1.5.0
+   Compiling log v0.4.29
+   Compiling compare v0.0.6
+   Compiling hashbrown v0.17.1
+   Compiling memchr v2.8.0
+   Compiling indexmap v2.14.0
+   Compiling sfa v1.0.0
+   Compiling interval-heap v0.0.5
+   Compiling hash32 v0.2.1
+   Compiling tempfile v3.27.0
+   Compiling parking_lot_core v0.9.12
+   Compiling lz4_flex v0.13.1
+   Compiling quick_cache v0.6.21
+   Compiling thiserror v2.0.18
+   Compiling crossbeam-skiplist v0.1.3
+   Compiling enum_dispatch v0.3.13
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling winnow v0.7.15
+   Compiling stable_deref_trait v1.2.1
+   Compiling simd-adler32 v0.3.9
+   Compiling toml_write v0.1.2
+   Compiling byteview v0.10.1
+   Compiling adler2 v2.0.1
+   Compiling hashbrown v0.14.5
+   Compiling itoa v1.0.18
+   Compiling rustc-hash v2.1.2
+   Compiling self_cell v1.2.2
+   Compiling varint-rs v2.2.0
+   Compiling toml_edit v0.22.27
+   Compiling lsm-tree v3.1.4
+   Compiling dashmap v6.1.0
+   Compiling miniz_oxide v0.8.9
+   Compiling heapless v0.7.17
+   Compiling num-traits v0.2.19
+   Compiling nix v0.31.3
+   Compiling cobs v0.3.0
+   Compiling crc32fast v1.5.0
+   Compiling zmij v1.0.21
+   Compiling csv-core v0.1.13
+   Compiling flume v0.12.0
+   Compiling arrayref v0.3.9
+   Compiling ryu v1.0.23
+   Compiling cpufeatures v0.3.0
+   Compiling iana-time-zone v0.1.65
+   Compiling constant_time_eq v0.4.2
+   Compiling arrayvec v0.7.6
+   Compiling chrono v0.4.44
+   Compiling blake3 v1.8.5
+   Compiling csv v1.4.0
+   Compiling fjall v3.1.2
+   Compiling serde_json v1.0.149
+   Compiling flate2 v1.1.9
+   Compiling ctrlc v3.5.2
+   Compiling postcard v1.1.3
+   Compiling toml v0.8.23
+   Compiling sparx v0.0.0 (/workspace/sparx)
+warning: function `run_disabled_tenant_is_skipped_v1` is never used
+   --> tests/run_mode.rs:417:4
+    |
+417 | fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `sparx` (test "run_mode") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 54s
+     Running unittests src/lib.rs (target/debug/deps/sparx-bf002d3b260b855b)
+
+running 7 tests
+test features::dict::tests::empty_dictionary_starts_with_requested_seed ... ok
+test features::dict::tests::resolve_existing_feature_is_stable_and_side_effect_free ... ok
+test features::emit::tests::classify_key_examples_match_contract ... ok
+test features::emit::tests::principal_normalization_handles_upn_and_windows_forms ... ok
+test features::emit::tests::normalize_key_examples_match_contract ... ok
+test stable_hash::tests::stable_hash_hex128_is_deterministic_and_input_sensitive ... ok
+test stable_hash::tests::stable_hash_hex128_is_lowercase_ascii_hex ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/sparx-eb2e34ec90e65bcc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/alert_drill_extract.rs (target/debug/deps/alert_drill_extract-2032d76f2bb7bb64)
+
+running 7 tests
+test alert_drill_reads_plain_span_and_enforces_max_lines_v1 ... ok
+test alert_drill_rejects_provenance_path_traversal_v1 ... ok
+test alert_drill_resolves_source_stream_display_path_by_device_key_v1 ... ok
+test alert_drill_resolves_runtime_device_path_with_tenant_prefix_v1 ... ok
+test alert_drill_skips_gzip_span_v1 ... ok
+test alert_extract_missing_file_returns_exit_three_v1 ... ok
+test alert_extract_writes_plain_and_gzip_ranges_v1 ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+     Running tests/alert_scoring.rs (target/debug/deps/alert_scoring-13bdd8bf7388d2a9)
+
+running 20 tests
+test cold_start_days_activate_day_based_bucket_floor ... ok
+test blob_ratio_can_drive_noise_suspect_without_entity_focus ... ok
+test drift_is_near_zero_when_weighted_row_matches_centroid ... ok
+test cold_start_suppresses_outlier_and_keeps_info_only ... ok
+test min_lines_per_window_suppresses_alert_but_keeps_score_preview ... ok
+test outlier_reasons_include_new_feature_drift_and_entity_focus ... ok
+test rarity_normalization_is_invariant_to_uniform_row_scaling ... ok
+test sharp_drop_alert_construction_maps_tenant_aggregate_to_sentinel_and_empty_provenance ... ok
+test sharp_drop_alert_construction_is_deterministic_and_preserves_device_provenance ... ok
+test sharp_drop_alert_id_does_not_collide_with_hard_silence_vdrop ... ok
+test source_stream_alert_builders_reject_mismatched_subjects_v1 ... ok
+test source_stream_hard_silence_and_sharp_drop_alert_ids_do_not_collide_v1 ... ok
+test sharp_drop_alert_construction_rejects_invalid_candidates ... ok
+test source_stream_sharp_drop_alert_construction_preserves_source_provenance_v1 ... ok
+test source_stream_vdrop_alert_construction_is_deterministic_and_runtime_inactive_v1 ... ok
+test vdrop_alert_construction_is_deterministic_and_empty_provenance ... ok
+test top_features_alert_id_entities_and_postcard_roundtrip_are_deterministic ... ok
+test vdrop_alert_construction_maps_tenant_aggregate_to_sentinel_device_key ... ok
+test vdrop_alert_construction_rejects_invalid_candidates ... ok
+test volume_extreme_in_cold_start_emits_info ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/alerts_query.rs (target/debug/deps/alerts_query-d27356ca096d190d)
+
+running 9 tests
+test alerts_export_structured_category_filter_v1 ... ok
+test alerts_export_supports_plain_and_gzip_v1 ... ok
+test alerts_list_falls_back_when_entity_index_is_incomplete_v1 ... FAILED
+test alerts_list_falls_back_when_time_index_is_incomplete_v1 ... FAILED
+test alerts_list_json_is_sorted_by_window_desc_then_alert_id_v1 ... ok
+test alerts_list_structured_category_filter_v1 ... ok
+test alerts_search_structured_entity_filter_v1 ... ok
+test alerts_search_honors_time_filter_and_contains_v1 ... ok
+test alerts_show_json_and_missing_alert_v1 ... ok
+
+failures:
+
+---- alerts_list_falls_back_when_entity_index_is_incomplete_v1 stdout ----
+
+thread 'alerts_list_falls_back_when_entity_index_is_incomplete_v1' panicked at tests/alerts_query.rs:363:5:
+assertion `left == right` failed
+  left: 0
+ right: 4
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- alerts_list_falls_back_when_time_index_is_incomplete_v1 stdout ----
+
+thread 'alerts_list_falls_back_when_time_index_is_incomplete_v1' panicked at tests/alerts_query.rs:252:5:
+assertion `left == right` failed
+  left: 0
+ right: 4
+
+
+failures:
+    alerts_list_falls_back_when_entity_index_is_incomplete_v1
+    alerts_list_falls_back_when_time_index_is_incomplete_v1
+
+test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+error: test failed, to rerun pass `--test alerts_query`
+\n== cargo clippy --all-targets --all-features -- -D warnings (post-failure run) ==
+    Checking sparx v0.0.0 (/workspace/sparx)
+error: unneeded `return` statement
+    --> src/cli/route.rs:5204:13
+     |
+5204 |             return Ok(0);
+     |             ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+     = note: `-D clippy::needless-return` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+     |
+5204 -             return Ok(0);
+5204 +             Ok(0)
+     |
+
+error: unneeded `return` statement
+    --> src/cli/route.rs:5243:13
+     |
+5243 | /             return Ok(
+5244 | |                 finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
+5245 | |                     runtime,
+5246 | |                     cfg,
+...    |
+5269 | |                 )?),
+5270 | |             );
+     | |_____________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+help: remove `return`
+     |
+5243 ~             Ok(
+5244 +                 finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
+5245 +                     runtime,
+5246 +                     cfg,
+5247 +                     dict,
+5248 +                     acc_opt,
+5249 +                     active_spans,
+5250 +                     active_source_streams,
+5251 +                     sharp_drop_windows,
+5252 +                     source_stream_windows,
+5253 +                     cursor,
+5254 +                     sink,
+5255 +                     tenant_recovery_metrics_cache,
+5256 +                     device,
+5257 +                     file,
+5258 +                     line,
+5259 +                     offset_start,
+5260 +                     offset_end,
+5261 +                     byte_len,
+5262 +                     since,
+5263 +                     until,
+5264 +                     source_stream_enabled,
+5265 +                     df_cfg,
+5266 +                     centroid_cfg,
+5267 +                     alert_cfg,
+5268 +                     now_ts,
+5269 +                 )?),
+5270 ~             )
+     |
+
+error: could not compile `sparx` (lib test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `sparx` (lib) due to 2 previous errors
+\n== cargo bench --bench tenant_device_eps (post-failure run) ==
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+   Compiling cfg-if v1.0.4
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.186
+   Compiling syn v2.0.117
+   Compiling serde v1.0.228
+   Compiling serde_derive v1.0.228
+   Compiling scopeguard v1.2.0
+   Compiling crossbeam-utils v0.8.21
+   Compiling lock_api v0.4.14
+   Compiling bitflags v2.11.1
+   Compiling equivalent v1.0.2
+   Compiling semver v1.0.28
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.4.2
+   Compiling rustc_version v0.4.1
+   Compiling spin v0.9.8
+   Compiling cfg_aliases v0.2.1
+   Compiling autocfg v1.5.0
+   Compiling thiserror v2.0.18
+   Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.9
+   Compiling linux-raw-sys v0.12.1
+   Compiling parking_lot_core v0.9.12
+   Compiling once_cell v1.21.4
+   Compiling cc v1.2.62
+   Compiling num-traits v0.2.19
+   Compiling nix v0.31.3
+   Compiling heapless v0.7.17
+   Compiling crossbeam-epoch v0.9.18
+   Compiling thiserror-impl v2.0.18
+   Compiling hashbrown v0.16.1
+   Compiling zmij v1.0.21
+   Compiling smallvec v1.15.1
+   Compiling byteorder-lite v0.1.0
+   Compiling crc32fast v1.5.0
+   Compiling fastrand v2.4.1
+   Compiling xxhash-rust v0.8.15
+   Compiling twox-hash v2.1.2
+   Compiling hashbrown v0.17.1
+   Compiling memchr v2.8.0
+   Compiling log v0.4.29
+   Compiling byteorder v1.5.0
+   Compiling compare v0.0.6
+   Compiling hash32 v0.2.1
+   Compiling interval-heap v0.0.5
+   Compiling enum_dispatch v0.3.13
+   Compiling sfa v1.0.0
+   Compiling indexmap v2.14.0
+   Compiling lz4_flex v0.13.1
+   Compiling tempfile v3.27.0
+   Compiling quick_cache v0.6.21
+   Compiling crossbeam-skiplist v0.1.3
+   Compiling blake3 v1.8.5
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling simd-adler32 v0.3.9
+   Compiling hashbrown v0.14.5
+   Compiling stable_deref_trait v1.2.1
+   Compiling rustc-hash v2.1.2
+   Compiling adler2 v2.0.1
+   Compiling serde_json v1.0.149
+   Compiling toml_write v0.1.2
+   Compiling byteview v0.10.1
+   Compiling winnow v0.7.15
+   Compiling self_cell v1.2.2
+   Compiling itoa v1.0.18
+   Compiling varint-rs v2.2.0
+   Compiling lsm-tree v3.1.4
+   Compiling toml_edit v0.22.27
+   Compiling miniz_oxide v0.8.9
+   Compiling dashmap v6.1.0
+   Compiling cobs v0.3.0
+   Compiling csv-core v0.1.13
+   Compiling flume v0.12.0
+   Compiling iana-time-zone v0.1.65
+   Compiling ryu v1.0.23
+   Compiling cpufeatures v0.3.0
+   Compiling constant_time_eq v0.4.2
+   Compiling arrayref v0.3.9
+   Compiling arrayvec v0.7.6
+   Compiling csv v1.4.0
+   Compiling chrono v0.4.44
+   Compiling fjall v3.1.2
+   Compiling flate2 v1.1.9
+   Compiling postcard v1.1.3
+   Compiling ctrlc v3.5.2
+   Compiling toml v0.8.23
+   Compiling sparx v0.0.0 (/workspace/sparx)
+    Finished `bench` profile [optimized] target(s) in 1m 59s
+     Running benches/tenant_device_eps.rs (target/release/deps/tenant_device_eps-5b607050718fb41b)
+sparx tenant/device EPS benchmark
+tenants=2
+devices_per_tenant=8
+files_per_device=2
+events_per_file=2000
+total_events=64000
+elapsed_s=151.990051
+total_eps=421.08
+read_chunk_bytes=262144
+source_stream_enabled=false
+\n== SPARX_BENCH_TENANTS=4 SPARX_BENCH_DEVICES_PER_TENANT=16 SPARX_BENCH_FILES_PER_DEVICE=2 SPARX_BENCH_EVENTS_PER_FILE=5000 cargo bench --bench tenant_device_eps ==
+    Finished `bench` profile [optimized] target(s) in 0.17s
+     Running benches/tenant_device_eps.rs (target/release/deps/tenant_device_eps-5b607050718fb41b)
