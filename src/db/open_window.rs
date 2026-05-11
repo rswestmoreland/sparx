@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Open-window checkpoint encodings.
 // See: contracts/26_open_window_checkpoint_encoding_v0_1.md
-// Phase 2c covers win_active and win_row value encodings.
+// Covers win_active and win_row value encodings.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpenWindowErrorV1 {

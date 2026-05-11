@@ -1,4 +1,7 @@
-// Phase 1b tests for CLI parsing (no filesystem IO).
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// CLI parsing tests with no filesystem IO.
 
 use sparx::cli::parse::parse_args_v1;
 use sparx::cli::{

@@ -1,90 +1,153 @@
 # sparx
 
-sparx is a Sparse Matrix Log Analyzer for Enterprise Linux. Its objective is to process
-large, heterogeneous log collections across many tenants and devices in near-real time,
-build stable behavioral baselines, and emit explainable alerts that are useful to both
-analysts and customers.
+sparx is a Sparse Matrix Log Analyzer for Enterprise Linux. It processes large,
+heterogeneous log collections across many tenants and devices, builds stable
+behavioral baselines, and emits explainable alerts with retained source
+provenance for analyst and customer review.
 
-## How sparx uses a sparse matrix
+This project was inspired by a friend's love of sparse matrices and signal
+processing. It is an intersection between data science, log management, and
+cybersecurity.
+
+## What a sparse matrix is
+
+A matrix is a rectangular table of values. In log analysis, a useful model is:
+
+- rows represent observations, such as a device during a time window
+- columns represent possible features, such as event types, users, IPs,
+  commands, paths, vendor fields, shape classes, or normalized tokens
+- values represent measurements, usually counts or weighted counts
+
+A dense matrix stores every row/column value, including zeros. A sparse matrix
+stores only nonzero values. That distinction matters because log feature spaces
+are usually very wide while each observation touches only a small subset of the
+possible columns.
 
 sparx treats each finalized time window as a sparse row:
 
-- each row represents a specific tenant/device/window slice
+- each row is a tenant/device/window slice
 - each column is a canonical `FeatureId`
 - each stored value is the count observed for that feature in the window
 
-The representation stays sparse because sparx only persists features that were actually
-observed in that window. It does not materialize a dense feature table full of zeros.
-That makes the system practical for large multi-tenant log streams where each device and
-window only touches a small fraction of the total feature space.
+All omitted features are treated as zero without being stored. This keeps
+multi-tenant telemetry practical while still supporting rarity scoring, drift
+scoring, spike/extreme volume scoring, hard-silence detection, sharp-drop
+detection, source-stream volume-loss detection, and explainable alerting.
 
-From those sparse rows, sparx:
-- maintains per-tenant feature dictionaries
-- updates DF-ring, centroid, and fixed-layout stats baselines
-- scores outliers and noise suspects
-- writes explainable `AlertV1` objects that retain provenance for drill/extract
+## Why sparse rows help log analysis
 
-## Operating model
+Enterprise logs are wide and inconsistent. A single environment can contain
+firewalls, endpoints, applications, identity systems, cloud services, and custom
+collectors. Each product has its own fields, formats, and high-cardinality
+values. sparx uses sparse rows so it can retain useful signal without building a
+large zero-filled table.
 
-- multi-tenant layout with per-tenant watch roots and per-device log directories
-- tails actively written plain-text and gzip-compressed files where applicable
-- supports heterogeneous input formats:
-  - syslog envelope variants
-  - key/value logs
-  - JSON logs
-  - CSV logs
-  - CEF with reverse parsing rules
-  - plaintext fallback
-- emits canonical features and entity sketches from tokenized events
-- aggregates events into time windows, persists open-window checkpoints, finalizes rows,
-  updates baselines, scores results, and writes explainable alerts
-- supports operator-facing workflows including purge, migrate, policy validation,
-  alert query/export, alert drill/extract, replay-spool, status, oneshot, and run
+Advantages include:
+
+- storage grows with observed features, not every possible feature
+- tenant dictionaries, baselines, and retention boundaries stay isolated
+- deterministic feature IDs, row keys, tie-breaks, and explanations are possible
+- sparse dot products and vector norms can compare windows to baselines
+- top contributing features can be ranked from the same data used for scoring
+- provenance can point alerts back to exact source file spans
+- unknown or partially parsed formats can still emit deterministic token and
+  shape features
+
+## Supported input model
+
+sparx reads per-tenant watch roots with per-device log directories. It supports
+plain text and gzip where applicable, and tokenizes heterogeneous formats:
+
+- syslog envelope variants
+- key/value logs
+- JSON logs
+- CSV logs
+- CEF with reverse parsing rules
+- plaintext fallback
+
+Parsers normalize what they can, emit canonical features and entity sketches,
+and fall back to deterministic token/shape features when a format is only
+partially known.
+
+## Alerting and health scope
+
+The active alert model writes `AlertV1` records for finalized sparse rows and
+volume-loss conditions. `AlertV1.provenance: Vec<FileSpanV1>` is the only
+authoritative drilldown field model.
+
+Active alert and health signals include:
+
+- rarity, drift, spike, and extreme volume components for sparse rows
+- `V_DROP` hard-silence detection for device and tenant aggregate subjects
+- `V_DROP` sharp-drop detection for reduced-but-nonzero activity
+- `V_DROP` source-stream detection behind a default-off source-stream gate
+- status, JSON status, Prometheus metrics, and health output for bounded
+  operator diagnostics
+- alert query/export/drill/extract workflows backed by persisted `AlertV1`
+  records and secondary alert indexes
 
 ## Storage and runtime model
 
-- storage engine target for the real DB/runtime layer: Fjall
-- Fjall remains behind a thin internal adapter boundary under `src/db/`
-- sparx uses a single-owner embedded DB model
-- DB-backed CLI/runtime flows must fail closed rather than pretending to succeed
-- `AlertV1.provenance: Vec<FileSpanV1>` is the only authoritative drilldown field model
+- Fjall is the active embedded DB backend.
+- Fjall stays behind the internal adapter boundary under `src/db/`.
+- sparx uses a single-owner embedded DB model.
+- DB-backed CLI and runtime flows fail closed.
+- `replay-spool` is filesystem/config based and does not open Fjall.
+- `replay-spool` is valid only for replay-compatible file sinks; stdout fails
+  closed.
+
+## Operator workflows
+
+The current CLI/runtime surface includes:
+
+- `run`
+- `oneshot`
+- `status`
+- `status --json`
+- `/metrics`
+- `/healthz`
+- `tenant policy show`
+- `tenant policy check`
+- `purge`
+- `migrate`
+- `alerts query/search/show/export`
+- `alert drill/extract`
+- `replay-spool`
 
 ## Repository guide
 
-- locked v0.1 contracts are in `contracts/`
-- current planning and design notes are in `docs/`
-- consolidated phase history is in `PHASE_HISTORY.txt`
-- minimal fixture corpus is under `fixtures/`
+- `contracts/`: locked v0.1 contracts and behavior boundaries
+- `docs/`: user-facing architecture, operations, configuration, alerting, and
+  validation guidance
+- `docs/roadmap/`: archived historical checkpoint notes, retained for project
+  traceability
+- `fixtures/`: minimal fixture corpus and expected outputs
+- `src/`: Rust implementation
+- `tests/`: deterministic unit and integration coverage
+- `LICENSE` and `NOTICE.md`: MIT license and author/copyright metadata
 
 ## Current status
 
-- Phases 0 through 12 are complete
-- Phase 12e completed tenant lifecycle runtime reconciliation for the daemon path,
-  including disable/terminating enforcement without restart, deterministic active-index
-  reconciliation across discovered and known tenants, and tenant `last_seen_ts` updates
-  during observed inventory cycles
-- Phase 12.5 completed contract/config/docs closure before Phase 13
-- Phase 12.5a completed the scope lock and checklist insertion for that closure work
-- Phase 12.5b completed hashed-fallback retirement across contracts and stale config surface
-- Phase 12.5c completed config contract reconciliation and validator hardening
-- Phase 12.5d completed observability contract narrowing to the current status-centered v0.1 surface
-- Phase 12.5e completed output sink and spool reconciliation against the narrowed active runtime/config surface
-- Phase 12.5f completed Fjall note and doc closure, including removal of stale planning wording and dead doc artifacts
-- Phase 12.5g completed the final consistency sweep and closeout across contracts, docs, config wording, and tests
-- Phase 13a completed observability expansion
-- Phase 13b completed release hardening and final operator ergonomics
-- Phase 14a completed output recovery automation
-- Phase 14b completed recovery visibility and tuning
-- Phase 15a completed scoring policy activation
-- Phase 15b completed secondary alert index persistence
-- Phase 15c completed secondary alert index query activation
-- Phase 15d completed structured alert filter activation
-- next recommended phase: 16a replay cadence and spool-cap tuning
+The current checkpoint includes source-stream `V_DROP` behavior for v1 behind the
+default-off source-stream gate. Parser-class subjects, vendor-event-family
+subjects, source-stream-specific threshold knobs, heartbeat checks, maintenance
+calendars, cross-tenant outage correlation, and AlertV1 schema changes remain
+outside the v1 scope unless explicitly approved.
 
-## Current implementation priorities
+Before v1 release, sparx still needs user-run Rust toolchain validation logs for
+formatting, build, tests, and clippy, followed by release packaging and operator
+documentation review.
 
-- Phase 15b activated deterministic secondary `alert_idx_*` persistence alongside the primary alert object
-- Phase 15c activates the persisted `alert_idx_time` path for list/search/export candidate selection when coverage is complete
-- Phase 15d activates structured category/entity alert filters on top of the persisted secondary indexes while preserving backward-safe fallback to primary scans
-- keep the primary `AlertV1` object authoritative for show/export/drill flows
-- next focus: carefully scoped replay cadence and spool-cap tuning for output recovery
+## Current hardening status
+
+The current checkpoint includes security, performance, consistency, and bad-data hardening. Covered areas include alert provenance path validation, spool path safety, symlink-resistant spool inventory, bounded ingest resource caps, chunked plain-text runtime reading, coherent source comments, explicit runtime invariant errors, and malformed-readable-log stability coverage. Final release validation still requires user-run Rust toolchain logs.
+
+## License
+
+sparx is open source under the MIT License.
+
+Author: Richard S. Westmoreland  
+Contact: dev@rswestmore.land  
+Copyright (c) 2026 Richard S. Westmoreland.
+
+See `LICENSE` for the full license text.

@@ -1,7 +1,9 @@
-// Reader abstraction for plain and gzip files.
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// Reader abstraction for streamed plain-text and gzip files.
 // See: contracts/17_format_handling_v0_1.md
 //   and contracts/31_tenant_db_simple_value_encodings_v0_1.md
-// Phase 3c: plain + gzip streamed readers.
 
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};

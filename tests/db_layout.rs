@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::config::load::default_config_v1;
 use sparx::db::layout::{filesystem_layout_v1, FilesystemLayoutV1};
 

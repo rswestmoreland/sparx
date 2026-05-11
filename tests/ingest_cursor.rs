@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::ingest::{
     apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorResetReasonV1, FileCursorV1, ObservedFileStateV1,
 };

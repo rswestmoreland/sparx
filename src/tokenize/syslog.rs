@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// Syslog envelope parsing with deterministic fallback behavior.
+// See: contracts/18_syslog_envelope_and_cef_reverse_kv_v0_1.md
+
 use crate::tokenize::{ParsedLineV1, SyslogEnvelopeV1};
 use crate::types::UnixSec;
 use chrono::{Datelike, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::tokenize::{tokenize_message_v1, TokenEventV1};
 
 fn kv_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {

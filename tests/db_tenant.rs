@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use tempfile::tempdir;
 
 use sparx::alert::{
@@ -5,11 +8,29 @@ use sparx::alert::{
     ALERT_SCHEMA_VERSION_V1,
 };
 use sparx::db::baseline_sketch::{CentroidValuePairV1, DeviceStatsV1, DfCountPairV1, WelfordF64V1};
-use sparx::db::keys::key_tenant_alert_v1;
+use sparx::db::keys::{
+    key_tenant_alert_v1, key_tenant_drop_open_device_v1, key_tenant_drop_open_source_stream_v1,
+    key_tenant_drop_open_tenant_v1, key_tenant_silence_open_device_v1,
+    key_tenant_silence_open_source_stream_v1, key_tenant_silence_open_tenant_v1,
+    key_tenant_silence_subject_device_state_v1, key_tenant_silence_subject_tenant_state_v1,
+    key_tenant_silence_subject_source_stream_state_v1, key_tenant_source_stats_v1,
+    key_tenant_source_stream_catalog_v1,
+};
 use sparx::db::open_window::{SparseCountPairV1, TopKStringEntryV1, WinActiveV1, WinMetaV1};
 use sparx::db::{
-    TenantDbV1, TenantDeviceBaselineStateV1, TenantDfSlotBucketStateV1,
-    TenantMigrateJournalEntryV1, TenantOpenWindowStateV1, TenantSchemaStateV1,
+    ExpectedSourceStateUpdateV1, SourceStreamStatsV1, TenantDbV1, TenantDeviceBaselineStateV1,
+    TenantDfSlotBucketStateV1, TenantMigrateJournalEntryV1, TenantOpenWindowStateV1,
+    TenantSchemaStateV1,
+};
+use sparx::db::silence::{
+    OpenDropStateV1, OpenSilenceStateV1, OPEN_DROP_FLAG_OPEN_V1, OPEN_SILENCE_FLAG_OPEN_V1,
+    SILENCE_SCHEMA_VERSION_V1,
+    SILENCE_SUBJECT_KIND_DEVICE_V1, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+    SILENCE_SUBJECT_KIND_TENANT_V1,
+};
+use sparx::db::source_stream::{
+    source_stream_catalog_from_identity_v1, source_stream_identity_from_path_v1,
+    update_source_stream_stats_from_observation_v1,
 };
 use sparx::features::EntitySketchSnapshotV1;
 use sparx::ingest::FileCursorV1;
@@ -486,6 +507,246 @@ fn tenant_migrate_journal_scan_is_deterministic_v1() -> Result<(), Box<dyn std::
             },
         ],
         db.scan_migrate_journal_entries_v1()?
+    );
+    Ok(())
+}
+
+#[test]
+fn tenant_db_updates_expected_source_state_records_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let db = open_temp_tenant_db_v1()?;
+    let device_update = ExpectedSourceStateUpdateV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_DEVICE_V1,
+        window_size_s_u32: 60,
+        window_start_ts_i64: 1_700_000_000,
+        window_end_ts_i64: 1_700_000_060,
+        observed_lines_u64: 12,
+        observed_bytes_u64: 2048,
+        bucket_u8: 17,
+        update_ts_i64: 1_700_000_060,
+        min_lines_per_window_u32: 10,
+    };
+    let tenant_update = ExpectedSourceStateUpdateV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_TENANT_V1,
+        ..device_update.clone()
+    };
+
+    let device_state = db.update_device_expected_source_state_v1("device-001", &device_update)?;
+    let tenant_state = db.update_tenant_expected_source_state_v1(&tenant_update)?;
+
+    assert_eq!(device_state.observed_windows_total_u64, 1);
+    assert_eq!(device_state.mature_windows_total_u64, 1);
+    assert_eq!(tenant_state.subject_kind_u8, SILENCE_SUBJECT_KIND_TENANT_V1);
+    assert_eq!(tenant_state.last_observed_lines_u64, 12);
+
+    assert!(db
+        .get_raw_v1(key_tenant_silence_subject_device_state_v1("device-001").as_bytes())?
+        .is_some());
+    assert!(db
+        .get_raw_v1(key_tenant_silence_subject_tenant_state_v1().as_bytes())?
+        .is_some());
+    assert_eq!(db.read_device_expected_source_state_v1("device-001")?, Some(device_state.clone()));
+    assert_eq!(db.read_tenant_expected_source_state_v1()?, Some(tenant_state));
+    assert_eq!(
+        db.list_device_expected_source_states_v1()?,
+        vec![("device-001".to_string(), device_state)]
+    );
+    Ok(())
+}
+
+
+#[test]
+fn tenant_db_roundtrips_source_stream_catalog_stats_and_state_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let db = open_temp_tenant_db_v1()?;
+    let identity = source_stream_identity_from_path_v1("tenant-a", "device-001", "var/log/auth.log")?;
+    let catalog = source_stream_catalog_from_identity_v1(&identity, 1_700_000_000, 1_700_000_060)?;
+
+    db.write_source_stream_catalog_v1(&catalog)?;
+    assert!(db
+        .get_raw_v1(key_tenant_source_stream_catalog_v1("device-001", &identity.source_stream_id).as_bytes())?
+        .is_some());
+    assert_eq!(
+        db.read_source_stream_catalog_v1("device-001", &identity.source_stream_id)?,
+        Some(catalog.clone())
+    );
+    assert_eq!(db.list_source_stream_catalogs_for_device_v1("device-001")?, vec![catalog]);
+
+    let stats = update_source_stream_stats_from_observation_v1(None, 12, 1200, 1_700_000_060)?;
+    let stats = update_source_stream_stats_from_observation_v1(Some(&stats), 18, 2400, 1_700_000_120)?;
+    db.write_source_stream_stats_v1("device-001", &identity.source_stream_id, 17, &stats)?;
+    assert!(db
+        .get_raw_v1(key_tenant_source_stats_v1("device-001", &identity.source_stream_id, 17).as_bytes())?
+        .is_some());
+    assert_eq!(
+        db.read_source_stream_stats_v1("device-001", &identity.source_stream_id, 17)?,
+        Some(SourceStreamStatsV1 {
+            line_count: WelfordF64V1 { n: 2, mean: 15.0, m2: 18.0 },
+            byte_count: WelfordF64V1 { n: 2, mean: 1800.0, m2: 720000.0 },
+            score_total: WelfordF64V1 { n: 0, mean: 0.0, m2: 0.0 },
+            last_update_ts: 1_700_000_120,
+        })
+    );
+    assert_eq!(
+        db.list_source_stream_stats_for_device_v1("device-001", &identity.source_stream_id)?,
+        vec![(17, stats.clone())]
+    );
+
+    let update = ExpectedSourceStateUpdateV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+        window_size_s_u32: 60,
+        window_start_ts_i64: 1_700_000_000,
+        window_end_ts_i64: 1_700_000_060,
+        observed_lines_u64: 12,
+        observed_bytes_u64: 1200,
+        bucket_u8: 17,
+        update_ts_i64: 1_700_000_060,
+        min_lines_per_window_u32: 10,
+    };
+    let state = db.update_source_stream_expected_source_state_v1("device-001", &identity.source_stream_id, &update)?;
+    assert_eq!(state.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert!(db
+        .get_raw_v1(key_tenant_silence_subject_source_stream_state_v1("device-001", &identity.source_stream_id).as_bytes())?
+        .is_some());
+    assert_eq!(
+        db.read_source_stream_expected_source_state_v1("device-001", &identity.source_stream_id)?,
+        Some(state.clone())
+    );
+    assert_eq!(
+        db.list_source_stream_expected_source_states_for_device_v1("device-001")?,
+        vec![(identity.source_stream_id, state)]
+    );
+    Ok(())
+}
+
+#[test]
+fn tenant_db_roundtrips_open_silence_dedup_state_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let db = open_temp_tenant_db_v1()?;
+    let device_open = OpenSilenceStateV1 {
+        schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
+        subject_kind_u8: SILENCE_SUBJECT_KIND_DEVICE_V1,
+        state_flags_u8: OPEN_SILENCE_FLAG_OPEN_V1,
+        silence_start_ts_i64: 1_700_000_060,
+        last_alert_window_start_ts_i64: 1_700_000_060,
+        last_alert_window_end_ts_i64: 1_700_000_240,
+        last_alert_id: "0123456789abcdef0123456789abcdef".to_string(),
+    };
+    let tenant_open = OpenSilenceStateV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_TENANT_V1,
+        last_alert_id: "abcdef0123456789abcdef0123456789".to_string(),
+        ..device_open.clone()
+    };
+
+    db.write_device_open_silence_state_v1("device-001", &device_open)?;
+    db.write_tenant_open_silence_state_v1(&tenant_open)?;
+
+    assert!(db
+        .get_raw_v1(key_tenant_silence_open_device_v1("device-001").as_bytes())?
+        .is_some());
+    assert!(db
+        .get_raw_v1(key_tenant_silence_open_tenant_v1().as_bytes())?
+        .is_some());
+    assert_eq!(db.read_device_open_silence_state_v1("device-001")?, Some(device_open));
+    assert_eq!(db.read_tenant_open_silence_state_v1()?, Some(tenant_open));
+    Ok(())
+}
+
+
+#[test]
+fn tenant_db_roundtrips_open_drop_state_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let db = open_temp_tenant_db_v1()?;
+    let device_open = OpenDropStateV1 {
+        schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
+        subject_kind_u8: SILENCE_SUBJECT_KIND_DEVICE_V1,
+        state_flags_u8: OPEN_DROP_FLAG_OPEN_V1,
+        drop_start_ts_i64: 1_700_000_060,
+        last_alert_window_start_ts_i64: 1_700_000_060,
+        last_alert_window_end_ts_i64: 1_700_000_120,
+        last_alert_id: "0123456789abcdef0123456789abcdef".to_string(),
+    };
+    let tenant_open = OpenDropStateV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_TENANT_V1,
+        last_alert_id: "abcdef0123456789abcdef0123456789".to_string(),
+        ..device_open.clone()
+    };
+
+    db.write_device_open_drop_state_v1("device-001", &device_open)?;
+    db.write_tenant_open_drop_state_v1(&tenant_open)?;
+
+    assert!(db
+        .get_raw_v1(key_tenant_drop_open_device_v1("device-001").as_bytes())?
+        .is_some());
+    assert!(db
+        .get_raw_v1(key_tenant_drop_open_tenant_v1().as_bytes())?
+        .is_some());
+    assert_eq!(db.read_device_open_drop_state_v1("device-001")?, Some(device_open.clone()));
+    assert_eq!(db.read_tenant_open_drop_state_v1()?, Some(tenant_open));
+    assert_eq!(db.list_device_open_drop_states_v1()?, vec![("device-001".to_string(), device_open)]);
+    Ok(())
+}
+
+#[test]
+fn tenant_db_roundtrips_source_stream_open_states_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let db = open_temp_tenant_db_v1()?;
+    let source_stream_id_a = "0123456789abcdef0123456789abcdef";
+    let source_stream_id_b = "fedcba9876543210fedcba9876543210";
+    let silence_a = OpenSilenceStateV1 {
+        schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
+        subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+        state_flags_u8: OPEN_SILENCE_FLAG_OPEN_V1,
+        silence_start_ts_i64: 1_700_000_060,
+        last_alert_window_start_ts_i64: 1_700_000_060,
+        last_alert_window_end_ts_i64: 1_700_000_240,
+        last_alert_id: "0123456789abcdef0123456789abcdef".to_string(),
+    };
+    let silence_b = OpenSilenceStateV1 {
+        last_alert_id: "abcdef0123456789abcdef0123456789".to_string(),
+        ..silence_a.clone()
+    };
+    let drop_a = OpenDropStateV1 {
+        schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
+        subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+        state_flags_u8: OPEN_DROP_FLAG_OPEN_V1,
+        drop_start_ts_i64: 1_700_000_060,
+        last_alert_window_start_ts_i64: 1_700_000_060,
+        last_alert_window_end_ts_i64: 1_700_000_120,
+        last_alert_id: "11111111111111111111111111111111".to_string(),
+    };
+    let drop_b = OpenDropStateV1 {
+        last_alert_id: "22222222222222222222222222222222".to_string(),
+        ..drop_a.clone()
+    };
+
+    db.write_source_stream_open_silence_state_v1("device-001", source_stream_id_b, &silence_b)?;
+    db.write_source_stream_open_silence_state_v1("device-001", source_stream_id_a, &silence_a)?;
+    db.write_source_stream_open_drop_state_v1("device-001", source_stream_id_b, &drop_b)?;
+    db.write_source_stream_open_drop_state_v1("device-001", source_stream_id_a, &drop_a)?;
+
+    assert!(db
+        .get_raw_v1(key_tenant_silence_open_source_stream_v1("device-001", source_stream_id_a).as_bytes())?
+        .is_some());
+    assert!(db
+        .get_raw_v1(key_tenant_drop_open_source_stream_v1("device-001", source_stream_id_a).as_bytes())?
+        .is_some());
+    assert_eq!(
+        db.read_source_stream_open_silence_state_v1("device-001", source_stream_id_a)?,
+        Some(silence_a.clone())
+    );
+    assert_eq!(
+        db.read_source_stream_open_drop_state_v1("device-001", source_stream_id_a)?,
+        Some(drop_a.clone())
+    );
+    assert_eq!(
+        db.list_source_stream_open_silence_states_for_device_v1("device-001")?,
+        vec![
+            (source_stream_id_a.to_string(), silence_a),
+            (source_stream_id_b.to_string(), silence_b),
+        ]
+    );
+    assert_eq!(
+        db.list_source_stream_open_drop_states_for_device_v1("device-001")?,
+        vec![
+            (source_stream_id_a.to_string(), drop_a),
+            (source_stream_id_b.to_string(), drop_b),
+        ]
     );
     Ok(())
 }

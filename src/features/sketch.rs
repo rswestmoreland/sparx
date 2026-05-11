@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// Bounded entity sketch helpers for explainable alerts.
+// See: contracts/02_shape_catalog_v0_1.md and contracts/03_alert_object_explanation_v0_1.md
+
 use std::collections::BTreeMap;
 
 use crate::config::CapsSectionV1;

@@ -1,3 +1,29 @@
+PHASE_16B.txt
+---------------
+Phase 16b complete: per-tenant recovery backlog visibility.
+
+Implemented:
+- exposed deterministic per-tenant backlog files/bytes through status, status --json, /metrics, and /healthz
+- kept global backlog counters authoritative and left replay ordering and delivery behavior unchanged
+- left broader recovery analytics deferred for a later phase
+
+Next:
+- Phase 17a: broader recovery analytics
+
+
+PHASE_16A.txt
+---------------
+Phase 16a complete: replay cadence and spool-cap tuning.
+
+Implemented:
+- activated `output.automated_replay_interval_s` for deterministic daemon replay throttling between run cycles
+- activated `output.spool_max_mb` so helper-backed jsonl recovery uses a config-controlled deterministic spool cap
+- expanded status, metrics, and health recovery views with the active cadence and spool-cap settings
+
+Next:
+- Phase 16b: per-tenant recovery backlog visibility
+
+
 PHASE_15D.txt
 ---------------
 Phase 15d complete: structured alert filter activation.
@@ -1159,3 +1185,749 @@ PHASE_15A - scoring policy activation
 - activated scoring.cold_start_days as a day-based bucket maturity floor derived from window_size_s
 - activated scoring.min_lines_per_window as a minimum alertable line-count floor while preserving baseline updates
 - tightened config validation for active scoring thresholds and added scoring-policy tests
+
+
+PHASE_17A.txt
+-------------
+Phase 17a complete: broader recovery analytics.
+Phase 17b complete: recovery age analytics and stale backlog surfacing.
+Phase 17c complete: recovery trend analytics.
+
+Implemented:
+- persisted cumulative recovery counters for spool writes, replay successes, replay failures, cap drops, and automated replay attempts
+- persisted the most recent automated replay timestamp plus replayed/failed file counts
+- exposed recovery analytics through status, status --json, /metrics, and /healthz
+- kept the locked fail-closed delivery model, deterministic replay ordering, and active recovery tuning unchanged
+- persisted previous/last global backlog snapshots plus derived backlog trend deltas and direction across status and enabled endpoints
+
+Next:
+- Phase 17d: per-tenant recovery trend analytics
+
+PHASE_17D.txt
+-------------
+Phase 17d complete: per-tenant recovery trend analytics.
+
+Implemented:
+- persisted previous/last per-tenant recovery backlog snapshots for tenants that presently have backlog in the active recovery path
+- exposed per-tenant recovery trend deltas and per-tenant trend direction through status, status --json, /metrics, and /healthz
+- kept the locked fail-closed delivery model, deterministic replay ordering, and active recovery tuning unchanged
+
+Next:
+- Phase 18a: replay-rate analytics
+
+PHASE_18A.txt
+-------------
+Phase 18a complete: replay-rate analytics.
+
+Implemented:
+- persisted previous/last global recovery counter snapshots for spool writes, replay successes, replay failures, and automated replay attempts
+- exposed derived replay-rate analytics through status, status --json, /metrics, and /healthz
+- kept recovery control behavior, replay ordering, and delivery semantics unchanged
+
+Next:
+- Phase 18b: per-tenant replay-rate analytics
+
+PHASE_18B.txt
+-------------
+Phase 18b complete: per-tenant replay-rate analytics.
+
+Implemented:
+- persisted previous/last per-tenant recovery counter snapshots for tenants that presently have backlog in the active recovery snapshot view
+- exposed per-tenant replay-rate analytics through status, status --json, /metrics, and /healthz
+- kept recovery control behavior, replay ordering, and delivery semantics unchanged
+
+Next:
+- Phase 18c: long-window replay-rate history analytics
+
+PHASE_18C.txt
+-------------
+Phase 18c complete: long-window replay-rate history analytics.
+
+Implemented:
+- persisted a global recovery counter history-start anchor for spool writes, replay successes, replay failures, and automated replay attempts
+- derived global long-window replay-rate fields from the persisted history-start anchor to the current last counter snapshot
+- exposed the long-window view through status, status --json, /metrics, and /healthz
+- kept recovery control behavior, replay ordering, and delivery semantics unchanged
+
+Next:
+- Phase 18d: per-tenant long-window replay-rate history analytics
+
+
+PHASE_18D.txt
+-------------
+Phase 18d complete: per-tenant long-window replay-rate history analytics.
+
+Implemented:
+- persisted per-tenant recovery counter history-start anchors for spool writes, replay successes, replay failures, and automated replay attempts
+- derived per-tenant long-window replay-rate fields from the persisted per-tenant history-start anchor to the current matching tenant last counter snapshot
+- exposed the per-tenant long-window view through status, status --json, /metrics, and /healthz
+- kept recovery control behavior, replay ordering, and delivery semantics unchanged
+
+Next:
+- Phase 18e: recovery observability reconciliation and cleanup
+
+PHASE_18E.txt
+-------------
+Phase 18e complete: recovery observability reconciliation and cleanup.
+
+Implemented:
+- consolidated global short-window, global long-window, per-tenant short-window, and per-tenant long-window replay-rate derivation through one shared counter-rate view
+- added status JSON coverage for reset-like timestamp inversions and counter inversions so derived replay rates remain null rather than negative or misleading
+- reconciled README, docs README, current checklist, phase history, and recovery contracts after Phase 18d
+- kept persisted keys, replay ordering, delivery semantics, recovery cadence, and recovery control behavior unchanged
+
+Next:
+- Phase 19: scope lock and roadmap planning
+
+PHASE_19.txt
+------------
+Phase 19 complete: scope lock and roadmap planning.
+
+Implemented:
+- reviewed the Phase 18e checkpoint as a planning baseline without changing runtime code
+- closed the recovery-observability expansion arc from Phases 16 through 18
+- added docs/PHASE19_SCOPE_ROADMAP.md with current state, deferred items, cleanup candidates, and next-phase roadmap
+- locked Phase 20 as release-readiness audit and cleanup before any additional recovery observability features
+- kept runtime behavior, tests, persisted keys, metrics, health output, replay ordering, and delivery semantics unchanged
+
+Next:
+- Phase 20: release-readiness audit and cleanup
+
+PHASE_20A.txt
+-------------
+Phase 20a complete: source comment and stale wording cleanup.
+
+Implemented:
+- refreshed stale phase-era source headers that described earlier partial implementation states
+- clarified active Fjall / Embedded DB wording while preserving the continuity-only Contract 06 filename
+- recorded V_DROP / sudden loss-of-log detection as planned future scoring work, not active v0.1 scoring behavior
+- added docs/PHASE20_RELEASE_READINESS_AUDIT.md as the Phase 20 audit tracker
+- kept runtime behavior, tests, persisted keys, metrics, health output, replay ordering, delivery semantics, and scoring logic unchanged
+
+Next:
+- Phase 20b: contract and docs final consistency pass
+
+Phase 20b complete: contract and docs final consistency pass.
+
+Changed:
+- reconciled README, docs README, current checklist, Phase 19 roadmap notes, Phase 20 audit tracker, Contract 11, Contract 30, and Contract 33
+- corrected Contract 30 recovery snapshot examples from stale `metric/counter/v1/...` wording to the active `metrics/v1/counter/<name>` global metrics key-prefix form
+- recorded that derived replay-rate values are exposed through status, /metrics, and /healthz, not persisted as independent DB keys
+- kept `V_DROP` / sudden loss-of-log detection documented as planned future scoring work, not active v0.1 scoring behavior
+
+No runtime source, tests, persisted keys, metrics, health output, replay behavior, recovery behavior, or scoring logic changed.
+
+Next recommended phase:
+- Phase 20c: release-readiness test matrix and acceptance checklist
+
+
+PHASE_20C.txt
+-------------
+Phase 20c complete: release-readiness test matrix and acceptance checklist.
+
+Implemented:
+- added docs/PHASE20C_TEST_MATRIX_ACCEPTANCE.md as the external validation matrix for the current v0.1 implementation
+- recorded required external validation gates: cargo fmt --check and cargo test
+- recorded optional stricter clippy validation when available
+- grouped the existing integration tests by subsystem so failures can be traced back to CLI/config, DB, ingest/tokenization, features/baselines/scoring, alerts, recovery, and end-to-end smoke coverage
+- preserved V_DROP / sudden loss-of-log detection as planned future scoring work, not active v0.1 scoring behavior
+- kept runtime behavior, tests, persisted keys, metrics, health output, replay behavior, recovery behavior, and scoring logic unchanged
+
+Next:
+- Phase 20d: checkpoint closeout
+
+PHASE_20D.txt
+-------------
+Phase 20d complete: checkpoint closeout.
+
+Implemented:
+- added docs/PHASE20D_CHECKPOINT_CLOSEOUT.md as the Phase 20 closeout and Phase 21 handoff
+- reconciled README, docs README, current checklist, phase history, Contract 11, and Contract 33 for the closeout
+- recorded Phase 20 as closed and Phase 21 health/silence detection scope lock as the next recommended phase
+- preserved V_DROP / sudden loss-of-log detection as planned future scoring work, not active current scoring behavior
+- kept runtime behavior, tests, persisted keys, metrics, health output, replay behavior, recovery behavior, and scoring logic unchanged
+
+Next:
+- Phase 21: health and silence detection scope lock
+
+## Phase 21 health and silence detection scope lock
+- added docs/PHASE21_HEALTH_SILENCE_SCOPE_LOCK.md as the scope-lock and implementation handoff for future V_DROP work
+- added contracts/34_health_silence_detection_v0_1.md as the planned contract for future sudden loss-of-log detection
+- locked the first future V_DROP implementation scope to tenant/device silence plus tenant aggregate silence
+- deferred per-file, parser-class, vendor-event-family, external heartbeat, maintenance-calendar, and cross-tenant outage scope
+- recorded AlertV1 as the future V_DROP output path, with empty provenance allowed for absence-of-data alerts and fail-closed drill/extract behavior
+- kept runtime behavior, tests, persisted keys, metrics, health output, replay behavior, recovery behavior, and scoring logic unchanged
+
+Next recommended phase:
+- Phase 22: expected-source state and V_DROP implementation planning
+
+## Phase 22 expected-source state and V_DROP implementation planning
+- added docs/PHASE22_EXPECTED_SOURCE_STATE_VDROP_PLAN.md as the implementation-planning handoff for future V_DROP work
+- added contracts/35_expected_source_state_vdrop_plan_v0_1.md as the planned expected-source state/key/encoding contract
+- locked planned device expected-source state, tenant aggregate expected-source state, open silence/dedup state, and optional diagnostics as planned-not-active state groups
+- locked planned hard-silence implementation before sharp-drop detection
+- recorded Phase 23a expected-source state structs and encodings as the next recommended phase
+- kept runtime behavior, tests, active persisted keys, metrics, health output, replay behavior, recovery behavior, and scoring logic unchanged
+
+Next recommended phase:
+- Phase 23a: expected-source state structs and encodings
+
+## Phase 23a expected-source state structs and encodings
+- added src/db/silence.rs with inactive ExpectedSourceStateV1 and OpenSilenceStateV1 structs plus deterministic byte encoders/decoders
+- added tenant DB key helpers for silence_subject/v1/device/<device_key>/state, silence_subject/v1/tenant/state, silence_open/v1/device/<device_key>, and silence_open/v1/tenant
+- added focused tests for expected-source state encodings, open-silence encodings, validation failures, and deterministic silence key builders
+- updated contracts and docs to mark the state/key/encoding primitives as implemented while preserving V_DROP as inactive scoring behavior
+- kept finalized-window state updates, candidate evaluation, AlertV1 emission, metrics, health fields, replay behavior, and recovery behavior unchanged
+
+Next recommended phase:
+- Phase 23b: state update from finalized windows
+
+PHASE_23B.txt
+-------------
+Phase 23b complete: expected-source state updates from finalized windows.
+
+Implemented:
+- added runtime persistence for device expected-source state at `silence_subject/v1/device/<device_key>/state`
+- added runtime persistence for tenant aggregate expected-source state at `silence_subject/v1/tenant/state`
+- added deterministic update helpers for observed-window counts, maturity-floor counts, and non-regressive last-seen fields
+- added focused tests for update rules, tenant DB persistence, and oneshot finalized-window integration
+- kept V_DROP inactive: no candidate evaluator, no AlertV1 emission, no open-silence dedup writes, no metrics or health fields, and no recovery/replay behavior changes
+
+Next recommended phase:
+- Phase 23c: V_DROP candidate evaluator
+
+PHASE_23C.txt
+-------------
+Phase 23c complete: V_DROP candidate evaluator.
+
+Implemented:
+- added pure in-memory V_DROP candidate evaluation primitives in src/db/silence.rs
+- added deterministic hard-silence candidate derivation for mature device and tenant expected-source state
+- added deterministic suppression reasons for missing state, invalid state, immature state, not-silent subjects, insufficient missed windows, low expected activity, counter inversions, invalid buckets, and already-open silence state
+- added focused tests for device and tenant candidate creation plus fail-closed suppression behavior
+- kept V_DROP alert emission inactive: no AlertV1 construction, no silence_open/* writes, no runtime missing-window scans, no metrics or health fields, and no recovery/replay behavior changes
+
+Next recommended phase:
+- Phase 23d: V_DROP AlertV1 construction and open-silence dedup state
+
+PHASE_23D.txt
+-------------
+Phase 23d complete: V_DROP AlertV1 construction and open-silence dedup state.
+
+Implemented:
+- added deterministic V_DROP AlertV1 construction from VDropCandidateV1
+- added VDropAlertBuildResultV1 with the alert, primary alert KV, and matching OpenSilenceStateV1
+- added tenant DB read/write helpers for device and tenant open-silence dedup state
+- added focused tests for deterministic alert construction, invalid-candidate rejection, primary alert KV roundtrip, and open-silence DB roundtrip
+- kept runtime missing-window scanning and automatic V_DROP emission inactive
+
+Next recommended phase:
+- Phase 23e: runtime integration and operator surfacing
+
+PHASE_23E.txt
+-------------
+Phase 23e complete: V_DROP runtime integration and operator surfacing.
+
+Implemented:
+- activated first runtime hard-silence V_DROP integration for run and oneshot
+- evaluated mature device and tenant aggregate expected-source state after finalized-window processing
+- persisted emitted V_DROP alerts through the existing primary AlertV1 path
+- emitted V_DROP alerts through the configured alert sink and existing operator alert workflows
+- wrote matching silence_open/* state to suppress duplicate alerts during an ongoing silence interval
+- closed matching open-silence state when a later finalized window is observed for that subject
+- added focused runtime tests for run, oneshot, alert-search surfacing, and open-silence dedup
+- kept sharp-drop detection, richer subject scopes, metrics/health fields, recovery behavior, and replay behavior unchanged
+
+Next recommended phase:
+- Phase 23f: V_DROP validation hardening and closeout
+
+
+PHASE_23F.txt
+-------------
+Phase 23f complete: V_DROP validation hardening and closeout.
+
+Implemented:
+- added docs/PHASE23F_VDROP_VALIDATION_CLOSEOUT.md
+- refreshed stale src/db/silence.rs header wording now that V_DROP runtime integration is active
+- added evaluator coverage proving closed open-silence state does not suppress a future independent candidate
+- extended oneshot runtime coverage so later observations close device and tenant aggregate open-silence state without adding duplicate V_DROP alerts
+- reconciled README, docs, contracts, checklist, and phase history for first hard-silence V_DROP closeout
+- kept active scope limited to mature device and tenant aggregate hard silence
+- kept sharp-drop detection, richer subject scopes, metrics/health fields, recovery behavior, and replay behavior deferred; public policy knobs were implemented later through Phase 25b
+
+Follow-on phase:
+- Phase 25c: V_DROP diagnostics counters and operator surfacing is complete
+
+-------------
+Phase 24 complete: V_DROP policy controls and diagnostics scope lock.
+
+Changed:
+- added docs/PHASE24_VDROP_POLICY_DIAGNOSTICS_SCOPE_LOCK.md
+- added contracts/36_vdrop_policy_diagnostics_scope_v0_1.md
+- updated README, docs README, current checklist, contracts index/readme, Contract 11, Contract 33, Contract 34, Contract 35, Phase 19/20/23 handoff notes, and phase history
+
+Scope locked:
+- future policy controls should cover global enablement, device enablement, tenant aggregate enablement, missed-window threshold, mature-window floor, and expected-line floor
+- tenant policy overrides should take precedence over global configuration
+- diagnostics should cover tracked subjects, open intervals, evaluated subjects, suppressed candidates, emitted alerts, and last evaluation timestamp
+- default future policy behavior must preserve the active Phase 23f hard-silence behavior
+
+Not changed:
+- no runtime source code
+- no tests
+- no persisted keys
+- no metrics or health fields
+- no recovery or replay behavior
+- no active scoring behavior
+
+Follow-on phase:
+- Phase 25c: V_DROP diagnostics counters and operator surfacing is complete
+
+
+## Phase 25a V_DROP configuration and tenant-policy implementation
+
+Status: complete.
+
+Implemented:
+- added active parse/validation surface for the `[vdrop]` config section
+- added environment overrides for V_DROP policy controls
+- added tenant policy override fields for the same bounded controls
+- rendered unset tenant policy overrides as `inherit` in policy show/check output
+- added tests for defaults, file/env loading, validation, and tenant policy rendering
+
+Still deferred:
+- diagnostics counters and status/metrics/health surfacing
+- sharp-drop detection
+- richer silence subject scopes
+- recovery/replay behavior changes
+
+Follow-on phase:
+- Phase 25c: V_DROP diagnostics counters and operator surfacing is complete
+
+
+## Phase 25b V_DROP policy resolution and runtime evaluator integration
+
+Status: complete.
+
+Implemented:
+- resolved runtime V_DROP policy per tenant from global `[vdrop]` config plus tenant-policy overrides
+- treated missing tenant policy as inherit and malformed/invalid policy as fail-closed for the V_DROP runtime pass
+- routed global enablement, subject enablement, missed-window threshold, mature-window floor, and expected-line floor into runtime evaluation
+- added oneshot coverage for global disable, tenant-policy device-subject disable, and tenant-policy threshold override
+- added run coverage for tenant-policy all-subject disable
+
+Not changed:
+- no diagnostics counters
+- no status, metrics, or health V_DROP diagnostics
+- no sharp-drop detection
+- no richer silence subject scopes
+- no recovery/replay behavior changes
+
+Follow-on phase:
+- Phase 25c: V_DROP diagnostics counters and operator surfacing is complete
+
+
+## Phase 25c V_DROP diagnostics counters and operator surfacing
+
+Status: complete.
+
+Implemented:
+- added bounded V_DROP diagnostic counters and gauges for tracked subjects, open-silence subjects, evaluated subjects, candidates, suppressed candidates, emitted alerts, and last evaluation timestamp
+- persisted diagnostics through the existing global metrics store with global and per-tenant names
+- surfaced diagnostics through status, status --json, /metrics, and /healthz
+- extended status, endpoint, run, and oneshot coverage for the diagnostics surface
+
+Not changed:
+- no sharp-drop detection
+- no richer silence subject scopes
+- no recovery/replay behavior changes
+- no alert schema changes
+
+Next recommended phase:
+- Phase 25d: V_DROP diagnostics validation hardening and closeout
+
+## Phase 25d V_DROP diagnostics validation hardening and closeout
+
+Status: complete.
+
+Implemented:
+- added docs/PHASE25D_VDROP_DIAGNOSTICS_VALIDATION_CLOSEOUT.md
+- tightened V_DROP open-silence diagnostics so current tenant gauges reflect post-evaluation open dedup state
+- updated run and oneshot coverage for post-emission open-silence diagnostic values
+- reconciled docs and contracts to close the Phase 25 policy/diagnostics sequence
+
+Not changed:
+- no sharp-drop detection
+- no richer silence subject scopes
+- no external heartbeat checks
+- no maintenance-window calendars
+- no recovery/replay behavior changes
+- no alert schema changes
+
+Phase 26 later completed sharp-drop detection scope lock and planning.
+
+
+## Phase 26a sharp-drop review and scope lock
+- completed documentation-only review and drift reconciliation after Phase 25d
+- accepted active `alert_idx_*` persistence as current checkpoint truth because Phase 15b-15d code, tests, docs, and contracts align on active secondary alert indexes with fallback to primary scans
+- added `docs/PHASE26_SHARP_DROP_SCOPE_LOCK.md`
+- added `contracts/37_sharp_drop_detection_scope_v0_1.md`
+- scoped future sharp-drop as reduced-but-nonzero `V_DROP` behavior with detail `drop_kind=sharp_drop`
+- scoped first sharp-drop subjects to both device and tenant aggregate
+- recommended existing DeviceStatsV1 bucket baselines as the first expected-volume source without changing the locked 68-byte stats/v1 layout
+- recommended separate future `drop_open/*` state rather than reusing `silence_open/*`
+- corrected stale Contract 25 silence_open wording and Phase 22 sharp-drop wording
+- replaced preexisting non-ASCII characters in three contracts with ASCII forms
+- no runtime source files were changed, and no local cargo/build/test run was performed
+
+## Phase 26b sharp-drop semantic contract
+- completed documentation-only semantic contract for future sharp-drop V_DROP detection
+- added `docs/PHASE26B_SHARP_DROP_SEMANTIC_CONTRACT.md`
+- tightened `contracts/37_sharp_drop_detection_scope_v0_1.md` with exact ratio terminology, gates, and planning defaults
+- locked `observed_expected_ratio = observed_lines / expected_lines`
+- locked `drop_ratio = 1.0 - observed_expected_ratio` as the severity value used for future V_DROP sharp-drop scoring
+- kept hard silence as the full-drop case with `drop_ratio = 1.0` and higher priority than sharp drop
+- confirmed DeviceStatsV1 line_count bucket baselines as the primary expected-volume source and byte_count as explanation-only for the first implementation
+- recommended conservative planning defaults: max observed/expected ratio `0.25`, min drop ratio `0.75`, variance gate `3.0` stddevs when meaningful, and tenant aggregate mature-device floor `2`
+- changed no runtime source files, tests, stats encodings, alert schema, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+
+Phase 26c later completed sharp-drop state and dedup model decision.
+
+## Phase 26c sharp-drop state and dedup model decision
+- completed documentation-only state and dedup model decision for future sharp-drop V_DROP detection
+- added `docs/PHASE26C_SHARP_DROP_STATE_DEDUP_MODEL.md`
+- tightened `contracts/37_sharp_drop_detection_scope_v0_1.md` with future `drop_open/*` key, value, closure, and supersession rules
+- locked separate future tenant-scoped keys: `drop_open/v1/device/<device_key>` and `drop_open/v1/tenant`
+- chose a separate future semantic state type named `OpenDropStateV1` rather than reusing OpenSilenceStateV1
+- recommended a minimal 30-byte fixed header plus variable alert id bytes, with flags for open, closed-by-recovery, and closed-by-hard-silence supersession
+- kept `silence_open/*` dedicated to active hard-silence dedup and closure
+- confirmed hard silence remains authoritative and may supersede open sharp-drop intervals
+- confirmed tenant aggregate sharp-drop state and device sharp-drop state do not automatically suppress each other
+- changed no runtime source files, tests, stats encodings, alert schema, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+
+Phase 26d later completed sharp-drop AlertV1 explanation contract.
+
+
+## Phase 26d sharp-drop AlertV1 explanation contract
+- completed documentation-only AlertV1 explanation contract for future sharp-drop V_DROP detection
+- added `docs/PHASE26D_SHARP_DROP_ALERT_EXPLANATION_CONTRACT.md`
+- tightened `contracts/37_sharp_drop_detection_scope_v0_1.md` with future AlertV1 field, reason detail, summary, provenance, alert id, and signature rules
+- confirmed future sharp-drop alerts reuse the existing AlertV1 schema without new fields
+- locked reason code `V_DROP` with first detail `drop_kind=sharp_drop`
+- locked deterministic reason-detail ordering and stable ASCII string formatting
+- locked `score_volume = clamp01(drop_ratio)` and `score_total = score_volume`
+- confirmed `top_features = []` for the first implementation
+- confirmed device sharp-drop alerts should include current finalized-row provenance when available
+- confirmed tenant aggregate sharp-drop alerts use empty provenance for the first implementation
+- required sharp-drop alert id inputs to include `sharp_drop` so hard-silence and sharp-drop V_DROP alerts cannot collide for the same subject/window
+- changed no runtime source files, tests, stats encodings, AlertV1 schema, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+
+Phase 26e later completed diagnostics, tests, and acceptance planning.
+
+## Phase 26e sharp-drop diagnostics, tests, and acceptance plan
+- completed documentation-only diagnostics, tests, and acceptance plan for future sharp-drop V_DROP implementation
+- added `docs/PHASE26E_SHARP_DROP_DIAGNOSTICS_TEST_ACCEPTANCE_PLAN.md`
+- tightened `contracts/37_sharp_drop_detection_scope_v0_1.md` with future diagnostics boundaries, deterministic test groups, and implementation acceptance gates
+- confirmed sharp-drop diagnostics are optional for the first implementation and must be bounded, aggregate, and low-cardinality if added
+- kept device-label Prometheus metrics, per-subject metric series, and suppression-reason label cardinality prohibited
+- defined required future evaluator, state/dedup, AlertV1, runtime integration, and diagnostics test groups
+- defined acceptance gates that preserve the locked DeviceStatsV1 68-byte layout, AlertV1 schema, AlertV1.provenance authority, replay semantics, recovery behavior, and hard-silence priority
+- changed no runtime source files, tests, stats encodings, AlertV1 schema, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+
+Phase 26f later completed checkpoint closeout.
+
+
+## Phase 26f sharp-drop checkpoint closeout
+- completed documentation-only closeout for the Phase 26 sharp-drop planning sequence
+- added `docs/PHASE26F_SHARP_DROP_CHECKPOINT_CLOSEOUT.md`
+- reconciled README, docs README, current checklist, Contract 37, contract indexes/readmes, and consistency/milestone notes
+- confirmed Phase 26 is complete as planning and contract scoping only
+- confirmed sharp-drop runtime behavior remained inactive at the Phase 26f checkpoint
+- carried forward locked Phase 26 decisions: V_DROP with `drop_kind=sharp_drop`, DeviceStatsV1 line_count baselines, hard-silence priority, separate future `drop_open/*`, unchanged AlertV1 schema, and bounded diagnostics only if implemented
+- changed no runtime source files, tests, stats encodings, AlertV1 schema, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+
+Phase 27a later completed sharp-drop evaluator primitives.
+
+## Phase 27a sharp-drop evaluator primitives
+- implemented storage-agnostic sharp-drop evaluator primitives in `src/db/silence.rs`
+- added expected-volume derivation from existing DeviceStatsV1 line_count and byte_count bucket stats
+- added tenant aggregate expected-volume summation over mature device summaries
+- added sharp-drop current-window, config, candidate, evaluation, and suppression primitive types
+- preserved hard-silence priority by suppressing sharp drop when observed lines are zero
+- added deterministic evaluator tests in `tests/db_silence.rs`
+- changed no persisted key encodings, AlertV1 schema, runtime integration, config, tenant-policy, diagnostics, replay, or recovery behavior
+- no local cargo/build/test run was performed
+
+Next recommended phase: Phase 27b sharp-drop state, AlertV1 construction, and dedup primitives.
+
+## Phase 27b - sharp-drop state, AlertV1 construction, and dedup primitives
+- implemented storage-neutral `OpenDropStateV1` in `src/db/silence.rs`
+- added `OpenDropStateV1` encode/decode helpers with the locked 30-byte fixed header plus variable lowercase-hex alert id bytes
+- added open, closed-by-recovery, and closed-by-hard-silence-supersession flags
+- added storage-neutral open-drop duplicate-suppression and closure helpers
+- added canonical `drop_open/*` tenant key builders in `src/db/keys.rs`
+- implemented `build_sharp_drop_alert_v1()` in `src/alert/mod.rs` without changing AlertV1 schema
+- preserved deterministic `V_DROP` reason details with first detail `drop_kind=sharp_drop`
+- preserved device current-row provenance when provided; tenant aggregate sharp-drop alerts keep empty provenance for the first implementation
+- ensured sharp-drop alert ids include `sharp_drop` and do not collide with hard-silence V_DROP alert ids for the same subject/window
+- added deterministic tests for drop_open keys, OpenDropStateV1 codecs, malformed state rejection, dedup/closure helpers, AlertV1 construction, provenance rules, tenant aggregate mapping, and hard-silence/sharp-drop id non-collision
+- changed no runtime run/oneshot integration, tenant DB persistence helpers, config, tenant-policy, diagnostics, replay behavior, or recovery behavior
+- no local cargo/build/test run was performed
+- rustfmt was attempted but is not installed in this sandbox
+
+Next recommended phase: Phase 27c sharp-drop runtime integration.
+
+Phase 27c - sharp-drop runtime integration
+- implemented runtime sharp-drop evaluation in run and oneshot using existing V_DROP policy controls
+- collected finalized-window observations and pre-update DeviceStatsV1 expected-volume summaries
+- evaluated device sharp-drop candidates after hard-silence V_DROP evaluation
+- evaluated tenant aggregate sharp-drop candidates by summing mature device expected-volume summaries for the same finalized window
+- persisted device and tenant aggregate drop_open/* state for emitted sharp-drop alerts
+- closed open-drop state by recovery or hard-silence supersession
+- emitted sharp-drop AlertV1 objects through the existing sink path without changing AlertV1 schema
+- added a oneshot integration test for device sharp-drop alert emission and open-drop persistence
+- added docs/PHASE27C_SHARP_DROP_RUNTIME_INTEGRATION.md and updated README, docs, contracts, and current checklist
+- no new config schema fields, tenant-policy fields, metric names, metric labels, stats encodings, replay behavior, or recovery behavior were added
+- hard silence remains authoritative and may supersede matching open sharp-drop state
+- no local cargo/build/test run was performed
+
+Next recommended phase: Phase 27d diagnostics, validation, and closeout.
+
+## Phase 27d sharp-drop diagnostics, validation, and closeout
+- completed bounded diagnostics and closeout for the first sharp-drop implementation sequence
+- added `docs/PHASE27D_SHARP_DROP_DIAGNOSTICS_VALIDATION_CLOSEOUT.md`
+- added `open_drop_subjects` to V_DROP diagnostic deltas and persisted per-tenant `vdrop_open_drop_subjects__<tenant_id>` gauges
+- surfaced open-drop counts through status, JSON status, Prometheus metrics, and health output without device labels or per-subject metric series
+- added deterministic checks for the new diagnostics surface and oneshot open-drop gauge persistence
+- preserved DeviceStatsV1 68-byte layout, AlertV1 schema/provenance, hard-silence priority, silence_open/* behavior, replay behavior, recovery behavior, config schema, and tenant-policy schema
+- no local cargo/build/test/rustfmt run was performed
+
+Later completed phase: Phase 28 post-sharp-drop review and next-scope planning.
+
+
+## Phase 28 post-sharp-drop review and next-scope planning
+- completed documentation-only review and roadmap checkpoint after Phase 27d
+- added `docs/PHASE28_POST_SHARP_DROP_REVIEW_PLAN.md`
+- confirmed hard-silence and sharp-drop V_DROP behavior are active for device and tenant aggregate subjects
+- confirmed active `alert_idx_*` persistence remains current truth
+- reconciled stale current-status wording around sharp-drop deferral in README, docs, and contracts
+- kept richer subject scopes, external heartbeat checks, maintenance calendars, suppression-reason cardinality metrics, AlertV1 schema changes, replay changes, and recovery changes deferred
+- changed no runtime source files or tests
+- no local cargo/build/test/rustfmt run was performed
+
+Next recommended phase: Phase 29 richer V_DROP subject-scope planning, pending approval.
+
+## Phase 29 richer V_DROP subject-scope planning
+- completed documentation-only richer subject-scope planning checkpoint after Phase 28
+- added `docs/PHASE29_RICHER_VDROP_SUBJECT_SCOPE_PLAN.md`
+- added `contracts/38_vdrop_richer_subject_scope_v0_1.md`
+- compared source-stream/source-path, parser-class, and vendor-event-family V_DROP subject models
+- selected source stream as the first future richer V_DROP subject family to plan
+- deferred parser-class V_DROP subjects until parser-class accounting and operator semantics are explicitly scoped
+- deferred vendor-event-family V_DROP subjects until taxonomy/content-pack family classification is explicitly stable
+- locked source_stream_id as a subject identifier derived from tenant id, device key, and canonical relative source path using the existing stable hash rule
+- clarified source_stream_id is not a FeatureId and does not revive hashed-fallback FeatureId behavior
+- required future source-stream expected volume to use separate stats/state rather than changing DeviceStatsV1
+- preserved AlertV1 schema and AlertV1.provenance authority
+- preserved hard-silence priority, silence_open/* semantics, drop_open/* semantics, replay behavior, and recovery behavior
+- preserved bounded/low-cardinality diagnostics with no device-label, source-path-label, parser-class-label, vendor-family-label, or per-subject Prometheus fanout
+- changed no runtime source files or tests
+- no local cargo/build/test/rustfmt run was performed
+
+Next recommended phase: Phase 30 source-stream V_DROP implementation planning, pending approval.
+
+
+## Phase 30 source-stream V_DROP implementation planning
+- completed documentation-only implementation-planning checkpoint after Phase 29
+- added `docs/PHASE30_SOURCE_STREAM_VDROP_IMPLEMENTATION_PLAN.md`
+- added `contracts/39_source_stream_vdrop_implementation_plan_v0_1.md`
+- locked source-stream identity as a stable subject id derived from tenant id, device key, and canonical relative source path
+- locked canonical source-stream hash input and source path validation rules
+- clarified `source_stream_id` is not a FeatureId and does not revive hashed-fallback FeatureId behavior
+- planned source-stream catalog, stats, expected-source state, open-silence state, and open-drop state key families for later implementation
+- planned explicit source-stream V_DROP policy gating with a default-disabled first implementation posture
+- preserved AlertV1 schema/provenance authority, DeviceStatsV1 layout, active device/tenant V_DROP behavior, silence_open/* and drop_open/* semantics, replay behavior, and recovery behavior
+- preserved bounded/low-cardinality diagnostics with no device-label, source-path-label, source-stream-id-label, parser-class-label, vendor-family-label, or per-subject Prometheus fanout
+- changed no runtime source files or tests
+- no local cargo/build/test/rustfmt run was performed
+
+Next recommended phase: Phase 31a source-stream identity/catalog/stats-state primitives, pending approval.
+
+## Phase 31a source-stream identity/catalog/stats-state primitives
+
+Status: complete as an implementation-primitives checkpoint. Source-stream runtime V_DROP
+remains inactive.
+
+Summary:
+- added `src/db/source_stream.rs` for source-stream canonicalization, identity,
+  catalog, and stats primitives
+- added deterministic source-stream id derivation using the locked BLAKE3 hex128 rule
+- added `SourceStreamCatalogV1` and deterministic codec
+- added `SourceStreamStatsV1` and deterministic codec using Welford-family line and byte
+  states
+- added source-stream stats update helper; score_total remains reserved and zeroed
+- added `SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 = 3` support for ExpectedSourceStateV1
+  without changing its 68-byte layout
+- added source-stream catalog, stats, and expected-source state key builders
+- added tenant DB source-stream catalog/stat/expected-state storage helpers
+- added deterministic tests for source-stream identity, invalid path rejection, codecs,
+  key paths, expected-source subject kind, and tenant DB storage helpers
+- added `docs/PHASE31A_SOURCE_STREAM_IDENTITY_CATALOG_STATS_STATE_PRIMITIVES.md`
+- updated README, docs, contracts, checklist, and phase history
+
+Preserved:
+- source-stream runtime V_DROP evaluation and alert emission remain inactive
+- no config or tenant-policy schema changes
+- no metrics/health changes
+- no AlertV1 schema or provenance changes
+- no DeviceStatsV1 layout changes
+- no replay or recovery behavior changes
+- no hashed-fallback FeatureId behavior is introduced
+
+Validation:
+- no local cargo/build/test/rustfmt run was performed because Rust tooling is unavailable
+  in this sandbox
+- ASCII and path-length checks passed
+
+Next recommended phase: Phase 31b source-stream evaluator primitives, pending approval.
+
+## Phase 31b source-stream evaluator primitives
+
+Status: complete as an implementation-primitives checkpoint. Source-stream runtime V_DROP remains inactive.
+
+Summary:
+- added SourceStreamSubjectV1 and SourceStreamCurrentWindowV1 evaluator wrappers
+- added source-stream subject validation for tenant id, device key, source_stream_id, and canonical source path
+- added expected-volume derivation from SourceStreamStatsV1
+- added source-stream hard-silence evaluator helper using existing storage-agnostic V_DROP semantics
+- added source-stream sharp-drop evaluator helper using existing storage-agnostic sharp-drop semantics
+- preserved hard-silence priority over sharp-drop for zero observed source-stream activity
+- added deterministic reason-detail decoration with device_key, source_stream_id, and source_path
+- added deterministic tests in tests/source_stream.rs
+- added docs/PHASE31B_SOURCE_STREAM_EVALUATOR_PRIMITIVES.md
+- updated README, docs, contracts, checklist, and phase history
+
+Preserved:
+- source-stream runtime V_DROP evaluation and alert emission remain inactive
+- no config or tenant-policy schema changes
+- no metrics/health changes
+- no AlertV1 schema or provenance changes
+- no DeviceStatsV1 layout changes
+- no replay or recovery behavior changes
+- no hashed-fallback FeatureId behavior is introduced
+
+Validation:
+- no local cargo/build/test/rustfmt run was performed in this sandbox
+- ASCII and path-length checks passed
+
+Next recommended phase: Phase 31c source-stream AlertV1 construction and subject-specific open-state/dedup primitives, pending approval.
+
+
+## Phase 31c source-stream AlertV1 construction and open-state/dedup primitives
+
+Status: complete as an implementation-primitives checkpoint. Source-stream runtime V_DROP remains inactive.
+
+Summary:
+- fixed a small Phase 31b syntax typo in `src/alert/mod.rs` before adding Phase 31c primitives
+- added source-stream hard-silence AlertV1 construction using the existing AlertV1 schema
+- added source-stream sharp-drop AlertV1 construction using the existing AlertV1 schema
+- preserved AlertV1.provenance authority for source-stream sharp-drop construction
+- added deterministic source-stream hard-silence and sharp-drop alert id inputs that include source_stream and drop kind
+- added source-stream-specific open-silence and open-drop construction helpers
+- added source-stream-specific open-state suppression helpers
+- added source-stream open-state key builders and tenant DB read/write/list helpers
+- added deterministic tests in tests/alert_scoring.rs, tests/source_stream.rs, tests/db_keys.rs, and tests/db_tenant.rs
+- added docs/PHASE31C_SOURCE_STREAM_ALERT_STATE_DEDUP_PRIMITIVES.md
+- updated README, docs, contracts, checklist, and phase history
+
+Preserved:
+- source-stream runtime V_DROP evaluation and alert emission remain inactive
+- no config or tenant-policy schema changes
+- no metrics/status/health changes
+- no DeviceStatsV1 layout changes
+- no AlertV1 schema changes
+- no replay or recovery behavior changes
+- no hashed-fallback FeatureId behavior is introduced
+
+Validation:
+- no local cargo/build/test/rustfmt run was performed in this sandbox
+- ASCII, path-length, stale-marker, and zip integrity checks passed
+
+Next phase completed after this checkpoint: Phase 31d source-stream policy/config gating behind the default-off source-stream gate.
+
+
+Phase 31d - source-stream policy/config gating
+- Status: complete as a policy/config gating checkpoint.
+- Added `[vdrop].source_stream_enabled` with default false.
+- Added `SPARX_VDROP_SOURCE_STREAM_ENABLED` environment override.
+- Added tenant-policy `vdrop_source_stream_enabled` with inherit semantics.
+- Added source-stream gate resolution helper and rendered the tenant override through
+  `tenant policy show` and `tenant policy check`.
+- Added deterministic config and tenant-policy tests for the default-off source-stream gate.
+- Preserved source-stream runtime inactivity, no metrics/status/health changes, no AlertV1
+  schema changes, no DeviceStatsV1 layout changes, no replay changes, and no recovery
+  changes.
+- No local cargo/build/test/rustfmt run was performed in this sandbox.
+
+Phase 31e - source-stream runtime integration
+- Status: complete as a runtime-integration checkpoint behind the default-off source-stream gate.
+- Wired source-stream observation collection into run and oneshot only when the resolved tenant source-stream gate is enabled.
+- Finalized windows now update source-stream catalog, stats, expected-source state, and per-source provenance when the gate is enabled.
+- Tenant V_DROP evaluation now includes source-stream hard-silence candidates from source-stream expected-source state when the gate is enabled.
+- Tenant V_DROP evaluation now includes source-stream sharp-drop candidates from current finalized source-stream windows when mature SourceStreamStatsV1 expected-volume summaries exist.
+- Source-stream hard-silence and sharp-drop AlertV1 records are persisted and emitted through the existing V_DROP alert flow.
+- Source-stream silence_open/* and drop_open/* state is persisted for emitted source-stream alerts.
+- Hard-silence priority over sharp-drop is preserved for each source stream.
+- Added targeted oneshot and run tests for default-off gating, enabled hard-silence emission, tenant-policy disable behavior, and seeded source-stream sharp-drop emission.
+- Added docs/PHASE31E_SOURCE_STREAM_RUNTIME_INTEGRATION.md and updated README, docs, contracts, checklist, and phase history.
+- Preserved: no new metrics/status/health surface, no config schema changes, no tenant-policy schema changes, no AlertV1 schema changes, no DeviceStatsV1 layout changes, no replay behavior changes, no recovery behavior changes, no hashed-fallback FeatureId behavior.
+- No local cargo/build/test/rustfmt/clippy run was performed in this sandbox.
+- Recommended next phase: Phase 31f source-stream diagnostics, validation, and closeout.
+
+Phase 31f - source-stream diagnostics, validation, and closeout
+- Status: complete as a diagnostics/validation/closeout checkpoint.
+- Fixed a small Phase 31e optional metric formatting typo in src/observability.rs before adding the bounded diagnostics surface.
+- Added source-stream V_DROP diagnostics to status text, JSON status, Prometheus metrics, and health output.
+- Surfaced source-stream gate state, tracked source-stream subjects, open hard-silence subjects, open sharp-drop subjects, evaluated subjects, candidates, suppressed candidates, emitted alerts, and last evaluation timestamp.
+- Added per-tenant source-stream diagnostics using only the existing tenant_id dimension.
+- Preserved the no source-path-label, source-stream-id-label, device-label, parser-class-label, vendor-family-label, per-subject-series, and suppression-reason-label boundary.
+- Added deterministic status, metrics, health, and enabled oneshot diagnostic coverage.
+- Added docs/PHASE31F_SOURCE_STREAM_DIAGNOSTICS_VALIDATION_CLOSEOUT.md and updated README, docs, contracts, checklist, and phase history.
+- Preserved: no config schema change, no tenant-policy schema change, no AlertV1 schema change, no AlertV1 provenance change, no DeviceStatsV1 layout change, no replay behavior change, no recovery behavior change, and no hashed-fallback FeatureId behavior.
+- No local cargo/build/test/rustfmt/clippy run was performed in this sandbox.
+- Recommended next phase: final hardening and release-readiness review, pending approval.
+
+
+## Phase 32 final hardening and release-readiness review
+
+Status: complete as a documentation-only hardening/release-readiness checkpoint.
+
+Summary:
+- reviewed the Phase 31f checkpoint across root docs, contracts, source tree, and tests
+- confirmed the Phase 31 source-stream V_DROP sequence is closed through diagnostics and closeout
+- reconciled stale planning wording in docs/README.md, README.md, CURRENT_PLAN_CHECKLIST, Contract 39, contract index/readme, and release-gate contracts
+- added docs/PHASE32_FINAL_HARDENING_RELEASE_READINESS_REVIEW.md
+- recorded the v1 completion definition and remaining release-readiness gates
+
+Preserved:
+- no runtime source behavior changes
+- no test changes
+- no config schema changes
+- no tenant-policy schema changes
+- no AlertV1 schema or provenance changes
+- no DeviceStatsV1 or SourceStreamStatsV1 layout changes
+- no tenant/global DB key encoding changes
+- no metrics names or labels changes
+- no replay or recovery behavior changes
+- no hashed-fallback FeatureId behavior
+
+Validation:
+- no local cargo/build/test/rustfmt/clippy run was performed in this sandbox
+- ASCII, path-length, stale-marker, prohibited source-stream metric-label, and zip-integrity checks passed
+
+Next recommended phase: Phase 33 final validation packaging driven by user-provided cargo/toolchain logs. Fix any reported build/test failures before adding new features.

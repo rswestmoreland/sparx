@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -52,6 +55,12 @@ fn copy_fixture_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device
     for file in files {
         fs::copy(fixture_source_v1(file), device_dir.join(file)).unwrap();
     }
+}
+
+fn write_tenant_policy_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, body: &str) {
+    let policy_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(".sparx");
+    fs::create_dir_all(&policy_dir).unwrap();
+    fs::write(policy_dir.join("policy.toml"), body).unwrap();
 }
 
 fn run_test_lock_v1() -> MutexGuard<'static, ()> {
@@ -186,6 +195,43 @@ fn count_spool_files_v1(root: &Path) -> usize {
     count
 }
 
+fn count_vdrop_alerts_v1(runtime: &mut SparxRuntimeV1, tenant_id: &str) -> Result<usize, sparx::db::DbErrorV1> {
+    runtime.with_tenant_db_v1(tenant_id, 0, |db| {
+        let mut count = 0usize;
+        for alert_id in db.list_primary_alert_ids_v1()? {
+            if let Some(alert) = db.read_primary_alert_v1(&alert_id)? {
+                if alert.reasons.iter().any(|reason| reason.code == "V_DROP") {
+                    count = count.saturating_add(1);
+                }
+            }
+        }
+        Ok(count)
+    })
+}
+
+fn count_source_stream_vdrop_alerts_v1(
+    runtime: &mut SparxRuntimeV1,
+    tenant_id: &str,
+) -> Result<usize, sparx::db::DbErrorV1> {
+    runtime.with_tenant_db_v1(tenant_id, 0, |db| {
+        let mut count = 0usize;
+        for alert_id in db.list_primary_alert_ids_v1()? {
+            if let Some(alert) = db.read_primary_alert_v1(&alert_id)? {
+                if alert.reasons.iter().any(|reason| {
+                    reason.code == "V_DROP"
+                        && reason
+                            .details
+                            .iter()
+                            .any(|(key, value)| key == "subject_kind" && value == "source_stream")
+                }) {
+                    count = count.saturating_add(1);
+                }
+            }
+        }
+        Ok(count)
+    })
+}
+
 
 #[test]
 fn run_startup_and_shutdown_persist_process_state_and_flush_v1() -> Result<(), Box<dyn std::error::Error>> {
@@ -222,6 +268,87 @@ fn run_startup_and_shutdown_persist_process_state_and_flush_v1() -> Result<(), B
 }
 
 #[test]
+fn run_runtime_emits_vdrop_alerts_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let _lock = run_test_lock_v1();
+    let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
+
+    let mut cfg = temp_cfg_v1();
+    cfg.scoring.cold_start_days = 0;
+    cfg.scoring.min_lines_per_window = 1;
+    copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
+
+    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
+
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1("vdrop_candidates_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1("vdrop_alerts_emitted_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_gauge_v1("vdrop_tracked_subjects__smoke")?,
+        Some(2.0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
+        Some(2.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn run_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let _lock = run_test_lock_v1();
+    let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
+
+    let mut cfg = temp_cfg_v1();
+    cfg.scoring.cold_start_days = 0;
+    cfg.scoring.min_lines_per_window = 1;
+    cfg.vdrop.source_stream_enabled = true;
+    copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
+
+    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
+
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let device_key = device_key_v1("smoke", "edge01");
+    assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 3);
+    assert_eq!(count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?, 1);
+    let catalogs = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.list_source_stream_catalogs_for_device_v1(&device_key)
+    })?;
+    assert_eq!(catalogs.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn run_tenant_policy_can_disable_all_vdrop_subjects_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let _lock = run_test_lock_v1();
+    let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
+
+    let mut cfg = temp_cfg_v1();
+    cfg.scoring.cold_start_days = 0;
+    cfg.scoring.min_lines_per_window = 1;
+    copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
+    write_tenant_policy_v1(&cfg, "smoke", "policy_version = 1\nvdrop_enabled = false\n");
+
+    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
+
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 0);
+    Ok(())
+}
+
 fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
@@ -478,7 +605,19 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     let mut cfg = temp_cfg_v1();
     cfg.metrics.prometheus_bind = reserve_loopback_bind_v1();
     cfg.metrics.health_bind = reserve_loopback_bind_v1();
+    cfg.output.sink = "stdout".to_string();
+    cfg.output.automated_replay_interval_s = 3600;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log", "edge01.gz"]);
+
+    let mut tenant_a_alert = sample_alert_v1();
+    tenant_a_alert.alert_id = "run-metrics-tenant-a".to_string();
+    tenant_a_alert.tenant_id = "tenant-a".to_string();
+    let mut tenant_b_alert = sample_alert_v1();
+    tenant_b_alert.alert_id = "run-metrics-tenant-b".to_string();
+    tenant_b_alert.tenant_id = "tenant-b".to_string();
+    write_spool_alert_v1(&cfg.sparx.data_root, &tenant_a_alert)?;
+    let tenant_b_path = write_spool_alert_v1(&cfg.sparx.data_root, &tenant_b_alert)?;
+    let tenant_b_bytes = std::fs::metadata(&tenant_b_path)?.len();
 
     let metrics_resp: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let health_resp: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
@@ -504,11 +643,88 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     assert!(metrics_resp.contains("sparx_run_cycles_completed_total 1"));
     assert!(metrics_resp.contains("sparx_run_devices_processed_total"));
     assert!(metrics_resp.contains("sparx_recovery_automated_replay_max_files_per_pass 128"));
-    assert!(metrics_resp.contains("sparx_recovery_spool_backlog_files 0"));
+    assert!(metrics_resp.contains("sparx_recovery_automated_replay_interval_seconds 3600"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_max_megabytes 2048"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_backlog_files 2"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_backlog_tenants 2"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_oldest_file_ts "));
+    assert!(metrics_resp.contains("sparx_recovery_spool_oldest_age_seconds "));
+    assert!(metrics_resp.contains("sparx_recovery_stale_backlog 0"));
+    assert!(metrics_resp.contains("sparx_recovery_stale_backlog_tenants 0"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_backlog_files_by_tenant{tenant_id=\"tenant-a\"} 1"));
+    assert!(metrics_resp.contains(&format!("sparx_recovery_spool_backlog_bytes_by_tenant{{tenant_id=\"tenant-b\"}} {}", tenant_b_bytes)));
+    assert!(metrics_resp.contains("sparx_recovery_spool_oldest_age_seconds_by_tenant{tenant_id=\"tenant-a\"} "));
+    assert!(metrics_resp.contains("sparx_recovery_stale_backlog_by_tenant{tenant_id=\"tenant-a\"} 0"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_writes_total 0"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_replayed_total 0"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_replay_fail_total 0"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_drop_total 0"));
+    assert!(metrics_resp.contains("sparx_recovery_automated_replay_attempts_total 0"));
+    assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction 0"));
+    assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-a\"} 0"));
+    assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-b\"} 0"));
+    assert!(metrics_resp.contains("sparx_recovery_history_start_counter_snapshot_ts "));
+    assert!(metrics_resp.contains("sparx_recovery_history_start_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp.contains("sparx_recovery_history_counter_snapshot_interval_seconds_by_tenant{tenant_id=\"tenant-b\"}"));
+    assert!(metrics_resp.contains("sparx_recovery_previous_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp.contains("sparx_recovery_last_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-b\"}"));
+    assert!(metrics_resp.contains("sparx_recovery_spool_write_rate_per_second_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp.contains("sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant{tenant_id=\"tenant-b\"}"));
+    assert!(metrics_resp.contains("sparx_vdrop_enabled 1"));
+    assert!(metrics_resp.contains("sparx_vdrop_device_enabled 1"));
+    assert!(metrics_resp.contains("sparx_vdrop_tenant_enabled 1"));
+    assert!(metrics_resp.contains("sparx_vdrop_source_stream_enabled 0"));
+    assert!(metrics_resp.contains("sparx_vdrop_evaluated_subjects_total"));
+    assert!(metrics_resp.contains("sparx_vdrop_alerts_emitted_total"));
+    assert!(metrics_resp.contains("sparx_vdrop_open_drop_subjects"));
+    assert!(metrics_resp.contains("sparx_vdrop_source_stream_evaluated_subjects_total"));
+    assert!(metrics_resp.contains("sparx_vdrop_source_stream_alerts_emitted_total"));
     assert!(health_resp.starts_with("HTTP/1.1 200 OK"));
     assert!(health_resp.contains("status: ok"));
-    assert!(health_resp.contains("spool_backlog_files: 0"));
+    assert!(health_resp.contains("spool_backlog_files: 2"));
+    assert!(health_resp.contains("spool_backlog_tenants: 2"));
+    assert!(health_resp.contains("spool_oldest_file_ts: "));
+    assert!(health_resp.contains("spool_oldest_age_s: "));
+    assert!(health_resp.contains("stale_backlog: false"));
+    assert!(health_resp.contains("stale_backlog_tenants: 0"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].tenant_id: tenant-a"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].oldest_file_ts: "));
+    assert!(health_resp.contains("spool_backlog_tenant[0].oldest_age_s: "));
+    assert!(health_resp.contains("spool_backlog_tenant[0].stale: false"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].backlog_trend_direction: unknown"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].previous_counter_snapshot_ts: null"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].history_start_counter_snapshot_ts: "));
+    assert!(health_resp.contains("spool_backlog_tenant[0].history_counter_snapshot_interval_s: "));
+    assert!(health_resp.contains("spool_backlog_tenant[0].history_spool_write_rate_per_s: "));
+    assert!(health_resp.contains("spool_backlog_tenant[0].spool_replayed_rate_per_s: null"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].spool_write_rate_per_s: null"));
+    assert!(health_resp.contains("spool_backlog_tenant[0].automated_replay_attempt_rate_per_s: null"));
+    assert!(health_resp.contains("spool_backlog_tenant[1].tenant_id: tenant-b"));
+    assert!(health_resp.contains("spool_backlog_tenant[1].backlog_trend_direction: unknown"));
+    assert!(health_resp.contains("spool_writes_total: 0"));
+    assert!(health_resp.contains("automated_replay_attempts_total: 0"));
     assert!(health_resp.contains("automated_replay_max_files_per_pass: 128"));
+    assert!(health_resp.contains("automated_replay_interval_s: 3600"));
+    assert!(health_resp.contains("spool_max_mb: 2048"));
+    assert!(health_resp.contains("backlog_trend_direction: unknown"));
+    assert!(health_resp.contains("previous_counter_snapshot_ts: "));
+    assert!(health_resp.contains("last_counter_snapshot_ts: "));
+    assert!(health_resp.contains("counter_snapshot_interval_s: "));
+    assert!(health_resp.contains("history_start_counter_snapshot_ts: "));
+    assert!(health_resp.contains("history_counter_snapshot_interval_s: "));
+    assert!(health_resp.contains("history_spool_write_rate_per_s: "));
+    assert!(health_resp.contains("spool_write_rate_per_s: "));
+    assert!(health_resp.contains("spool_replayed_rate_per_s: "));
+    assert!(health_resp.contains("spool_replay_fail_rate_per_s: "));
+    assert!(health_resp.contains("automated_replay_attempt_rate_per_s: "));
+    assert!(health_resp.contains("vdrop_enabled: true"));
+    assert!(health_resp.contains("vdrop_device_enabled: true"));
+    assert!(health_resp.contains("vdrop_tenant_enabled: true"));
+    assert!(health_resp.contains("vdrop_source_stream_enabled: false"));
+    assert!(health_resp.contains("vdrop_evaluated_subjects_total: "));
+    assert!(health_resp.contains("vdrop_alerts_emitted_total: "));
+    assert!(health_resp.contains("vdrop_source_stream_evaluated_subjects_total: "));
+    assert!(health_resp.contains("vdrop_source_stream_alerts_emitted_total: "));
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(runtime.global_db_v1().read_metric_counter_v1("run_cycles_completed_total")?, Some(1));
@@ -654,5 +870,95 @@ fn run_automated_replay_is_bounded_per_cycle_v1() -> Result<(), Box<dyn std::err
         .join("tenant=tenant-a")
         .join(format!("spool_{}.json", format!("{:032x}", 2u32)));
     assert!(remaining.exists());
+
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_automated_replay_attempts_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replayed_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replay_fail_total")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_writes_total")?, Some(0));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_automated_replay_attempt_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_replayed")?, Some(1.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_failed")?, Some(0.0));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_snapshot_ts")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_snapshot_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?, Some(2.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?, Some(1.0));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_automated_replay_attempts_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_automated_replay_attempts_total")?, Some(2));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_writes_total")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replayed_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replay_fail_total")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_automated_replay_attempts_total")?, Some(1));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_snapshot_ts__tenant-a")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_snapshot_ts__tenant-a")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?, Some(2.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?, Some(1.0));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(2));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(2));
+    Ok(())
+}
+
+#[test]
+fn run_automated_replay_interval_limits_cycle_attempts_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let _lock = run_test_lock_v1();
+    let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "2");
+
+    let mut cfg = temp_cfg_v1();
+    cfg.output.automated_replay_max_files_per_pass = 1;
+    cfg.output.automated_replay_interval_s = 3600;
+    for i in 0..3u32 {
+        let alert_id = format!("{:032x}", i);
+        let alert = sample_spooled_alert_v1("tenant-a", "device-a", &alert_id);
+        write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
+    }
+
+    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
+
+    let spool_root = Path::new(&cfg.sparx.data_root).join("spool").join("alerts");
+    assert_eq!(count_spool_files_v1(&spool_root), 1);
+
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_automated_replay_attempts_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replayed_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_replayed")?, Some(1.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?, Some(2.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?, Some(1.0));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?.is_some());
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?, Some(2));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_automated_replay_attempts_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_automated_replay_attempts_total")?, Some(2));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replayed_total")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_automated_replay_attempts_total")?, Some(1));
+    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?.is_some());
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a")?, Some(0));
+    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?, Some(2.0));
+    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?, Some(1.0));
     Ok(())
 }

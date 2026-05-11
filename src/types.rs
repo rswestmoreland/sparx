@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Shared primitives and small enums used across the crate.
-// No logic in Phase 0b.
+// Shared types only; no runtime logic in this module.
 
 pub type UnixSec = i64;
 pub type DeviceKey = String;

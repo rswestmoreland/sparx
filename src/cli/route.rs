@@ -1,6 +1,9 @@
-// CLI routing.
-// Phase 10a hardens dispatch so config-free commands bypass config load
-// and unimplemented operational commands fail closed.
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// CLI routing and command execution.
+// Config-free commands bypass config load where the CLI contract permits.
+// DB-backed commands fail closed on DB ownership, open, or runtime errors.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -13,10 +16,36 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use crate::alert::{AlertScoringConfigV1, AlertV1, FileSpanV1, build_alert_v1};
+use crate::alert::{
+    build_alert_v1, build_sharp_drop_alert_v1, build_source_stream_sharp_drop_alert_v1,
+    build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, AlertScoringConfigV1, AlertV1,
+    FileSpanV1,
+};
 use crate::drilldown::{drill_alert_v1, extract_alert_v1};
 use crate::config::ConfigV1;
 use crate::db::layout::filesystem_layout_v1;
+use crate::db::silence::{
+    close_open_drop_state_by_hard_silence_v1, close_open_drop_state_by_recovery_v1,
+    evaluate_sharp_drop_candidate_v1, evaluate_vdrop_candidate_v1,
+    open_drop_state_suppresses_candidate_v1, sharp_drop_expected_volume_from_device_stats_v1,
+    sum_sharp_drop_expected_volumes_v1, ExpectedSourceStateUpdateV1, OpenDropStateV1,
+    OpenSilenceStateV1, SharpDropCurrentWindowV1, SharpDropEvaluationConfigV1,
+    SharpDropEvaluationV1, SharpDropExpectedVolumeV1, SharpDropSuppressionReasonV1,
+    VDropEvaluationConfigV1, VDropEvaluationV1, OPEN_DROP_FLAG_OPEN_V1,
+    OPEN_SILENCE_FLAG_CLOSED_V1, OPEN_SILENCE_FLAG_OPEN_V1,
+    SHARP_DROP_DEFAULT_MAX_OBSERVED_EXPECTED_RATIO_V1,
+    SHARP_DROP_DEFAULT_MIN_DROP_RATIO_V1, SHARP_DROP_DEFAULT_TENANT_MATURE_DEVICE_FLOOR_V1,
+    SHARP_DROP_DEFAULT_VARIANCE_GATE_STDDEVS_V1, SILENCE_SUBJECT_KIND_DEVICE_V1,
+    SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1, SILENCE_SUBJECT_KIND_TENANT_V1,
+};
+use crate::db::source_stream::{
+    evaluate_source_stream_hard_silence_candidate_v1,
+    evaluate_source_stream_sharp_drop_candidate_v1,
+    sharp_drop_expected_volume_from_source_stream_stats_v1, source_stream_identity_from_path_v1,
+    source_stream_open_drop_state_suppresses_candidate_v1, source_stream_subject_from_identity_v1,
+    update_source_stream_catalog_observed_v1, update_source_stream_stats_from_observation_v1,
+    SourceStreamIdentityV1, SourceStreamSubjectV1,
+};
 use crate::db::tenant_values::{
     decode_feat_dict_id_to_str_v1, decode_feat_dict_meta_entries_v1, decode_feat_dict_meta_last_gc_ts_v1,
     decode_feat_dict_meta_next_id_v1, decode_feat_dict_str_to_id_v1,
@@ -24,12 +53,14 @@ use crate::db::tenant_values::{
 };
 use crate::db::DbErrorV1;
 use crate::policy::{
-    load_tenant_policy_v1, tenant_policy_path_parts_v1, TenantPolicyLoadErrorKindV1, TenantPolicyV1,
+    load_tenant_policy_v1, resolve_vdrop_source_stream_enabled_v1, tenant_policy_path_parts_v1,
+    TenantPolicyLoadErrorKindV1, TenantPolicyV1,
 };
 use crate::features::{emit_line_features_v1, FeatureDictionaryConfigV1, FeatureDictionaryMetaV1, FeatureDictionaryV1};
 use crate::ingest::{
-    apply_cursor_read_progress_v1, discover_device_inventory_v1, open_file_reader_v1, reconcile_cursor_v1,
-    CursorPlanV1, DiscoveredFileV1, FileCursorV1, ObservedFileStateV1, TenantDeviceV1,
+    apply_cursor_read_progress_v1, device_key_v1, discover_device_inventory_v1, open_file_reader_v1,
+    reconcile_cursor_v1, CursorPlanV1, DiscoveredFileV1, FileCursorV1, ObservedFileStateV1,
+    TenantDeviceV1,
 };
 use crate::runtime::{
     GlobalSchemaMigrateResultV1, MigrateAllResultV1, SchemaMigrateOutcomeKindV1, SparxRuntimeV1,
@@ -37,6 +68,76 @@ use crate::runtime::{
 };
 use crate::observability::{
     build_status_snapshot_from_runtime_v1, format_status_text_v1, ObservabilityServersV1,
+    METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1,
+    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1,
+    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1,
+    METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1,
+    METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1,
+    metric_recovery_tenant_last_snapshot_backlog_bytes_v1,
+    metric_recovery_tenant_last_snapshot_backlog_files_v1,
+    metric_recovery_tenant_last_snapshot_ts_v1,
+    metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_ts_v1,
+    metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1,
+    metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1,
+    metric_recovery_tenant_history_start_counter_snapshot_spool_replayed_total_v1,
+    metric_recovery_tenant_history_start_counter_snapshot_spool_writes_total_v1,
+    metric_recovery_tenant_history_start_counter_snapshot_ts_v1,
+    metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1,
+    metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1,
+    metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1,
+    metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1,
+    metric_recovery_tenant_previous_counter_snapshot_ts_v1,
+    metric_recovery_tenant_previous_snapshot_backlog_bytes_v1,
+    metric_recovery_tenant_previous_snapshot_backlog_files_v1,
+    metric_recovery_tenant_previous_snapshot_ts_v1,
+    metric_recovery_tenant_spool_replay_fail_total_v1,
+    metric_recovery_tenant_spool_replayed_total_v1,
+    metric_recovery_tenant_spool_writes_total_v1,
+    metric_recovery_tenant_automated_replay_attempts_total_v1,
+    metric_vdrop_tenant_alerts_emitted_total_v1,
+    metric_vdrop_tenant_candidates_total_v1,
+    metric_vdrop_tenant_evaluated_subjects_total_v1,
+    metric_vdrop_tenant_last_evaluation_ts_v1,
+    metric_vdrop_tenant_open_silence_subjects_v1,
+    metric_vdrop_tenant_open_drop_subjects_v1,
+    metric_vdrop_tenant_suppressed_candidates_total_v1,
+    metric_vdrop_tenant_source_stream_alerts_emitted_total_v1,
+    metric_vdrop_tenant_source_stream_candidates_total_v1,
+    metric_vdrop_tenant_source_stream_evaluated_subjects_total_v1,
+    metric_vdrop_tenant_source_stream_last_evaluation_ts_v1,
+    metric_vdrop_tenant_source_stream_open_drop_subjects_v1,
+    metric_vdrop_tenant_source_stream_open_silence_subjects_v1,
+    metric_vdrop_tenant_source_stream_suppressed_candidates_total_v1,
+    metric_vdrop_tenant_source_stream_tracked_subjects_v1,
+    metric_vdrop_tenant_tracked_subjects_v1,
+    METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1,
     METRIC_RUN_ALERTS_EMITTED_TOTAL_V1, METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1,
     METRIC_RUN_DEVICES_FAILED_TOTAL_V1, METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1,
     METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1, METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1,
@@ -44,11 +145,19 @@ use crate::observability::{
     METRIC_RUN_LAST_CYCLE_TENANTS_PROCESSED_V1, METRIC_RUN_LAST_CYCLE_TENANTS_SKIPPED_V1,
     METRIC_RUN_LAST_CYCLE_TENANTS_TOTAL_V1, METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1,
     METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1, METRIC_RUN_TENANTS_TOTAL_V1,
+    METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1, METRIC_VDROP_CANDIDATES_TOTAL_V1,
+    METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1, METRIC_VDROP_LAST_EVALUATION_TS_V1,
+    METRIC_VDROP_SOURCE_STREAM_ALERTS_EMITTED_TOTAL_V1,
+    METRIC_VDROP_SOURCE_STREAM_CANDIDATES_TOTAL_V1,
+    METRIC_VDROP_SOURCE_STREAM_EVALUATED_SUBJECTS_TOTAL_V1,
+    METRIC_VDROP_SOURCE_STREAM_LAST_EVALUATION_TS_V1,
+    METRIC_VDROP_SOURCE_STREAM_SUPPRESSED_CANDIDATES_TOTAL_V1,
+    METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1,
 };
 use crate::sink::{
-    read_spooled_alert_v1, sorted_spool_files_for_replay_v1, JsonlAlertSinkV1,
-    JsonlSinkConfigV1, SpoolConfigV1, SpoolReplayReportV1, SpoolingJsonlAlertSinkV1,
-    StdoutAlertSinkV1, SPOOL_MAX_MB_DEFAULT_V1,
+    read_spooled_alert_v1, sorted_spool_files_for_replay_v1, spool_backlog_per_tenant_v1, spool_backlog_summary_v1, JsonlAlertSinkV1,
+    JsonlSinkConfigV1, SpoolConfigV1, SpoolCountersV1, SpoolEmitOutcomeV1, SpoolReplayReportV1,
+    SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
 };
 use crate::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
 use crate::window::{align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1};
@@ -82,6 +191,82 @@ pub struct RouteResultV1 {
 }
 
 type RunTestCycleHookV1 = Arc<dyn Fn(u32, &mut SparxRuntimeV1, &ConfigV1) + Send + Sync>;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct VDropResolvedPolicyV1 {
+    enabled: bool,
+    device_enabled: bool,
+    tenant_enabled: bool,
+    source_stream_enabled: bool,
+    min_expected_windows_missed_u64: u64,
+    min_mature_windows_u64: u64,
+    min_expected_lines_u64: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct VDropDiagnosticsDeltaV1 {
+    tracked_subjects: u64,
+    open_silence_subjects: u64,
+    open_drop_subjects: u64,
+    evaluated_subjects: u64,
+    candidates: u64,
+    suppressed_candidates: u64,
+    alerts_emitted: u64,
+    source_stream_tracked_subjects: u64,
+    source_stream_open_silence_subjects: u64,
+    source_stream_open_drop_subjects: u64,
+    source_stream_evaluated_subjects: u64,
+    source_stream_candidates: u64,
+    source_stream_suppressed_candidates: u64,
+    source_stream_alerts_emitted: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct VDropCollectResultV1 {
+    alerts: Vec<AlertV1>,
+    diagnostics: VDropDiagnosticsDeltaV1,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct SharpDropRuntimeWindowV1 {
+    device_key: String,
+    window_start_ts_i64: i64,
+    window_end_ts_i64: i64,
+    observed_lines_u64: u64,
+    observed_bytes_u64: u64,
+    bucket_u8: u8,
+    expected: Option<SharpDropExpectedVolumeV1>,
+    provenance: Vec<FileSpanV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SourceStreamActiveObservationV1 {
+    identity: SourceStreamIdentityV1,
+    subject: SourceStreamSubjectV1,
+    observed_lines_u64: u64,
+    observed_bytes_u64: u64,
+    spans: Vec<ActiveSpanStateV1>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct SourceStreamRuntimeWindowV1 {
+    subject: SourceStreamSubjectV1,
+    window_start_ts_i64: i64,
+    window_end_ts_i64: i64,
+    observed_lines_u64: u64,
+    observed_bytes_u64: u64,
+    bucket_u8: u8,
+    expected: Option<SharpDropExpectedVolumeV1>,
+    provenance: Vec<FileSpanV1>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct ProcessDeviceResultV1 {
+    alerts_emitted: usize,
+    sharp_drop_windows: Vec<SharpDropRuntimeWindowV1>,
+    source_stream_windows: Vec<SourceStreamRuntimeWindowV1>,
+}
+
 
 static RUN_TEST_CYCLE_HOOK_V1: OnceLock<Mutex<Option<RunTestCycleHookV1>>> = OnceLock::new();
 
@@ -257,7 +442,28 @@ fn command_label_v1(cmd: &CommandV1) -> &'static str {
 }
 
 
+fn validate_cli_path_component_v1(field: &str, value: &str) -> Result<(), String> {
+    if value.is_empty() || value == "." || value == ".." {
+        return Err(format!("invalid {} filesystem component", field));
+    }
+    if value.bytes().any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f) {
+        return Err(format!("invalid {} filesystem component", field));
+    }
+    Ok(())
+}
+
+fn invalid_cli_input_result_v1(command: &str, detail: String) -> RouteResultV1 {
+    RouteResultV1 {
+        exit_code: 2,
+        msg_stdout: None,
+        msg_stderr: Some(format!("{} invalid input: {}", command, detail)),
+    }
+}
+
 fn route_tenant_purge_v1(cfg: &ConfigV1, tenant_id: &str, force: bool) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("tenant purge", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -284,8 +490,10 @@ fn route_tenant_purge_v1(cfg: &ConfigV1, tenant_id: &str, force: bool) -> RouteR
     route_tenant_purge_result_v1(&result)
 }
 
-
 fn route_tenant_policy_show_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("tenant policy show", e);
+    }
     let layout = filesystem_layout_v1(cfg);
     let (tenant_dir, policy_path) = tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
     match load_tenant_policy_v1(&tenant_dir, &policy_path) {
@@ -299,6 +507,9 @@ fn route_tenant_policy_show_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV1
 }
 
 fn route_tenant_policy_check_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("tenant policy check", e);
+    }
     let layout = filesystem_layout_v1(cfg);
     let (tenant_dir, policy_path) = tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
     match load_tenant_policy_v1(&tenant_dir, &policy_path) {
@@ -311,7 +522,6 @@ fn route_tenant_policy_check_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV
     }
 }
 
-
 fn route_alerts_list_v1(
     cfg: &ConfigV1,
     tenant_id: &str,
@@ -321,6 +531,9 @@ fn route_alerts_list_v1(
     entity: Option<AlertEntityFilterV1>,
     json: bool,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alerts list", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -378,6 +591,9 @@ fn route_alerts_list_v1(
 }
 
 fn route_alerts_show_v1(cfg: &ConfigV1, tenant_id: &str, alert_id: &str, json: bool) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alerts show", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -441,6 +657,9 @@ fn route_alerts_search_v1(
     entity: Option<AlertEntityFilterV1>,
     contains: &str,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alerts search", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -486,6 +705,9 @@ fn route_alerts_export_v1(
     out_path: &str,
     gzip: bool,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alerts export", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -579,6 +801,9 @@ fn route_alert_extract_v1(
     max_bytes: Option<u64>,
     max_lines: Option<u64>,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alert extract", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -653,6 +878,9 @@ fn route_alert_drill_v1(
     max_bytes: Option<u64>,
     max_lines: Option<u64>,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("alert drill", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -1142,6 +1370,41 @@ fn format_tenant_policy_show_v1(
     ));
     out.push_str(&format!("key_overrides_count: {}
 ", policy.key_overrides.len()));
+    out.push_str(&format!(
+        "vdrop_enabled: {}
+",
+        format_optional_bool_v1(policy.vdrop_enabled)
+    ));
+    out.push_str(&format!(
+        "vdrop_device_enabled: {}
+",
+        format_optional_bool_v1(policy.vdrop_device_enabled)
+    ));
+    out.push_str(&format!(
+        "vdrop_tenant_enabled: {}
+",
+        format_optional_bool_v1(policy.vdrop_tenant_enabled)
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_enabled: {}
+",
+        format_optional_bool_v1(policy.vdrop_source_stream_enabled)
+    ));
+    out.push_str(&format!(
+        "vdrop_min_expected_windows_missed: {}
+",
+        format_optional_u32_inherit_v1(policy.vdrop_min_expected_windows_missed)
+    ));
+    out.push_str(&format!(
+        "vdrop_min_mature_windows: {}
+",
+        format_optional_u64_inherit_v1(policy.vdrop_min_mature_windows)
+    ));
+    out.push_str(&format!(
+        "vdrop_min_expected_lines: {}
+",
+        format_optional_u64_inherit_v1(policy.vdrop_min_expected_lines)
+    ));
     out.push_str("key_overrides:
 ");
     for (norm_key, category) in &policy.key_overrides {
@@ -1149,6 +1412,22 @@ fn format_tenant_policy_show_v1(
 ", norm_key, category));
     }
     out
+}
+
+fn format_optional_bool_v1(value: Option<bool>) -> &'static str {
+    match value {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "inherit",
+    }
+}
+
+fn format_optional_u32_inherit_v1(value: Option<u32>) -> String {
+    value.map(|v| v.to_string()).unwrap_or_else(|| "inherit".to_string())
+}
+
+fn format_optional_u64_inherit_v1(value: Option<u64>) -> String {
+    value.map(|v| v.to_string()).unwrap_or_else(|| "inherit".to_string())
 }
 
 fn format_tenant_policy_check_v1(
@@ -1164,6 +1443,13 @@ policy_version: {}
 min_identity_confidence: {}
 ip_bucket: {}
 key_overrides_count: {}
+vdrop_enabled: {}
+vdrop_device_enabled: {}
+vdrop_tenant_enabled: {}
+vdrop_source_stream_enabled: {}
+vdrop_min_expected_windows_missed: {}
+vdrop_min_mature_windows: {}
+vdrop_min_expected_lines: {}
 ",
         tenant_id,
         policy_path.display(),
@@ -1171,10 +1457,20 @@ key_overrides_count: {}
         policy.min_identity_confidence,
         policy.ip_bucket.as_deref().unwrap_or("none"),
         policy.key_overrides.len(),
+        format_optional_bool_v1(policy.vdrop_enabled),
+        format_optional_bool_v1(policy.vdrop_device_enabled),
+        format_optional_bool_v1(policy.vdrop_tenant_enabled),
+        format_optional_bool_v1(policy.vdrop_source_stream_enabled),
+        format_optional_u32_inherit_v1(policy.vdrop_min_expected_windows_missed),
+        format_optional_u64_inherit_v1(policy.vdrop_min_mature_windows),
+        format_optional_u64_inherit_v1(policy.vdrop_min_expected_lines),
     )
 }
 
 fn route_migrate_tenant_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("migrate", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -1477,6 +1773,11 @@ fn format_schema_migrate_outcome_v1(outcome: &SchemaMigrateOutcomeKindV1) -> &'s
 }
 
 fn route_replay_spool_v1(cfg: &ConfigV1, tenant_id: Option<&str>) -> RouteResultV1 {
+    if let Some(tenant_id) = tenant_id {
+        if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+            return invalid_cli_input_result_v1("replay-spool", e);
+        }
+    }
     if cfg.output.sink != "jsonl" {
         return RouteResultV1 {
             exit_code: 1,
@@ -1594,7 +1895,6 @@ fn format_replay_spool_failures_v1(tenant_id: Option<&str>, failed_paths: &[Path
     Some(s)
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ActiveSpanStateV1 {
     file_rel: String,
@@ -1612,10 +1912,10 @@ enum OneShotSinkV1 {
 }
 
 impl OneShotSinkV1 {
-    fn emit_v1(&mut self, alert: &AlertV1) -> Result<(), String> {
+    fn emit_v1(&mut self, alert: &AlertV1) -> Result<Option<SpoolEmitOutcomeV1>, String> {
         match self {
-            OneShotSinkV1::Jsonl(sink) => sink.emit_at_v1(alert, alert.window_end_ts).map(|_| ()).map_err(|e| e.msg),
-            OneShotSinkV1::Stdout(sink) => sink.emit_line_v1(alert).map_err(|e| e.msg),
+            OneShotSinkV1::Jsonl(sink) => sink.emit_at_v1(alert, alert.window_end_ts).map(Some).map_err(|e| e.msg),
+            OneShotSinkV1::Stdout(sink) => sink.emit_line_v1(alert).map(|_| None).map_err(|e| e.msg),
         }
     }
 
@@ -1634,6 +1934,17 @@ impl OneShotSinkV1 {
             OneShotSinkV1::Jsonl(sink) => sink.shutdown_v1().map_err(|e| e.msg),
             OneShotSinkV1::Stdout(_) => Ok(()),
         }
+    }
+
+    fn spool_counters_snapshot_v1(&self) -> SpoolCountersV1 {
+        match self {
+            OneShotSinkV1::Jsonl(sink) => sink.counters_v1().clone(),
+            OneShotSinkV1::Stdout(_) => SpoolCountersV1::default(),
+        }
+    }
+
+    fn supports_recovery_v1(&self) -> bool {
+        matches!(self, OneShotSinkV1::Jsonl(_))
     }
 
     fn into_stdout_v1(self) -> Result<Option<String>, String> {
@@ -1670,6 +1981,679 @@ impl RunCycleSummaryV1 {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct RecoveryMetricsTotalsV1 {
+    spool_writes_total: u64,
+    spool_replayed_total: u64,
+    spool_replay_fail_total: u64,
+    spool_drop_total: u64,
+    automated_replay_attempts_total: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct TenantRecoveryMetricsTotalsV1 {
+    spool_writes_total: u64,
+    spool_replayed_total: u64,
+    spool_replay_fail_total: u64,
+    automated_replay_attempts_total: u64,
+}
+
+impl RecoveryMetricsTotalsV1 {
+    fn add_counter_delta_v1(&mut self, delta: &SpoolCountersV1) {
+        self.spool_writes_total = self.spool_writes_total.saturating_add(delta.sink_spool_total);
+        self.spool_replayed_total = self
+            .spool_replayed_total
+            .saturating_add(delta.sink_spool_replayed_total);
+        self.spool_replay_fail_total = self
+            .spool_replay_fail_total
+            .saturating_add(delta.sink_spool_replay_fail_total);
+        self.spool_drop_total = self
+            .spool_drop_total
+            .saturating_add(delta.sink_spool_drop_total);
+    }
+}
+
+impl TenantRecoveryMetricsTotalsV1 {
+    fn add_spool_write_v1(&mut self) {
+        self.spool_writes_total = self.spool_writes_total.saturating_add(1);
+    }
+
+    fn add_replayed_v1(&mut self, count: u64) {
+        self.spool_replayed_total = self.spool_replayed_total.saturating_add(count);
+    }
+
+    fn add_replay_fail_v1(&mut self, count: u64) {
+        self.spool_replay_fail_total = self.spool_replay_fail_total.saturating_add(count);
+    }
+
+    fn add_automated_attempt_v1(&mut self) {
+        self.automated_replay_attempts_total = self.automated_replay_attempts_total.saturating_add(1);
+    }
+}
+
+fn read_metric_gauge_as_u64_v1(runtime: &SparxRuntimeV1, name: &str) -> Result<Option<u64>, DbErrorV1> {
+    let value = match runtime.global_db_v1().read_metric_gauge_v1(name)? {
+        Some(value) => value,
+        None => return Ok(None),
+    };
+    if !value.is_finite() || value < 0.0 {
+        return Ok(None);
+    }
+    let rounded = value.round();
+    if (rounded - value).abs() > f64::EPSILON {
+        return Ok(None);
+    }
+    Ok(Some(rounded as u64))
+}
+
+fn increment_metric_counter_by_v1(
+    runtime: &SparxRuntimeV1,
+    name: &str,
+    delta: u64,
+) -> Result<(), DbErrorV1> {
+    if delta == 0 {
+        return Ok(());
+    }
+    let db = runtime.global_db_v1();
+    let current = db.read_metric_counter_v1(name)?.unwrap_or(0);
+    db.write_metric_counter_v1(name, current.saturating_add(delta))
+}
+
+fn write_metric_gauge_u64_v1(
+    runtime: &SparxRuntimeV1,
+    name: &str,
+    value: u64,
+) -> Result<(), DbErrorV1> {
+    runtime.global_db_v1().write_metric_gauge_v1(name, value as f64)
+}
+
+fn persist_vdrop_diagnostics_delta_v1(
+    runtime: &SparxRuntimeV1,
+    tenant_id: &str,
+    diagnostics: &VDropDiagnosticsDeltaV1,
+    eval_ts_i64: i64,
+) -> Result<(), DbErrorV1> {
+    increment_metric_counter_by_v1(runtime, METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1, diagnostics.evaluated_subjects)?;
+    increment_metric_counter_by_v1(runtime, METRIC_VDROP_CANDIDATES_TOTAL_V1, diagnostics.candidates)?;
+    increment_metric_counter_by_v1(runtime, METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1, diagnostics.suppressed_candidates)?;
+    increment_metric_counter_by_v1(runtime, METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1, diagnostics.alerts_emitted)?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_SOURCE_STREAM_EVALUATED_SUBJECTS_TOTAL_V1,
+        diagnostics.source_stream_evaluated_subjects,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_SOURCE_STREAM_CANDIDATES_TOTAL_V1,
+        diagnostics.source_stream_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_SOURCE_STREAM_SUPPRESSED_CANDIDATES_TOTAL_V1,
+        diagnostics.source_stream_suppressed_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_SOURCE_STREAM_ALERTS_EMITTED_TOTAL_V1,
+        diagnostics.source_stream_alerts_emitted,
+    )?;
+    if eval_ts_i64 >= 0 {
+        runtime.global_db_v1().write_metric_counter_v1(METRIC_VDROP_LAST_EVALUATION_TS_V1, eval_ts_i64 as u64)?;
+        if diagnostics.source_stream_evaluated_subjects > 0
+            || diagnostics.source_stream_candidates > 0
+            || diagnostics.source_stream_alerts_emitted > 0
+        {
+            runtime.global_db_v1().write_metric_counter_v1(
+                METRIC_VDROP_SOURCE_STREAM_LAST_EVALUATION_TS_V1,
+                eval_ts_i64 as u64,
+            )?;
+        }
+    }
+
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_tracked_subjects_v1(tenant_id),
+        diagnostics.tracked_subjects,
+    )?;
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_open_silence_subjects_v1(tenant_id),
+        diagnostics.open_silence_subjects,
+    )?;
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_open_drop_subjects_v1(tenant_id),
+        diagnostics.open_drop_subjects,
+    )?;
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_tracked_subjects_v1(tenant_id),
+        diagnostics.source_stream_tracked_subjects,
+    )?;
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_open_silence_subjects_v1(tenant_id),
+        diagnostics.source_stream_open_silence_subjects,
+    )?;
+    write_metric_gauge_u64_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_open_drop_subjects_v1(tenant_id),
+        diagnostics.source_stream_open_drop_subjects,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_evaluated_subjects_total_v1(tenant_id),
+        diagnostics.evaluated_subjects,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_candidates_total_v1(tenant_id),
+        diagnostics.candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_suppressed_candidates_total_v1(tenant_id),
+        diagnostics.suppressed_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_alerts_emitted_total_v1(tenant_id),
+        diagnostics.alerts_emitted,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_evaluated_subjects_total_v1(tenant_id),
+        diagnostics.source_stream_evaluated_subjects,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_candidates_total_v1(tenant_id),
+        diagnostics.source_stream_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_suppressed_candidates_total_v1(tenant_id),
+        diagnostics.source_stream_suppressed_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        &metric_vdrop_tenant_source_stream_alerts_emitted_total_v1(tenant_id),
+        diagnostics.source_stream_alerts_emitted,
+    )?;
+    if eval_ts_i64 >= 0 {
+        runtime.global_db_v1().write_metric_counter_v1(
+            &metric_vdrop_tenant_last_evaluation_ts_v1(tenant_id),
+            eval_ts_i64 as u64,
+        )?;
+        if diagnostics.source_stream_evaluated_subjects > 0
+            || diagnostics.source_stream_candidates > 0
+            || diagnostics.source_stream_alerts_emitted > 0
+        {
+            runtime.global_db_v1().write_metric_counter_v1(
+                &metric_vdrop_tenant_source_stream_last_evaluation_ts_v1(tenant_id),
+                eval_ts_i64 as u64,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn spool_counters_delta_v1(current: &SpoolCountersV1, previous: &SpoolCountersV1) -> SpoolCountersV1 {
+    SpoolCountersV1 {
+        sink_spool_total: current.sink_spool_total.saturating_sub(previous.sink_spool_total),
+        sink_spool_replayed_total: current
+            .sink_spool_replayed_total
+            .saturating_sub(previous.sink_spool_replayed_total),
+        sink_spool_replay_fail_total: current
+            .sink_spool_replay_fail_total
+            .saturating_sub(previous.sink_spool_replay_fail_total),
+        sink_spool_drop_total: current
+            .sink_spool_drop_total
+            .saturating_sub(previous.sink_spool_drop_total),
+    }
+}
+
+fn read_persisted_recovery_metrics_v1(runtime: &SparxRuntimeV1) -> Result<RecoveryMetricsTotalsV1, DbErrorV1> {
+    let db = runtime.global_db_v1();
+    Ok(RecoveryMetricsTotalsV1 {
+        spool_writes_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1)?.unwrap_or(0),
+        spool_replayed_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?.unwrap_or(0),
+        spool_replay_fail_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?.unwrap_or(0),
+        spool_drop_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1)?.unwrap_or(0),
+        automated_replay_attempts_total: db
+            .read_metric_counter_v1(METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?
+            .unwrap_or(0),
+    })
+}
+
+fn persist_recovery_metrics_v1(runtime: &SparxRuntimeV1, totals: &RecoveryMetricsTotalsV1) -> Result<(), DbErrorV1> {
+    let db = runtime.global_db_v1();
+    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1, totals.spool_writes_total)?;
+    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1, totals.spool_replayed_total)?;
+    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1, totals.spool_replay_fail_total)?;
+    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1, totals.spool_drop_total)?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        totals.automated_replay_attempts_total,
+    )?;
+    Ok(())
+}
+
+fn read_persisted_tenant_recovery_metrics_v1(
+    runtime: &SparxRuntimeV1,
+    tenant_id: &str,
+) -> Result<TenantRecoveryMetricsTotalsV1, DbErrorV1> {
+    let db = runtime.global_db_v1();
+    Ok(TenantRecoveryMetricsTotalsV1 {
+        spool_writes_total: db
+            .read_metric_counter_v1(&metric_recovery_tenant_spool_writes_total_v1(tenant_id))?
+            .unwrap_or(0),
+        spool_replayed_total: db
+            .read_metric_counter_v1(&metric_recovery_tenant_spool_replayed_total_v1(tenant_id))?
+            .unwrap_or(0),
+        spool_replay_fail_total: db
+            .read_metric_counter_v1(&metric_recovery_tenant_spool_replay_fail_total_v1(tenant_id))?
+            .unwrap_or(0),
+        automated_replay_attempts_total: db
+            .read_metric_counter_v1(&metric_recovery_tenant_automated_replay_attempts_total_v1(tenant_id))?
+            .unwrap_or(0),
+    })
+}
+
+fn persist_tenant_recovery_metrics_v1(
+    runtime: &SparxRuntimeV1,
+    tenant_id: &str,
+    totals: &TenantRecoveryMetricsTotalsV1,
+) -> Result<(), DbErrorV1> {
+    let db = runtime.global_db_v1();
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_spool_writes_total_v1(tenant_id),
+        totals.spool_writes_total,
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_spool_replayed_total_v1(tenant_id),
+        totals.spool_replayed_total,
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_spool_replay_fail_total_v1(tenant_id),
+        totals.spool_replay_fail_total,
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_automated_replay_attempts_total_v1(tenant_id),
+        totals.automated_replay_attempts_total,
+    )?;
+    Ok(())
+}
+
+fn with_tenant_recovery_metrics_v1<F>(
+    runtime: &SparxRuntimeV1,
+    cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
+    tenant_id: &str,
+    apply: F,
+) -> Result<(), DbErrorV1>
+where
+    F: FnOnce(&mut TenantRecoveryMetricsTotalsV1),
+{
+    if !cache.contains_key(tenant_id) {
+        let persisted = read_persisted_tenant_recovery_metrics_v1(runtime, tenant_id)?;
+        cache.insert(tenant_id.to_string(), persisted);
+    }
+    let totals = cache
+        .get_mut(tenant_id)
+        .ok_or_else(|| DbErrorV1::new_v1("tenant recovery metrics cache entry missing after insert"))?;
+    apply(totals);
+    persist_tenant_recovery_metrics_v1(runtime, tenant_id, totals)
+}
+
+fn spool_tenant_id_from_path_v1(path: &Path) -> Option<String> {
+    for component in path.components() {
+        let text = component.as_os_str().to_str()?;
+        if let Some(tenant_id) = text.strip_prefix("tenant=") {
+            return Some(tenant_id.to_string());
+        }
+    }
+    None
+}
+
+fn persist_tenant_recovery_emit_outcome_v1(
+    runtime: &SparxRuntimeV1,
+    cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
+    outcome: &Option<SpoolEmitOutcomeV1>,
+) -> Result<(), DbErrorV1> {
+    let Some(SpoolEmitOutcomeV1::Spooled { path }) = outcome else {
+        return Ok(());
+    };
+    let Some(tenant_id) = spool_tenant_id_from_path_v1(path) else {
+        return Ok(());
+    };
+    with_tenant_recovery_metrics_v1(runtime, cache, &tenant_id, |totals| {
+        totals.add_spool_write_v1();
+    })
+}
+
+fn persist_tenant_recovery_replay_report_v1(
+    runtime: &SparxRuntimeV1,
+    cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
+    report: &SpoolReplayReportV1,
+) -> Result<(), DbErrorV1> {
+    let mut replayed_by_tenant: BTreeMap<String, u64> = BTreeMap::new();
+    let mut failed_by_tenant: BTreeMap<String, u64> = BTreeMap::new();
+    let mut attempted_tenants: BTreeSet<String> = BTreeSet::new();
+
+    for path in &report.replayed_paths {
+        if let Some(tenant_id) = spool_tenant_id_from_path_v1(path) {
+            *replayed_by_tenant.entry(tenant_id.clone()).or_insert(0) += 1;
+            attempted_tenants.insert(tenant_id);
+        }
+    }
+    for path in &report.failed_paths {
+        if let Some(tenant_id) = spool_tenant_id_from_path_v1(path) {
+            *failed_by_tenant.entry(tenant_id.clone()).or_insert(0) += 1;
+            attempted_tenants.insert(tenant_id);
+        }
+    }
+
+    for tenant_id in attempted_tenants {
+        let replayed = replayed_by_tenant.get(&tenant_id).copied().unwrap_or(0);
+        let failed = failed_by_tenant.get(&tenant_id).copied().unwrap_or(0);
+        with_tenant_recovery_metrics_v1(runtime, cache, &tenant_id, |totals| {
+            totals.add_automated_attempt_v1();
+            totals.add_replayed_v1(replayed);
+            totals.add_replay_fail_v1(failed);
+        })?;
+    }
+    Ok(())
+}
+
+fn persist_last_automated_replay_summary_v1(
+    runtime: &SparxRuntimeV1,
+    attempt_ts: i64,
+    replayed: u64,
+    failed: u64,
+) -> Result<(), DbErrorV1> {
+    let db = runtime.global_db_v1();
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1,
+        attempt_ts as u64,
+    )?;
+    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1, replayed as f64)?;
+    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1, failed as f64)?;
+    Ok(())
+}
+
+fn persist_recovery_counter_delta_from_sink_v1(
+    runtime: &SparxRuntimeV1,
+    sink: &OneShotSinkV1,
+    totals: &mut RecoveryMetricsTotalsV1,
+    last_snapshot: &mut SpoolCountersV1,
+) -> Result<(), DbErrorV1> {
+    let snapshot = sink.spool_counters_snapshot_v1();
+    let delta = spool_counters_delta_v1(&snapshot, last_snapshot);
+    if delta != SpoolCountersV1::default() {
+        totals.add_counter_delta_v1(&delta);
+        persist_recovery_metrics_v1(runtime, totals)?;
+        *last_snapshot = snapshot;
+    }
+    Ok(())
+}
+
+fn persist_recovery_history_start_counter_snapshot_v1(
+    runtime: &SparxRuntimeV1,
+    snapshot_ts: i64,
+    spool_writes_total: Option<u64>,
+    spool_replayed_total: Option<u64>,
+    spool_replay_fail_total: Option<u64>,
+    automated_replay_attempts_total: Option<u64>,
+) -> Result<(), DbErrorV1> {
+    let db = runtime.global_db_v1();
+    if db
+        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1)?
+        .is_some()
+    {
+        return Ok(());
+    }
+
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1,
+        snapshot_ts as u64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+        spool_writes_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+        spool_replayed_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+        spool_replay_fail_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        automated_replay_attempts_total.unwrap_or(0),
+    )?;
+    Ok(())
+}
+
+fn persist_tenant_recovery_history_start_counter_snapshot_v1(
+    runtime: &SparxRuntimeV1,
+    tenant_id: &str,
+    snapshot_ts: i64,
+    spool_writes_total: Option<u64>,
+    spool_replayed_total: Option<u64>,
+    spool_replay_fail_total: Option<u64>,
+    automated_replay_attempts_total: Option<u64>,
+) -> Result<(), DbErrorV1> {
+    let db = runtime.global_db_v1();
+    let history_start_ts_name = metric_recovery_tenant_history_start_counter_snapshot_ts_v1(tenant_id);
+    if db.read_metric_counter_v1(&history_start_ts_name)?.is_some() {
+        return Ok(());
+    }
+
+    db.write_metric_counter_v1(&history_start_ts_name, snapshot_ts as u64)?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_history_start_counter_snapshot_spool_writes_total_v1(tenant_id),
+        spool_writes_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_history_start_counter_snapshot_spool_replayed_total_v1(tenant_id),
+        spool_replayed_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1(tenant_id),
+        spool_replay_fail_total.unwrap_or(0),
+    )?;
+    db.write_metric_counter_v1(
+        &metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1(tenant_id),
+        automated_replay_attempts_total.unwrap_or(0),
+    )?;
+    Ok(())
+}
+
+fn persist_recovery_backlog_snapshot_v1(
+    cfg: &ConfigV1,
+    runtime: &SparxRuntimeV1,
+    snapshot_ts: i64,
+) -> Result<(), DbErrorV1> {
+    let summary = spool_backlog_summary_v1(&cfg.sparx.data_root)
+        .map_err(|e| DbErrorV1::new_v1(format!("failed to read spool backlog summary: {}", e.msg)))?;
+    let tenant_summaries = spool_backlog_per_tenant_v1(&cfg.sparx.data_root)
+        .map_err(|e| DbErrorV1::new_v1(format!("failed to read per-tenant spool backlog summary: {}", e.msg)))?;
+    let db = runtime.global_db_v1();
+    let last_snapshot_ts = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1)?;
+    let last_snapshot_backlog_files = read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1)?;
+    let last_snapshot_backlog_bytes = read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1)?;
+    let last_counter_snapshot_ts = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1)?;
+    let last_counter_snapshot_spool_writes_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
+    let last_counter_snapshot_spool_replayed_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
+    let last_counter_snapshot_spool_replay_fail_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let last_counter_snapshot_automated_replay_attempts_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+    let spool_writes_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1)?;
+    let spool_replayed_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?;
+    let spool_replay_fail_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let automated_replay_attempts_total = db.read_metric_counter_v1(METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+
+    persist_recovery_history_start_counter_snapshot_v1(
+        runtime,
+        snapshot_ts,
+        spool_writes_total,
+        spool_replayed_total,
+        spool_replay_fail_total,
+        automated_replay_attempts_total,
+    )?;
+
+    match last_snapshot_ts {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1)?,
+    }
+    match last_snapshot_backlog_files {
+        Some(value) => db.write_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1, value as f64)?,
+        None => db.delete_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1)?,
+    }
+    match last_snapshot_backlog_bytes {
+        Some(value) => db.write_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1, value as f64)?,
+        None => db.delete_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1)?,
+    }
+    match last_counter_snapshot_ts {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1)?,
+    }
+    match last_counter_snapshot_spool_writes_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?,
+    }
+    match last_counter_snapshot_spool_replayed_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?,
+    }
+    match last_counter_snapshot_spool_replay_fail_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?,
+    }
+    match last_counter_snapshot_automated_replay_attempts_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?,
+    }
+
+    db.write_metric_counter_v1(METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1, snapshot_ts as u64)?;
+    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1, summary.files as f64)?;
+    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1, summary.bytes as f64)?;
+    db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1, snapshot_ts as u64)?;
+    match spool_writes_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?,
+    }
+    match spool_replayed_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?,
+    }
+    match spool_replay_fail_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?,
+    }
+    match automated_replay_attempts_total {
+        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1, value)?,
+        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?,
+    }
+
+    for tenant in tenant_summaries {
+        let previous_ts_name = metric_recovery_tenant_previous_snapshot_ts_v1(&tenant.tenant_id);
+        let previous_files_name = metric_recovery_tenant_previous_snapshot_backlog_files_v1(&tenant.tenant_id);
+        let previous_bytes_name = metric_recovery_tenant_previous_snapshot_backlog_bytes_v1(&tenant.tenant_id);
+        let last_ts_name = metric_recovery_tenant_last_snapshot_ts_v1(&tenant.tenant_id);
+        let last_files_name = metric_recovery_tenant_last_snapshot_backlog_files_v1(&tenant.tenant_id);
+        let last_bytes_name = metric_recovery_tenant_last_snapshot_backlog_bytes_v1(&tenant.tenant_id);
+        let previous_counter_ts_name = metric_recovery_tenant_previous_counter_snapshot_ts_v1(&tenant.tenant_id);
+        let previous_counter_spool_writes_name = metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1(&tenant.tenant_id);
+        let previous_counter_spool_replayed_name = metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1(&tenant.tenant_id);
+        let previous_counter_spool_replay_fail_name = metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1(&tenant.tenant_id);
+        let previous_counter_automated_attempts_name = metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1(&tenant.tenant_id);
+        let last_counter_ts_name = metric_recovery_tenant_last_counter_snapshot_ts_v1(&tenant.tenant_id);
+        let last_counter_spool_writes_name = metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1(&tenant.tenant_id);
+        let last_counter_spool_replayed_name = metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1(&tenant.tenant_id);
+        let last_counter_spool_replay_fail_name = metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1(&tenant.tenant_id);
+        let last_counter_automated_attempts_name = metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1(&tenant.tenant_id);
+
+        let tenant_last_snapshot_ts = db.read_metric_counter_v1(&last_ts_name)?;
+        let tenant_last_snapshot_backlog_files = db.read_metric_gauge_v1(&last_files_name)?;
+        let tenant_last_snapshot_backlog_bytes = db.read_metric_gauge_v1(&last_bytes_name)?;
+        let tenant_last_counter_snapshot_ts = db.read_metric_counter_v1(&last_counter_ts_name)?;
+        let tenant_last_counter_snapshot_spool_writes_total = db.read_metric_counter_v1(&last_counter_spool_writes_name)?;
+        let tenant_last_counter_snapshot_spool_replayed_total = db.read_metric_counter_v1(&last_counter_spool_replayed_name)?;
+        let tenant_last_counter_snapshot_spool_replay_fail_total = db.read_metric_counter_v1(&last_counter_spool_replay_fail_name)?;
+        let tenant_last_counter_snapshot_automated_replay_attempts_total = db.read_metric_counter_v1(&last_counter_automated_attempts_name)?;
+        let tenant_spool_writes_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_writes_total_v1(&tenant.tenant_id))?;
+        let tenant_spool_replayed_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_replayed_total_v1(&tenant.tenant_id))?;
+        let tenant_spool_replay_fail_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_replay_fail_total_v1(&tenant.tenant_id))?;
+        let tenant_automated_replay_attempts_total = db.read_metric_counter_v1(&metric_recovery_tenant_automated_replay_attempts_total_v1(&tenant.tenant_id))?;
+
+        persist_tenant_recovery_history_start_counter_snapshot_v1(
+            runtime,
+            &tenant.tenant_id,
+            snapshot_ts,
+            tenant_spool_writes_total,
+            tenant_spool_replayed_total,
+            tenant_spool_replay_fail_total,
+            tenant_automated_replay_attempts_total,
+        )?;
+
+        match tenant_last_snapshot_ts {
+            Some(value) => db.write_metric_counter_v1(&previous_ts_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_ts_name)?,
+        }
+        match tenant_last_snapshot_backlog_files {
+            Some(value) => db.write_metric_gauge_v1(&previous_files_name, value)?,
+            None => db.delete_metric_gauge_v1(&previous_files_name)?,
+        }
+        match tenant_last_snapshot_backlog_bytes {
+            Some(value) => db.write_metric_gauge_v1(&previous_bytes_name, value)?,
+            None => db.delete_metric_gauge_v1(&previous_bytes_name)?,
+        }
+        match tenant_last_counter_snapshot_ts {
+            Some(value) => db.write_metric_counter_v1(&previous_counter_ts_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_counter_ts_name)?,
+        }
+        match tenant_last_counter_snapshot_spool_writes_total {
+            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_writes_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_counter_spool_writes_name)?,
+        }
+        match tenant_last_counter_snapshot_spool_replayed_total {
+            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_replayed_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_counter_spool_replayed_name)?,
+        }
+        match tenant_last_counter_snapshot_spool_replay_fail_total {
+            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_replay_fail_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_counter_spool_replay_fail_name)?,
+        }
+        match tenant_last_counter_snapshot_automated_replay_attempts_total {
+            Some(value) => db.write_metric_counter_v1(&previous_counter_automated_attempts_name, value)?,
+            None => db.delete_metric_counter_v1(&previous_counter_automated_attempts_name)?,
+        }
+
+        db.write_metric_counter_v1(&last_ts_name, snapshot_ts as u64)?;
+        db.write_metric_gauge_v1(&last_files_name, tenant.files as f64)?;
+        db.write_metric_gauge_v1(&last_bytes_name, tenant.bytes as f64)?;
+        db.write_metric_counter_v1(&last_counter_ts_name, snapshot_ts as u64)?;
+        match tenant_spool_writes_total {
+            Some(value) => db.write_metric_counter_v1(&last_counter_spool_writes_name, value)?,
+            None => db.delete_metric_counter_v1(&last_counter_spool_writes_name)?,
+        }
+        match tenant_spool_replayed_total {
+            Some(value) => db.write_metric_counter_v1(&last_counter_spool_replayed_name, value)?,
+            None => db.delete_metric_counter_v1(&last_counter_spool_replayed_name)?,
+        }
+        match tenant_spool_replay_fail_total {
+            Some(value) => db.write_metric_counter_v1(&last_counter_spool_replay_fail_name, value)?,
+            None => db.delete_metric_counter_v1(&last_counter_spool_replay_fail_name)?,
+        }
+        match tenant_automated_replay_attempts_total {
+            Some(value) => db.write_metric_counter_v1(&last_counter_automated_attempts_name, value)?,
+            None => db.delete_metric_counter_v1(&last_counter_automated_attempts_name)?,
+        }
+    }
+    Ok(())
+}
 
 fn read_persisted_run_cycle_summary_v1(runtime: &SparxRuntimeV1) -> Result<RunCycleSummaryV1, DbErrorV1> {
     let db = runtime.global_db_v1();
@@ -1740,6 +2724,13 @@ fn format_automated_spool_replay_warning_v1(scope: &str, report: &SpoolReplayRep
     ))
 }
 
+fn should_run_automated_replay_v1(last_attempt_ts: Option<i64>, now_ts: i64, interval_s: u32) -> bool {
+    match last_attempt_ts {
+        None => true,
+        Some(last_attempt_ts) => now_ts.saturating_sub(last_attempt_ts) >= i64::from(interval_s),
+    }
+}
+
 fn test_run_max_cycles_v1() -> Option<u32> {
     std::env::var("SPARX_TEST_RUN_MAX_CYCLES")
         .ok()
@@ -1807,7 +2798,7 @@ fn run_daemon_inner_v1(
             },
             SpoolConfigV1 {
                 data_root: cfg.sparx.data_root.clone(),
-                spool_max_mb: SPOOL_MAX_MB_DEFAULT_V1,
+                spool_max_mb: cfg.output.spool_max_mb,
             },
         )),
         "stdout" => OneShotSinkV1::Stdout(StdoutAlertSinkV1::new(Vec::<u8>::new())),
@@ -1846,23 +2837,158 @@ fn run_daemon_inner_v1(
             };
         }
     };
+    let mut recovery_totals = match read_persisted_recovery_metrics_v1(runtime) {
+        Ok(totals) => totals,
+        Err(e) => {
+            observability.shutdown_v1();
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+            };
+        }
+    };
+    let mut last_sink_counters = sink.spool_counters_snapshot_v1();
+    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> = BTreeMap::new();
 
     let automated_replay_max_files = cfg.output.automated_replay_max_files_per_pass as usize;
+    let automated_replay_interval_s = cfg.output.automated_replay_interval_s;
+    let mut last_automated_replay_attempt_ts: Option<i64> = None;
 
     loop {
         let cycle_now_ts = current_unix_ts_v1();
-        match sink.replay_automated_v1(cycle_now_ts, automated_replay_max_files) {
-            Ok(Some(report)) => {
-                if let Some(warning) = format_automated_spool_replay_warning_v1(
-                    "run",
-                    &report,
-                    automated_replay_max_files,
-                ) {
-                    failures.push(warning);
+        if sink.supports_recovery_v1()
+            && should_run_automated_replay_v1(last_automated_replay_attempt_ts, cycle_now_ts, automated_replay_interval_s)
+        {
+            recovery_totals.automated_replay_attempts_total = recovery_totals
+                .automated_replay_attempts_total
+                .saturating_add(1);
+            if let Err(e) = persist_recovery_metrics_v1(runtime, &recovery_totals) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+            match sink.replay_automated_v1(cycle_now_ts, automated_replay_max_files) {
+                Ok(Some(report)) => {
+                    if let Err(e) = persist_last_automated_replay_summary_v1(
+                        runtime,
+                        cycle_now_ts,
+                        report.replayed_paths.len() as u64,
+                        report.failed_paths.len() as u64,
+                    ) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                    if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                        runtime,
+                        &sink,
+                        &mut recovery_totals,
+                        &mut last_sink_counters,
+                    ) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                    if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                        runtime,
+                        &mut tenant_recovery_metrics_cache,
+                        &report,
+                    ) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                    if let Some(warning) = format_automated_spool_replay_warning_v1(
+                        "run",
+                        &report,
+                        automated_replay_max_files,
+                    ) {
+                        failures.push(warning);
+                    }
+                }
+                Ok(None) => {
+                    if let Err(e) = persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
+                }
+                Err(e) => {
+                    if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                        };
+                    }
+                    if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                        runtime,
+                        &sink,
+                        &mut recovery_totals,
+                        &mut last_sink_counters,
+                    ) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                        };
+                    }
+                    if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                        };
+                    }
+                    failures.push(format!("automated spool replay warning: scope=run error={}", e));
                 }
             }
-            Ok(None) => {}
-            Err(e) => failures.push(format!("automated spool replay warning: scope=run error={}", e)),
+            last_automated_replay_attempt_ts = Some(cycle_now_ts);
         }
         match run_single_cycle_v1(runtime, cfg, migrate, &mut sink, cycle_now_ts) {
             Ok((cycle_summary, cycle_failures)) => {
@@ -1876,6 +3002,31 @@ fn run_daemon_inner_v1(
                         msg_stdout: None,
                         msg_stderr: Some(format!("run metrics error: {}", e)),
                     };
+                }
+                if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if sink.supports_recovery_v1() {
+                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, current_unix_ts_v1()) {
+                        observability.shutdown_v1();
+                        let _ = sink.shutdown_v1();
+                        return RouteResultV1 {
+                            exit_code: 4,
+                            msg_stdout: None,
+                            msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                        };
+                    }
                 }
                 failures.extend(cycle_failures);
             }
@@ -1899,8 +3050,72 @@ fn run_daemon_inner_v1(
         thread::sleep(Duration::from_millis(u64::from(cfg.ingest.poll_interval_ms)));
     }
 
-    match sink.replay_automated_v1(current_unix_ts_v1(), automated_replay_max_files) {
+    if sink.supports_recovery_v1() {
+        let final_replay_ts = current_unix_ts_v1();
+        recovery_totals.automated_replay_attempts_total = recovery_totals
+            .automated_replay_attempts_total
+            .saturating_add(1);
+        if let Err(e) = persist_recovery_metrics_v1(runtime, &recovery_totals) {
+            observability.shutdown_v1();
+            let _ = sink.shutdown_v1();
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+            };
+        }
+        match sink.replay_automated_v1(final_replay_ts, automated_replay_max_files) {
         Ok(Some(report)) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(
+                runtime,
+                final_replay_ts,
+                report.replayed_paths.len() as u64,
+                report.failed_paths.len() as u64,
+            ) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                runtime,
+                &mut tenant_recovery_metrics_cache,
+                &report,
+            ) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
             if let Some(warning) = format_automated_spool_replay_warning_v1(
                 "run-final",
                 &report,
@@ -1909,8 +3124,62 @@ fn run_daemon_inner_v1(
                 failures.push(warning);
             }
         }
-        Ok(None) => {}
-        Err(e) => failures.push(format!("automated spool replay warning: scope=run-final error={}", e)),
+        Ok(None) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                };
+            }
+        }
+        Err(e) => {
+            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
+                observability.shutdown_v1();
+                let _ = sink.shutdown_v1();
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                };
+            }
+            failures.push(format!("automated spool replay warning: scope=run-final error={}", e));
+        }
+        }
     }
 
     if let Err(e) = sink.shutdown_v1() {
@@ -2117,16 +3386,59 @@ fn run_single_cycle_v1(
                 .then(a.device.device_key.cmp(&b.device.device_key))
         });
 
+        let tenant_policy = match load_optional_tenant_policy_for_vdrop_v1(cfg, &tenant_id) {
+            Ok(policy) => policy,
+            Err(e) => {
+                return Err(RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run vdrop policy error: {}", e)),
+                });
+            }
+        };
+        let source_stream_enabled = resolve_vdrop_source_stream_enabled_v1(
+            cfg.vdrop.enabled,
+            cfg.vdrop.source_stream_enabled,
+            tenant_policy.as_ref(),
+        );
+
+        let mut sharp_drop_windows = Vec::new();
+        let mut source_stream_windows = Vec::new();
         for inventory in &inventories_sorted {
-            match process_device_oneshot_v1(runtime, cfg, inventory, None, None, sink, now_ts) {
-                Ok(alert_count) => {
+            match process_device_oneshot_v1(runtime, cfg, inventory, None, None, source_stream_enabled, sink, &mut tenant_recovery_metrics_cache, now_ts) {
+                Ok(device_result) => {
                     summary.devices_processed = summary.devices_processed.saturating_add(1);
-                    summary.alerts_emitted = summary.alerts_emitted.saturating_add(alert_count);
+                    summary.alerts_emitted = summary.alerts_emitted.saturating_add(device_result.alerts_emitted);
+                    sharp_drop_windows.extend(device_result.sharp_drop_windows);
+                    source_stream_windows.extend(device_result.source_stream_windows);
                 }
                 Err(e) => {
                     summary.devices_failed = summary.devices_failed.saturating_add(1);
                     failures.push(format!("{}/{}: {}", inventory.device.tenant_id, inventory.device.device_dir_rel, e));
                 }
+            }
+        }
+
+        match emit_vdrop_alerts_for_tenant_v1(
+            runtime,
+            cfg,
+            &tenant_id,
+            None,
+            &sharp_drop_windows,
+            &source_stream_windows,
+            sink,
+            &mut tenant_recovery_metrics_cache,
+            now_ts,
+        ) {
+            Ok(alert_count) => {
+                summary.alerts_emitted = summary.alerts_emitted.saturating_add(alert_count);
+            }
+            Err(e) => {
+                return Err(RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("run vdrop error: {}", e)),
+                });
             }
         }
     }
@@ -2229,7 +3541,6 @@ fn ensure_tenant_record_for_run_v1(
 }
 
 
-
 fn route_oneshot_v1(
     cfg: &ConfigV1,
     tenant_id: &str,
@@ -2238,6 +3549,9 @@ fn route_oneshot_v1(
     device_path: Option<&str>,
     migrate: MigrateModeV1,
 ) -> RouteResultV1 {
+    if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
+        return invalid_cli_input_result_v1("oneshot", e);
+    }
     let mut runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
         Ok(runtime) => runtime,
         Err(e) => {
@@ -2311,7 +3625,7 @@ fn run_oneshot_inner_v1(
             },
             SpoolConfigV1 {
                 data_root: cfg.sparx.data_root.clone(),
-                spool_max_mb: SPOOL_MAX_MB_DEFAULT_V1,
+                spool_max_mb: cfg.output.spool_max_mb,
             },
         )),
         "stdout" => OneShotSinkV1::Stdout(StdoutAlertSinkV1::new(Vec::<u8>::new())),
@@ -2328,9 +3642,76 @@ fn run_oneshot_inner_v1(
     let mut failed_devices: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     let automated_replay_max_files = cfg.output.automated_replay_max_files_per_pass as usize;
+    let mut recovery_totals = match read_persisted_recovery_metrics_v1(runtime) {
+        Ok(totals) => totals,
+        Err(e) => {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+            };
+        }
+    };
+    let mut last_sink_counters = sink.spool_counters_snapshot_v1();
+    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> = BTreeMap::new();
 
-    match sink.replay_automated_v1(current_unix_ts_v1(), automated_replay_max_files) {
+    if sink.supports_recovery_v1() {
+        let pre_replay_ts = current_unix_ts_v1();
+        recovery_totals.automated_replay_attempts_total = recovery_totals
+            .automated_replay_attempts_total
+            .saturating_add(1);
+        if let Err(e) = persist_recovery_metrics_v1(runtime, &recovery_totals) {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+            };
+        }
+
+        match sink.replay_automated_v1(pre_replay_ts, automated_replay_max_files) {
         Ok(Some(report)) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(
+                runtime,
+                pre_replay_ts,
+                report.replayed_paths.len() as u64,
+                report.failed_paths.len() as u64,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                runtime,
+                &mut tenant_recovery_metrics_cache,
+                &report,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
             if let Some(warning) = format_automated_spool_replay_warning_v1(
                 "oneshot-pre",
                 &report,
@@ -2339,14 +3720,78 @@ fn run_oneshot_inner_v1(
                 warnings.push(warning);
             }
         }
-        Ok(None) => {}
-        Err(e) => warnings.push(format!("automated spool replay warning: scope=oneshot-pre error={}", e)),
+        Ok(None) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+        }
+        Err(e) => {
+            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            warnings.push(format!("automated spool replay warning: scope=oneshot-pre error={}", e));
+        }
+        }
     }
 
+    let tenant_policy = match load_optional_tenant_policy_for_vdrop_v1(cfg, tenant_id) {
+        Ok(policy) => policy,
+        Err(e) => {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot vdrop policy error: {}", e)),
+            };
+        }
+    };
+    let source_stream_enabled = resolve_vdrop_source_stream_enabled_v1(
+        cfg.vdrop.enabled,
+        cfg.vdrop.source_stream_enabled,
+        tenant_policy.as_ref(),
+    );
+
+    let mut sharp_drop_windows = Vec::new();
+    let mut source_stream_windows = Vec::new();
     for inventory in &inventories {
-        match process_device_oneshot_v1(runtime, cfg, inventory, since, until, &mut sink, now_ts) {
-            Ok(alert_count) => {
-                total_alerts = total_alerts.saturating_add(alert_count);
+        match process_device_oneshot_v1(runtime, cfg, inventory, since, until, source_stream_enabled, &mut sink, &mut tenant_recovery_metrics_cache, now_ts) {
+            Ok(device_result) => {
+                total_alerts = total_alerts.saturating_add(device_result.alerts_emitted);
+                sharp_drop_windows.extend(device_result.sharp_drop_windows);
+                source_stream_windows.extend(device_result.source_stream_windows);
             }
             Err(e) => {
                 failed_devices.push(format!("{}/{}: {}", inventory.device.tenant_id, inventory.device.device_dir_rel, e));
@@ -2354,8 +3799,109 @@ fn run_oneshot_inner_v1(
         }
     }
 
-    match sink.replay_automated_v1(current_unix_ts_v1(), automated_replay_max_files) {
+    let device_filter_key = device_path.map(|path| device_key_v1(tenant_id, path));
+    match emit_vdrop_alerts_for_tenant_v1(
+        runtime,
+        cfg,
+        tenant_id,
+        device_filter_key.as_deref(),
+        &sharp_drop_windows,
+        &source_stream_windows,
+        &mut sink,
+        &mut tenant_recovery_metrics_cache,
+        now_ts,
+    ) {
+        Ok(alert_count) => {
+            total_alerts = total_alerts.saturating_add(alert_count);
+        }
+        Err(e) => {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot vdrop error: {}", e)),
+            };
+        }
+    }
+
+    if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+        runtime,
+        &sink,
+        &mut recovery_totals,
+        &mut last_sink_counters,
+    ) {
+        return RouteResultV1 {
+            exit_code: 4,
+            msg_stdout: None,
+            msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+        };
+    }
+    if sink.supports_recovery_v1() {
+        if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, current_unix_ts_v1()) {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+            };
+        }
+    }
+
+    if sink.supports_recovery_v1() {
+        let post_replay_ts = current_unix_ts_v1();
+        recovery_totals.automated_replay_attempts_total = recovery_totals
+            .automated_replay_attempts_total
+            .saturating_add(1);
+        if let Err(e) = persist_recovery_metrics_v1(runtime, &recovery_totals) {
+            return RouteResultV1 {
+                exit_code: 4,
+                msg_stdout: None,
+                msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+            };
+        }
+
+        match sink.replay_automated_v1(post_replay_ts, automated_replay_max_files) {
         Ok(Some(report)) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(
+                runtime,
+                post_replay_ts,
+                report.replayed_paths.len() as u64,
+                report.failed_paths.len() as u64,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                runtime,
+                &mut tenant_recovery_metrics_cache,
+                &report,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
             if let Some(warning) = format_automated_spool_replay_warning_v1(
                 "oneshot-post",
                 &report,
@@ -2364,8 +3910,52 @@ fn run_oneshot_inner_v1(
                 warnings.push(warning);
             }
         }
-        Ok(None) => {}
-        Err(e) => warnings.push(format!("automated spool replay warning: scope=oneshot-post error={}", e)),
+        Ok(None) => {
+            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                };
+            }
+        }
+        Err(e) => {
+            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                runtime,
+                &sink,
+                &mut recovery_totals,
+                &mut last_sink_counters,
+            ) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
+                return RouteResultV1 {
+                    exit_code: 4,
+                    msg_stdout: None,
+                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                };
+            }
+            warnings.push(format!("automated spool replay warning: scope=oneshot-post error={}", e));
+        }
+        }
     }
 
     if let Err(e) = sink.shutdown_v1() {
@@ -2547,15 +4137,25 @@ fn build_oneshot_inventory_v1(
     Ok(inventories)
 }
 
+#[derive(Clone, Debug, Default)]
+struct FinalizeWindowEmitResultV1 {
+    alerts_emitted: usize,
+    emit_outcome: Option<SpoolEmitOutcomeV1>,
+    sharp_drop_windows: Vec<SharpDropRuntimeWindowV1>,
+    source_stream_windows: Vec<SourceStreamRuntimeWindowV1>,
+}
+
 fn process_device_oneshot_v1(
     runtime: &mut SparxRuntimeV1,
     cfg: &ConfigV1,
     inventory: &crate::ingest::DeviceInventoryV1,
     since: Option<i64>,
     until: Option<i64>,
+    source_stream_enabled: bool,
     sink: &mut OneShotSinkV1,
+    tenant_recovery_metrics_cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
     now_ts: i64,
-) -> Result<usize, String> {
+) -> Result<ProcessDeviceResultV1, String> {
     let dict_cfg = FeatureDictionaryConfigV1::from(&cfg.features);
     let caps = WindowCapsV1::from(&cfg.caps);
     let df_cfg = DfRingConfigV1::from(&cfg.baseline);
@@ -2576,7 +4176,8 @@ fn process_device_oneshot_v1(
         .with_tenant_db_v1(&tenant_id, now_ts, |db| restore_active_window_from_tenant_db_v1(db, &device.device_key, caps.clone(), &dict))
         .map_err(|e| e.to_string())?;
     let mut active_spans: Vec<ActiveSpanStateV1> = Vec::new();
-    let mut alerts_emitted = 0usize;
+    let mut active_source_streams: BTreeMap<String, SourceStreamActiveObservationV1> = BTreeMap::new();
+    let mut result = ProcessDeviceResultV1::default();
     let mut ordered_files = inventory.files.clone();
     ordered_files.sort_by(|a, b| {
         a.is_gzip
@@ -2602,20 +4203,25 @@ fn process_device_oneshot_v1(
         if !cursor_plan.should_read {
             continue;
         }
-        alerts_emitted = alerts_emitted.saturating_add(process_file_oneshot_v1(
+        result.alerts_emitted = result.alerts_emitted.saturating_add(process_file_oneshot_v1(
             runtime,
             cfg,
             &mut dict,
             &mut acc,
             &mut active_spans,
+            &mut active_source_streams,
+            &mut result.sharp_drop_windows,
+            &mut result.source_stream_windows,
             &mut cursor,
             sink,
+            tenant_recovery_metrics_cache,
             device,
             file,
             &file_path,
             &cursor_plan,
             since,
             until,
+            source_stream_enabled,
             &df_cfg,
             &centroid_cfg,
             &alert_cfg,
@@ -2625,30 +4231,35 @@ fn process_device_oneshot_v1(
 
     if let Some(acc_final) = acc.take() {
         let finalized = acc_final.finalize_idle_v1();
-        alerts_emitted = alerts_emitted.saturating_add(
-            runtime
-                .with_tenant_db_v1(&tenant_id, now_ts, |db| {
-                    finalize_window_oneshot_v1(
-                        db,
-                        &tenant_id,
-                        device,
-                        &dict,
-                        take_file_spans_from_active_v1(&mut active_spans),
-                        sink,
-                        finalized.finalized_row.clone(),
-                        &df_cfg,
-                        &centroid_cfg,
-                        &alert_cfg,
-                    )
-                })
-                .map_err(|e| e.to_string())?,
-        );
+        let finalize_result = runtime
+            .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+                finalize_window_oneshot_v1(
+                    db,
+                    &tenant_id,
+                    device,
+                    &dict,
+                    take_file_spans_from_active_v1(&mut active_spans),
+                    take_source_stream_observations_v1(&mut active_source_streams),
+                    source_stream_enabled,
+                    sink,
+                    finalized.finalized_row.clone(),
+                    &df_cfg,
+                    &centroid_cfg,
+                    &alert_cfg,
+                )
+            })
+            .map_err(|e| e.to_string())?;
+        persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &finalize_result.emit_outcome)
+            .map_err(|e| e.to_string())?;
+        result.alerts_emitted = result.alerts_emitted.saturating_add(finalize_result.alerts_emitted);
+        result.sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
+        result.source_stream_windows.extend(finalize_result.source_stream_windows);
         runtime
             .with_tenant_db_v1(&tenant_id, now_ts, |db| apply_window_finalize_mutations_to_db_v1(db, &finalized.mutations))
             .map_err(|e| e.to_string())?;
     }
 
-    Ok(alerts_emitted)
+    Ok(result)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2658,24 +4269,38 @@ fn process_file_oneshot_v1(
     dict: &mut FeatureDictionaryV1,
     acc_opt: &mut Option<WindowAccumulatorV1>,
     active_spans: &mut Vec<ActiveSpanStateV1>,
+    active_source_streams: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
+    sharp_drop_windows: &mut Vec<SharpDropRuntimeWindowV1>,
+    source_stream_windows: &mut Vec<SourceStreamRuntimeWindowV1>,
     cursor: &mut FileCursorV1,
     sink: &mut OneShotSinkV1,
+    tenant_recovery_metrics_cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
     device: &TenantDeviceV1,
     file: &DiscoveredFileV1,
     file_path: &Path,
     cursor_plan: &CursorPlanV1,
     since: Option<i64>,
     until: Option<i64>,
+    source_stream_enabled: bool,
     df_cfg: &DfRingConfigV1,
     centroid_cfg: &CentroidStatsConfigV1,
     alert_cfg: &AlertScoringConfigV1,
     now_ts: i64,
 ) -> Result<usize, String> {
-    let mut reader = open_file_reader_v1(file_path, file.is_gzip, cursor_plan.start_offset, 1)
+    let reader_chunk_bytes = if file.is_gzip {
+        1
+    } else {
+        usize::try_from(cfg.ingest.read_chunk_bytes).unwrap_or(usize::MAX).max(1)
+    };
+    let mut reader = open_file_reader_v1(file_path, file.is_gzip, cursor_plan.start_offset, reader_chunk_bytes)
         .map_err(|e| format!("open file reader failed: {}", e))?;
+    let max_line_bytes = usize::try_from(cfg.ingest.max_line_len).unwrap_or(usize::MAX).max(1);
+    // Keep malformed or delimiter-free input bounded. The first capped slice is
+    // processed, then the rest of the physical line is skipped until newline.
     let mut line_buf = Vec::new();
     let mut line_start_offset = cursor_plan.start_offset;
     let mut current_offset = cursor_plan.start_offset;
+    let mut dropping_overlong_line = false;
     let mut alerts_emitted = 0usize;
 
     loop {
@@ -2683,23 +4308,26 @@ fn process_file_oneshot_v1(
         let Some(chunk) = chunk else {
             if !line_buf.is_empty() {
                 let line_end = current_offset;
-                let line = String::from_utf8_lossy(&line_buf).into_owned();
-                alerts_emitted = alerts_emitted.saturating_add(process_line_oneshot_v1(
+                alerts_emitted = alerts_emitted.saturating_add(process_buffered_line_oneshot_v1(
                     runtime,
                     cfg,
                     dict,
                     acc_opt,
                     active_spans,
+                    active_source_streams,
+                    sharp_drop_windows,
+                    source_stream_windows,
                     cursor,
                     sink,
+                    tenant_recovery_metrics_cache,
                     device,
                     file,
-                    line.trim_end_matches('\n').trim_end_matches('\r'),
+                    &line_buf,
                     line_start_offset,
                     line_end,
-                    line.as_bytes().len() as u64,
                     since,
                     until,
+                    source_stream_enabled,
                     df_cfg,
                     centroid_cfg,
                     alert_cfg,
@@ -2711,35 +4339,57 @@ fn process_file_oneshot_v1(
         };
 
         current_offset = chunk.offset_end;
-        if line_buf.is_empty() {
-            line_start_offset = chunk.offset_start;
-        }
-        line_buf.extend_from_slice(&chunk.data);
-        if chunk.data.len() == 1 && chunk.data[0] == b'\n' {
-            let line_end = current_offset;
-            let line = String::from_utf8_lossy(&line_buf).into_owned();
-            alerts_emitted = alerts_emitted.saturating_add(process_line_oneshot_v1(
-                runtime,
-                cfg,
-                dict,
-                acc_opt,
-                active_spans,
-                cursor,
-                sink,
-                device,
-                file,
-                line.trim_end_matches('\n').trim_end_matches('\r'),
-                line_start_offset,
-                line_end,
-                line.as_bytes().len() as u64,
-                since,
-                until,
-                df_cfg,
-                centroid_cfg,
-                alert_cfg,
-                now_ts,
-            )?);
-            line_buf.clear();
+        for (idx, byte) in chunk.data.iter().enumerate() {
+            let byte_end = if file.is_gzip {
+                chunk.offset_end
+            } else {
+                chunk.offset_start.saturating_add(idx as u64).saturating_add(1)
+            };
+
+            if dropping_overlong_line {
+                if *byte == b'\n' {
+                    dropping_overlong_line = false;
+                }
+                continue;
+            }
+
+            if line_buf.is_empty() {
+                line_start_offset = if file.is_gzip {
+                    chunk.offset_start
+                } else {
+                    chunk.offset_start.saturating_add(idx as u64)
+                };
+            }
+            line_buf.push(*byte);
+            if *byte == b'\n' || line_buf.len() >= max_line_bytes {
+                alerts_emitted = alerts_emitted.saturating_add(process_buffered_line_oneshot_v1(
+                    runtime,
+                    cfg,
+                    dict,
+                    acc_opt,
+                    active_spans,
+                    active_source_streams,
+                    sharp_drop_windows,
+                    source_stream_windows,
+                    cursor,
+                    sink,
+                    tenant_recovery_metrics_cache,
+                    device,
+                    file,
+                    &line_buf,
+                    line_start_offset,
+                    byte_end,
+                    since,
+                    until,
+                    source_stream_enabled,
+                    df_cfg,
+                    centroid_cfg,
+                    alert_cfg,
+                    now_ts,
+                )?);
+                dropping_overlong_line = *byte != b'\n' && line_buf.len() >= max_line_bytes;
+                line_buf.clear();
+            }
         }
     }
 
@@ -2754,14 +4404,74 @@ fn process_file_oneshot_v1(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn process_buffered_line_oneshot_v1(
+    runtime: &mut SparxRuntimeV1,
+    cfg: &ConfigV1,
+    dict: &mut FeatureDictionaryV1,
+    acc_opt: &mut Option<WindowAccumulatorV1>,
+    active_spans: &mut Vec<ActiveSpanStateV1>,
+    active_source_streams: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
+    sharp_drop_windows: &mut Vec<SharpDropRuntimeWindowV1>,
+    source_stream_windows: &mut Vec<SourceStreamRuntimeWindowV1>,
+    cursor: &mut FileCursorV1,
+    sink: &mut OneShotSinkV1,
+    tenant_recovery_metrics_cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
+    device: &TenantDeviceV1,
+    file: &DiscoveredFileV1,
+    line_buf: &[u8],
+    line_start_offset: u64,
+    line_end: u64,
+    since: Option<i64>,
+    until: Option<i64>,
+    source_stream_enabled: bool,
+    df_cfg: &DfRingConfigV1,
+    centroid_cfg: &CentroidStatsConfigV1,
+    alert_cfg: &AlertScoringConfigV1,
+    now_ts: i64,
+) -> Result<usize, String> {
+    // Invalid UTF-8 is treated as lossy text so malformed logs cannot panic the runtime.
+    let line = String::from_utf8_lossy(line_buf).into_owned();
+    process_line_oneshot_v1(
+        runtime,
+        cfg,
+        dict,
+        acc_opt,
+        active_spans,
+        active_source_streams,
+        sharp_drop_windows,
+        source_stream_windows,
+        cursor,
+        sink,
+        tenant_recovery_metrics_cache,
+        device,
+        file,
+        line.trim_end_matches('\n').trim_end_matches('\r'),
+        line_start_offset,
+        line_end,
+        line_buf.len() as u64,
+        since,
+        until,
+        source_stream_enabled,
+        df_cfg,
+        centroid_cfg,
+        alert_cfg,
+        now_ts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn process_line_oneshot_v1(
     runtime: &mut SparxRuntimeV1,
     cfg: &ConfigV1,
     dict: &mut FeatureDictionaryV1,
     acc_opt: &mut Option<WindowAccumulatorV1>,
     active_spans: &mut Vec<ActiveSpanStateV1>,
+    active_source_streams: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
+    sharp_drop_windows: &mut Vec<SharpDropRuntimeWindowV1>,
+    source_stream_windows: &mut Vec<SourceStreamRuntimeWindowV1>,
     cursor: &mut FileCursorV1,
     sink: &mut OneShotSinkV1,
+    tenant_recovery_metrics_cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
     device: &TenantDeviceV1,
     file: &DiscoveredFileV1,
     line: &str,
@@ -2770,6 +4480,7 @@ fn process_line_oneshot_v1(
     byte_len: u64,
     since: Option<i64>,
     until: Option<i64>,
+    source_stream_enabled: bool,
     df_cfg: &DfRingConfigV1,
     centroid_cfg: &CentroidStatsConfigV1,
     alert_cfg: &AlertScoringConfigV1,
@@ -2806,7 +4517,9 @@ fn process_line_oneshot_v1(
     }
 
     loop {
-        let acc = acc_opt.as_mut().expect("accumulator present");
+        let acc = acc_opt
+            .as_mut()
+            .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
         let result = acc
             .apply_line_v1(line_ts, line_ts, usize::try_from(byte_len).unwrap_or(usize::MAX), &emitted, dict)
             .map_err(|e| format!("apply line failed: {:?}", e))?;
@@ -2819,6 +4532,17 @@ fn process_line_oneshot_v1(
                     })
                     .map_err(|e| e.to_string())?;
                 update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
+                if source_stream_enabled {
+                    update_active_source_stream_observation_v1(
+                        active_source_streams,
+                        device,
+                        file,
+                        cursor.inode,
+                        offset_start,
+                        offset_end,
+                        byte_len,
+                    )?;
+                }
                 *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
                 runtime
                     .with_tenant_db_v1(&device.tenant_id, now_ts, |db| db.write_cursor_v1(&device.device_key, &file.file_key, cursor))
@@ -2830,14 +4554,16 @@ fn process_line_oneshot_v1(
                     .finalize_and_advance_v1(line_window_start_ts, line_ts)
                     .map_err(|e| format!("finalize and advance failed: {:?}", e))?;
                 let finalized_row = plan.finalized_row.clone();
-                let alerts = runtime
+                let finalize_result = runtime
                     .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                        let alerts = finalize_window_oneshot_v1(
+                        let finalize_result = finalize_window_oneshot_v1(
                             db,
                             &device.tenant_id,
                             device,
                             dict,
                             take_file_spans_from_active_v1(active_spans),
+                            take_source_stream_observations_v1(active_source_streams),
+                            source_stream_enabled,
                             sink,
                             finalized_row,
                             df_cfg,
@@ -2845,18 +4571,27 @@ fn process_line_oneshot_v1(
                             alert_cfg,
                         )?;
                         apply_window_finalize_mutations_to_db_v1(db, &plan.mutations)?;
-                        Ok(alerts)
+                        Ok(finalize_result)
                     })
                     .map_err(|e| e.to_string())?;
+                persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &finalize_result.emit_outcome)
+                    .map_err(|e| e.to_string())?;
+                let finalized_alerts_emitted = finalize_result.alerts_emitted;
+                sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
+                source_stream_windows.extend(finalize_result.source_stream_windows);
                 *acc_opt = Some(next);
-                return Ok(alerts.saturating_add(process_line_oneshot_v1(
+                return Ok(finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
                     runtime,
                     cfg,
                     dict,
                     acc_opt,
                     active_spans,
+                    active_source_streams,
+                    sharp_drop_windows,
+                    source_stream_windows,
                     cursor,
                     sink,
+                    tenant_recovery_metrics_cache,
                     device,
                     file,
                     line,
@@ -2865,6 +4600,7 @@ fn process_line_oneshot_v1(
                     byte_len,
                     since,
                     until,
+                    source_stream_enabled,
                     df_cfg,
                     centroid_cfg,
                     alert_cfg,
@@ -2882,12 +4618,14 @@ fn finalize_window_oneshot_v1(
     device: &TenantDeviceV1,
     dict: &FeatureDictionaryV1,
     spans: Vec<FileSpanV1>,
+    source_stream_observations: Vec<SourceStreamActiveObservationV1>,
+    source_stream_enabled: bool,
     sink: &mut OneShotSinkV1,
     row: crate::window::FinalizedWindowRowV1,
     df_cfg: &DfRingConfigV1,
     centroid_cfg: &CentroidStatsConfigV1,
     alert_cfg: &AlertScoringConfigV1,
-) -> Result<usize, DbErrorV1> {
+) -> Result<FinalizeWindowEmitResultV1, DbErrorV1> {
     let baseline_before = build_bucket_baseline_from_tenant_db_v1(db, &device.device_key, row.key.bucket, df_cfg)?;
     let current_stats = db
         .read_device_baseline_state_v1(&device.device_key, row.key.bucket)?
@@ -2907,6 +4645,17 @@ fn finalize_window_oneshot_v1(
         },
     };
     let stale_slot_keys = collect_stale_slot_keys_from_tenant_db_v1(db, slot)?;
+    let sharp_drop_windows = vec![SharpDropRuntimeWindowV1 {
+        device_key: device.device_key.clone(),
+        window_start_ts_i64: row.key.window_start_ts,
+        window_end_ts_i64: row.key.window_end_ts,
+        observed_lines_u64: u64::from(row.meta.lines),
+        observed_bytes_u64: row.meta.bytes,
+        bucket_u8: row.key.bucket,
+        expected: current_stats.as_ref().map(sharp_drop_expected_volume_from_device_stats_v1),
+        provenance: spans.clone(),
+    }];
+
     let preview = build_alert_v1(
         tenant_id,
         &format!("{}/{}", device.tenant_id, device.device_dir_rel),
@@ -2935,15 +4684,942 @@ fn finalize_window_oneshot_v1(
     )
     .map_err(|e| DbErrorV1::new_v1(format!("centroid update failed: {:?}", e)))?;
     apply_centroid_mutations_to_db_v1(db, &centroid_plan.mutations)?;
+    update_expected_source_states_from_finalized_window_v1(db, &row, alert_cfg.min_lines_per_window)?;
+    let source_stream_windows = if source_stream_enabled {
+        update_source_stream_states_from_finalized_window_v1(
+            db,
+            &row,
+            source_stream_observations,
+            alert_cfg.min_lines_per_window,
+        )?
+    } else {
+        Vec::new()
+    };
 
     if let Some(alert) = preview.alert {
         db.write_primary_alert_v1(&alert)?;
-        sink.emit_v1(&alert)
+        let emit_outcome = sink
+            .emit_v1(&alert)
             .map_err(|e| DbErrorV1::new_v1(format!("oneshot sink emit failed: {}", e)))?;
-        Ok(1)
+        Ok(FinalizeWindowEmitResultV1 {
+            alerts_emitted: 1,
+            emit_outcome,
+            sharp_drop_windows,
+            source_stream_windows,
+        })
     } else {
-        Ok(0)
+        Ok(FinalizeWindowEmitResultV1 {
+            alerts_emitted: 0,
+            emit_outcome: None,
+            sharp_drop_windows,
+            source_stream_windows,
+        })
     }
+}
+
+fn update_expected_source_states_from_finalized_window_v1(
+    db: &crate::db::TenantDbV1,
+    row: &crate::window::FinalizedWindowRowV1,
+    min_lines_per_window: u32,
+) -> Result<(), DbErrorV1> {
+    let window_size = row
+        .key
+        .window_end_ts
+        .checked_sub(row.key.window_start_ts)
+        .and_then(|v| u32::try_from(v).ok())
+        .ok_or_else(|| DbErrorV1::new_v1("expected-source state update invalid finalized window bounds"))?;
+    let update_common = |subject_kind_u8| ExpectedSourceStateUpdateV1 {
+        subject_kind_u8,
+        window_size_s_u32: window_size,
+        window_start_ts_i64: row.key.window_start_ts,
+        window_end_ts_i64: row.key.window_end_ts,
+        observed_lines_u64: u64::from(row.meta.lines),
+        observed_bytes_u64: row.meta.bytes,
+        bucket_u8: row.key.bucket,
+        update_ts_i64: row.key.window_end_ts,
+        min_lines_per_window_u32: min_lines_per_window,
+    };
+
+    db.update_device_expected_source_state_v1(
+        &row.key.device_key,
+        &update_common(SILENCE_SUBJECT_KIND_DEVICE_V1),
+    )?;
+    db.update_tenant_expected_source_state_v1(&update_common(SILENCE_SUBJECT_KIND_TENANT_V1))?;
+    close_observed_open_silence_states_for_window_v1(db, row)?;
+    Ok(())
+}
+
+
+fn update_source_stream_states_from_finalized_window_v1(
+    db: &crate::db::TenantDbV1,
+    row: &crate::window::FinalizedWindowRowV1,
+    observations: Vec<SourceStreamActiveObservationV1>,
+    min_lines_per_window: u32,
+) -> Result<Vec<SourceStreamRuntimeWindowV1>, DbErrorV1> {
+    let window_size = row
+        .key
+        .window_end_ts
+        .checked_sub(row.key.window_start_ts)
+        .and_then(|v| u32::try_from(v).ok())
+        .ok_or_else(|| DbErrorV1::new_v1("source-stream state update invalid finalized window bounds"))?;
+    let mut windows = Vec::with_capacity(observations.len());
+
+    for observation in observations {
+        let previous_stats = db.read_source_stream_stats_v1(
+            &observation.identity.device_key,
+            &observation.identity.source_stream_id,
+            row.key.bucket,
+        )?;
+        let expected = match previous_stats.as_ref() {
+            Some(stats) => Some(
+                sharp_drop_expected_volume_from_source_stream_stats_v1(stats)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected volume failed: {:?}", e)))?,
+            ),
+            None => None,
+        };
+
+        let previous_catalog = db.read_source_stream_catalog_v1(
+            &observation.identity.device_key,
+            &observation.identity.source_stream_id,
+        )?;
+        let catalog = update_source_stream_catalog_observed_v1(
+            previous_catalog.as_ref(),
+            &observation.identity,
+            row.key.window_end_ts,
+        )
+        .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog update failed: {:?}", e)))?;
+        db.write_source_stream_catalog_v1(&catalog)?;
+
+        let update = ExpectedSourceStateUpdateV1 {
+            subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+            window_size_s_u32: window_size,
+            window_start_ts_i64: row.key.window_start_ts,
+            window_end_ts_i64: row.key.window_end_ts,
+            observed_lines_u64: observation.observed_lines_u64,
+            observed_bytes_u64: observation.observed_bytes_u64,
+            bucket_u8: row.key.bucket,
+            update_ts_i64: row.key.window_end_ts,
+            min_lines_per_window_u32: min_lines_per_window,
+        };
+        db.update_source_stream_expected_source_state_v1(
+            &observation.identity.device_key,
+            &observation.identity.source_stream_id,
+            &update,
+        )?;
+
+        let next_stats = update_source_stream_stats_from_observation_v1(
+            previous_stats.as_ref(),
+            observation.observed_lines_u64,
+            observation.observed_bytes_u64,
+            row.key.window_end_ts,
+        )
+        .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats update failed: {:?}", e)))?;
+        db.write_source_stream_stats_v1(
+            &observation.identity.device_key,
+            &observation.identity.source_stream_id,
+            row.key.bucket,
+            &next_stats,
+        )?;
+
+        if let Some(next) = close_open_silence_state_after_observation_v1(
+            db.read_source_stream_open_silence_state_v1(
+                &observation.identity.device_key,
+                &observation.identity.source_stream_id,
+            )?,
+            SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+        ) {
+            db.write_source_stream_open_silence_state_v1(
+                &observation.identity.device_key,
+                &observation.identity.source_stream_id,
+                &next,
+            )?;
+        }
+
+        windows.push(SourceStreamRuntimeWindowV1 {
+            subject: observation.subject,
+            window_start_ts_i64: row.key.window_start_ts,
+            window_end_ts_i64: row.key.window_end_ts,
+            observed_lines_u64: observation.observed_lines_u64,
+            observed_bytes_u64: observation.observed_bytes_u64,
+            bucket_u8: row.key.bucket,
+            expected,
+            provenance: take_file_spans_from_active_values_v1(observation.spans),
+        });
+    }
+
+    windows.sort_by(|a, b| {
+        a.subject
+            .device_key
+            .cmp(&b.subject.device_key)
+            .then(a.subject.source_stream_id.cmp(&b.subject.source_stream_id))
+            .then(a.window_start_ts_i64.cmp(&b.window_start_ts_i64))
+            .then(a.window_end_ts_i64.cmp(&b.window_end_ts_i64))
+            .then(a.bucket_u8.cmp(&b.bucket_u8))
+    });
+    Ok(windows)
+}
+
+fn close_observed_open_silence_states_for_window_v1(
+    db: &crate::db::TenantDbV1,
+    row: &crate::window::FinalizedWindowRowV1,
+) -> Result<(), DbErrorV1> {
+    if let Some(next) = close_open_silence_state_after_observation_v1(
+        db.read_device_open_silence_state_v1(&row.key.device_key)?,
+        SILENCE_SUBJECT_KIND_DEVICE_V1,
+    ) {
+        db.write_device_open_silence_state_v1(&row.key.device_key, &next)?;
+    }
+    if let Some(next) = close_open_silence_state_after_observation_v1(
+        db.read_tenant_open_silence_state_v1()?,
+        SILENCE_SUBJECT_KIND_TENANT_V1,
+    ) {
+        db.write_tenant_open_silence_state_v1(&next)?;
+    }
+    Ok(())
+}
+
+fn close_open_silence_state_after_observation_v1(
+    state: Option<OpenSilenceStateV1>,
+    subject_kind_u8: u8,
+) -> Option<OpenSilenceStateV1> {
+    let mut state = state?;
+    if state.subject_kind_u8 != subject_kind_u8 {
+        return None;
+    }
+    if (state.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) == 0 {
+        return None;
+    }
+    state.state_flags_u8 = (state.state_flags_u8 & !OPEN_SILENCE_FLAG_OPEN_V1) | OPEN_SILENCE_FLAG_CLOSED_V1;
+    Some(state)
+}
+
+fn load_optional_tenant_policy_for_vdrop_v1(
+    cfg: &ConfigV1,
+    tenant_id: &str,
+) -> Result<Option<TenantPolicyV1>, DbErrorV1> {
+    let tenant_root = Path::new(&cfg.sparx.tenant_root);
+    let (tenant_dir, policy_path) = tenant_policy_path_parts_v1(tenant_root, tenant_id);
+    match load_tenant_policy_v1(&tenant_dir, &policy_path) {
+        Ok(policy) => Ok(Some(policy)),
+        Err(e) if e.kind == TenantPolicyLoadErrorKindV1::MissingPolicy => Ok(None),
+        Err(e) => Err(DbErrorV1::new_v1(format!(
+            "vdrop tenant policy load failed for {} at {}: {}",
+            tenant_id,
+            policy_path.display(),
+            e.details.join("; ")
+        ))),
+    }
+}
+
+fn resolve_vdrop_policy_v1(
+    cfg: &ConfigV1,
+    tenant_policy: Option<&TenantPolicyV1>,
+) -> VDropResolvedPolicyV1 {
+    let alert_cfg = AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
+    let min_mature_windows = tenant_policy
+        .and_then(|policy| policy.vdrop_min_mature_windows)
+        .or(cfg.vdrop.min_mature_windows)
+        .unwrap_or_else(|| u64::from(alert_cfg.cold_start_min_windows));
+    let min_expected_lines = tenant_policy
+        .and_then(|policy| policy.vdrop_min_expected_lines)
+        .or(cfg.vdrop.min_expected_lines)
+        .unwrap_or_else(|| u64::from(alert_cfg.min_lines_per_window));
+
+    VDropResolvedPolicyV1 {
+        enabled: tenant_policy
+            .and_then(|policy| policy.vdrop_enabled)
+            .unwrap_or(cfg.vdrop.enabled),
+        device_enabled: tenant_policy
+            .and_then(|policy| policy.vdrop_device_enabled)
+            .unwrap_or(cfg.vdrop.device_enabled),
+        tenant_enabled: tenant_policy
+            .and_then(|policy| policy.vdrop_tenant_enabled)
+            .unwrap_or(cfg.vdrop.tenant_enabled),
+        source_stream_enabled: resolve_vdrop_source_stream_enabled_v1(
+            cfg.vdrop.enabled,
+            cfg.vdrop.source_stream_enabled,
+            tenant_policy,
+        ),
+        min_expected_windows_missed_u64: u64::from(
+            tenant_policy
+                .and_then(|policy| policy.vdrop_min_expected_windows_missed)
+                .unwrap_or(cfg.vdrop.min_expected_windows_missed),
+        ),
+        min_mature_windows_u64: min_mature_windows,
+        min_expected_lines_u64: min_expected_lines,
+    }
+}
+
+fn vdrop_evaluation_config_from_policy_v1(
+    policy: &VDropResolvedPolicyV1,
+    eval_ts_i64: i64,
+) -> VDropEvaluationConfigV1 {
+    VDropEvaluationConfigV1 {
+        eval_ts_i64,
+        min_mature_windows_u64: policy.min_mature_windows_u64,
+        min_expected_windows_missed_u64: policy.min_expected_windows_missed_u64,
+        min_expected_lines_u64: policy.min_expected_lines_u64,
+    }
+}
+
+fn sharp_drop_device_evaluation_config_from_policy_v1(
+    policy: &VDropResolvedPolicyV1,
+) -> SharpDropEvaluationConfigV1 {
+    SharpDropEvaluationConfigV1 {
+        min_maturity_count_u64: policy.min_mature_windows_u64,
+        min_expected_lines_f64: policy.min_expected_lines_u64 as f64,
+        min_absolute_drop_lines_f64: policy.min_expected_lines_u64 as f64,
+        max_observed_expected_ratio_f32: SHARP_DROP_DEFAULT_MAX_OBSERVED_EXPECTED_RATIO_V1,
+        min_drop_ratio_f32: SHARP_DROP_DEFAULT_MIN_DROP_RATIO_V1,
+        variance_gate_stddevs_f32: SHARP_DROP_DEFAULT_VARIANCE_GATE_STDDEVS_V1,
+    }
+}
+
+fn sharp_drop_tenant_evaluation_config_from_policy_v1(
+    policy: &VDropResolvedPolicyV1,
+) -> SharpDropEvaluationConfigV1 {
+    SharpDropEvaluationConfigV1 {
+        min_maturity_count_u64: SHARP_DROP_DEFAULT_TENANT_MATURE_DEVICE_FLOOR_V1,
+        min_expected_lines_f64: policy.min_expected_lines_u64 as f64,
+        min_absolute_drop_lines_f64: policy.min_expected_lines_u64 as f64,
+        max_observed_expected_ratio_f32: SHARP_DROP_DEFAULT_MAX_OBSERVED_EXPECTED_RATIO_V1,
+        min_drop_ratio_f32: SHARP_DROP_DEFAULT_MIN_DROP_RATIO_V1,
+        variance_gate_stddevs_f32: SHARP_DROP_DEFAULT_VARIANCE_GATE_STDDEVS_V1,
+    }
+}
+
+fn emit_vdrop_alerts_for_tenant_v1(
+    runtime: &mut SparxRuntimeV1,
+    cfg: &ConfigV1,
+    tenant_id: &str,
+    device_filter_key: Option<&str>,
+    sharp_drop_windows: &[SharpDropRuntimeWindowV1],
+    source_stream_windows: &[SourceStreamRuntimeWindowV1],
+    sink: &mut OneShotSinkV1,
+    tenant_recovery_metrics_cache: &mut BTreeMap<String, TenantRecoveryMetricsTotalsV1>,
+    eval_ts_i64: i64,
+) -> Result<usize, DbErrorV1> {
+    let tenant_policy = load_optional_tenant_policy_for_vdrop_v1(cfg, tenant_id)?;
+    let resolved_policy = resolve_vdrop_policy_v1(cfg, tenant_policy.as_ref());
+    if !resolved_policy.enabled {
+        return Ok(0);
+    }
+    let eval_cfg = vdrop_evaluation_config_from_policy_v1(&resolved_policy, eval_ts_i64);
+    let mut result = runtime.with_tenant_db_v1(tenant_id, eval_ts_i64, |db| {
+        collect_and_persist_vdrop_alerts_for_tenant_db_v1(
+            db,
+            tenant_id,
+            device_filter_key,
+            &eval_cfg,
+            &resolved_policy,
+            sharp_drop_windows,
+            source_stream_windows,
+        )
+    })?;
+
+    let mut emitted = 0usize;
+    for alert in result.alerts {
+        let emit_outcome = sink
+            .emit_v1(&alert)
+            .map_err(|e| DbErrorV1::new_v1(format!("vdrop sink emit failed: {}", e)))?;
+        let emit_outcome = Some(emit_outcome);
+        persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &emit_outcome)?;
+        emitted = emitted.saturating_add(1);
+    }
+    result.diagnostics.alerts_emitted = emitted as u64;
+    persist_vdrop_diagnostics_delta_v1(runtime, tenant_id, &result.diagnostics, eval_ts_i64)?;
+    Ok(emitted)
+}
+
+fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
+    db: &crate::db::TenantDbV1,
+    tenant_id: &str,
+    device_filter_key: Option<&str>,
+    eval_cfg: &VDropEvaluationConfigV1,
+    policy: &VDropResolvedPolicyV1,
+    sharp_drop_windows: &[SharpDropRuntimeWindowV1],
+    source_stream_windows: &[SourceStreamRuntimeWindowV1],
+) -> Result<VDropCollectResultV1, DbErrorV1> {
+    let mut result = VDropCollectResultV1::default();
+    let mut device_states = db.list_device_expected_source_states_v1()?;
+    let mut device_open_states = db.list_device_open_silence_states_v1()?;
+    let mut device_open_drop_states = db.list_device_open_drop_states_v1()?;
+    if let Some(device_filter_key) = device_filter_key {
+        device_states.retain(|(device_key, _)| device_key == device_filter_key);
+        device_open_states.retain(|(device_key, _)| device_key == device_filter_key);
+        device_open_drop_states.retain(|(device_key, _)| device_key == device_filter_key);
+    }
+    let mut source_stream_device_keys: BTreeSet<String> = device_states
+        .iter()
+        .map(|(device_key, _)| device_key.clone())
+        .collect();
+    for window in source_stream_windows {
+        if device_filter_key
+            .map(|filter_key| filter_key != window.subject.device_key.as_str())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        source_stream_device_keys.insert(window.subject.device_key.clone());
+    }
+    let device_open_by_key: BTreeMap<String, OpenSilenceStateV1> = device_open_states.into_iter().collect();
+    let mut device_open_drop_by_key: BTreeMap<String, OpenDropStateV1> = device_open_drop_states.into_iter().collect();
+    let tenant_state = db.read_tenant_expected_source_state_v1()?;
+    let tenant_open = db.read_tenant_open_silence_state_v1()?;
+    let mut tenant_open_drop = db.read_tenant_open_drop_state_v1()?;
+
+    result.diagnostics.tracked_subjects = device_states.len() as u64;
+    result.diagnostics.open_silence_subjects = device_open_by_key
+        .values()
+        .filter(|state| open_silence_state_is_open_v1(state))
+        .count() as u64;
+    if device_filter_key.is_none() {
+        if tenant_state.is_some() {
+            result.diagnostics.tracked_subjects = result.diagnostics.tracked_subjects.saturating_add(1);
+        }
+        if tenant_open
+            .as_ref()
+            .map(open_silence_state_is_open_v1)
+            .unwrap_or(false)
+        {
+            result.diagnostics.open_silence_subjects = result.diagnostics.open_silence_subjects.saturating_add(1);
+        }
+    }
+
+    let mut hard_silence_device_keys: BTreeSet<String> = BTreeSet::new();
+    let mut hard_silence_tenant = false;
+
+    if policy.device_enabled {
+        for (device_key, state) in device_states {
+            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            match evaluate_vdrop_candidate_v1(
+                tenant_id,
+                &device_key,
+                Some(&state),
+                device_open_by_key.get(&device_key),
+                eval_cfg,
+            ) {
+                VDropEvaluationV1::Candidate(candidate) => {
+                    result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                    let built = build_vdrop_alert_v1(&candidate)
+                        .map_err(|e| DbErrorV1::new_v1(format!("vdrop alert build failed: {:?}", e)))?;
+                    db.write_primary_alert_v1(&built.alert)?;
+                    db.write_device_open_silence_state_v1(&device_key, &built.open_silence)?;
+                    if let Some(open_drop) = device_open_drop_by_key.get(&device_key).cloned() {
+                        if open_drop_state_is_open_v1(&open_drop) {
+                            let closed = close_open_drop_state_by_hard_silence_v1(&open_drop);
+                            db.write_device_open_drop_state_v1(&device_key, &closed)?;
+                            device_open_drop_by_key.insert(device_key.clone(), closed);
+                        }
+                    }
+                    hard_silence_device_keys.insert(device_key.clone());
+                    result.diagnostics.open_silence_subjects =
+                        result.diagnostics.open_silence_subjects.saturating_add(1);
+                    result.alerts.push(built.alert);
+                }
+                VDropEvaluationV1::Suppressed(_) => {
+                    result.diagnostics.suppressed_candidates = result.diagnostics.suppressed_candidates.saturating_add(1);
+                }
+            }
+        }
+    }
+
+    if policy.tenant_enabled && device_filter_key.is_none() {
+        result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+        match evaluate_vdrop_candidate_v1(
+            tenant_id,
+            tenant_id,
+            tenant_state.as_ref(),
+            tenant_open.as_ref(),
+            eval_cfg,
+        ) {
+            VDropEvaluationV1::Candidate(candidate) => {
+                result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                let built = build_vdrop_alert_v1(&candidate)
+                    .map_err(|e| DbErrorV1::new_v1(format!("vdrop alert build failed: {:?}", e)))?;
+                db.write_primary_alert_v1(&built.alert)?;
+                db.write_tenant_open_silence_state_v1(&built.open_silence)?;
+                if let Some(open_drop) = tenant_open_drop.clone() {
+                    if open_drop_state_is_open_v1(&open_drop) {
+                        let closed = close_open_drop_state_by_hard_silence_v1(&open_drop);
+                        db.write_tenant_open_drop_state_v1(&closed)?;
+                        tenant_open_drop = Some(closed);
+                    }
+                }
+                hard_silence_tenant = true;
+                result.diagnostics.open_silence_subjects =
+                    result.diagnostics.open_silence_subjects.saturating_add(1);
+                result.alerts.push(built.alert);
+            }
+            VDropEvaluationV1::Suppressed(_) => {
+                result.diagnostics.suppressed_candidates = result.diagnostics.suppressed_candidates.saturating_add(1);
+            }
+        }
+    }
+
+    collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
+        db,
+        tenant_id,
+        device_filter_key,
+        policy,
+        sharp_drop_windows,
+        &hard_silence_device_keys,
+        hard_silence_tenant,
+        &mut device_open_drop_by_key,
+        &mut tenant_open_drop,
+        &mut result,
+    )?;
+
+    result.diagnostics.open_drop_subjects = device_open_drop_by_key
+        .values()
+        .filter(|state| open_drop_state_is_open_v1(state))
+        .count() as u64;
+    if device_filter_key.is_none()
+        && tenant_open_drop
+            .as_ref()
+            .map(open_drop_state_is_open_v1)
+            .unwrap_or(false)
+    {
+        result.diagnostics.open_drop_subjects = result.diagnostics.open_drop_subjects.saturating_add(1);
+    }
+
+    collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
+        db,
+        tenant_id,
+        device_filter_key,
+        eval_cfg,
+        policy,
+        &source_stream_device_keys,
+        source_stream_windows,
+        &mut result,
+    )?;
+
+    Ok(result)
+}
+
+
+
+fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
+    db: &crate::db::TenantDbV1,
+    tenant_id: &str,
+    device_filter_key: Option<&str>,
+    eval_cfg: &VDropEvaluationConfigV1,
+    policy: &VDropResolvedPolicyV1,
+    source_stream_device_keys: &BTreeSet<String>,
+    source_stream_windows: &[SourceStreamRuntimeWindowV1],
+    result: &mut VDropCollectResultV1,
+) -> Result<(), DbErrorV1> {
+    if !policy.source_stream_enabled {
+        return Ok(());
+    }
+
+    let mut hard_silence_keys: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut open_drop_by_key: BTreeMap<(String, String), OpenDropStateV1> = BTreeMap::new();
+
+    for device_key in source_stream_device_keys {
+        if device_filter_key
+            .map(|filter_key| filter_key != device_key.as_str())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let states = db.list_source_stream_expected_source_states_for_device_v1(device_key)?;
+        let open_silence_by_id: BTreeMap<String, OpenSilenceStateV1> = db
+            .list_source_stream_open_silence_states_for_device_v1(device_key)?
+            .into_iter()
+            .collect();
+        let open_drop_for_device: BTreeMap<String, OpenDropStateV1> = db
+            .list_source_stream_open_drop_states_for_device_v1(device_key)?
+            .into_iter()
+            .collect();
+
+        let tracked_source_streams = states.len() as u64;
+        let open_source_stream_silences = open_silence_by_id
+            .values()
+            .filter(|state| open_silence_state_is_open_v1(state))
+            .count() as u64;
+        result.diagnostics.tracked_subjects = result.diagnostics.tracked_subjects.saturating_add(tracked_source_streams);
+        result.diagnostics.source_stream_tracked_subjects = result
+            .diagnostics
+            .source_stream_tracked_subjects
+            .saturating_add(tracked_source_streams);
+        result.diagnostics.open_silence_subjects = result
+            .diagnostics
+            .open_silence_subjects
+            .saturating_add(open_source_stream_silences);
+        result.diagnostics.source_stream_open_silence_subjects = result
+            .diagnostics
+            .source_stream_open_silence_subjects
+            .saturating_add(open_source_stream_silences);
+
+        for (source_stream_id, open_drop) in open_drop_for_device {
+            open_drop_by_key.insert((device_key.clone(), source_stream_id), open_drop);
+        }
+
+        for (source_stream_id, state) in states {
+            let catalog = db
+                .read_source_stream_catalog_v1(device_key, &source_stream_id)?
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream expected state missing catalog"))?;
+            let subject = SourceStreamSubjectV1 {
+                tenant_id: tenant_id.to_string(),
+                device_key: catalog.device_key.clone(),
+                source_stream_id: catalog.source_stream_id.clone(),
+                canonical_source_path: catalog.canonical_source_path.clone(),
+            };
+
+            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            result.diagnostics.source_stream_evaluated_subjects =
+                result.diagnostics.source_stream_evaluated_subjects.saturating_add(1);
+            match evaluate_source_stream_hard_silence_candidate_v1(
+                &subject,
+                Some(&state),
+                open_silence_by_id.get(&source_stream_id),
+                eval_cfg,
+            )
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream hard-silence evaluation failed: {:?}", e)))?
+            {
+                VDropEvaluationV1::Candidate(candidate) => {
+                    result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                    result.diagnostics.source_stream_candidates =
+                        result.diagnostics.source_stream_candidates.saturating_add(1);
+                    let built = build_source_stream_vdrop_alert_v1(&subject, &candidate)
+                        .map_err(|e| DbErrorV1::new_v1(format!("source-stream vdrop alert build failed: {:?}", e)))?;
+                    db.write_primary_alert_v1(&built.alert)?;
+                    db.write_source_stream_open_silence_state_v1(device_key, &source_stream_id, &built.open_silence)?;
+                    if let Some(open_drop) = open_drop_by_key.get(&(device_key.clone(), source_stream_id.clone())).cloned() {
+                        if open_drop_state_is_open_v1(&open_drop) {
+                            let closed = close_open_drop_state_by_hard_silence_v1(&open_drop);
+                            db.write_source_stream_open_drop_state_v1(device_key, &source_stream_id, &closed)?;
+                            open_drop_by_key.insert((device_key.clone(), source_stream_id.clone()), closed);
+                        }
+                    }
+                    hard_silence_keys.insert((device_key.clone(), source_stream_id.clone()));
+                    result.diagnostics.open_silence_subjects =
+                        result.diagnostics.open_silence_subjects.saturating_add(1);
+                    result.diagnostics.source_stream_open_silence_subjects = result
+                        .diagnostics
+                        .source_stream_open_silence_subjects
+                        .saturating_add(1);
+                    result.diagnostics.source_stream_alerts_emitted =
+                        result.diagnostics.source_stream_alerts_emitted.saturating_add(1);
+                    result.alerts.push(built.alert);
+                }
+                VDropEvaluationV1::Suppressed(_) => {
+                    result.diagnostics.suppressed_candidates =
+                        result.diagnostics.suppressed_candidates.saturating_add(1);
+                    result.diagnostics.source_stream_suppressed_candidates = result
+                        .diagnostics
+                        .source_stream_suppressed_candidates
+                        .saturating_add(1);
+                }
+            }
+        }
+    }
+
+    let source_cfg = sharp_drop_device_evaluation_config_from_policy_v1(policy);
+    let mut windows: Vec<&SourceStreamRuntimeWindowV1> = source_stream_windows.iter().collect();
+    windows.sort_by(|a, b| {
+        a.subject
+            .device_key
+            .cmp(&b.subject.device_key)
+            .then(a.subject.source_stream_id.cmp(&b.subject.source_stream_id))
+            .then(a.window_start_ts_i64.cmp(&b.window_start_ts_i64))
+            .then(a.window_end_ts_i64.cmp(&b.window_end_ts_i64))
+            .then(a.bucket_u8.cmp(&b.bucket_u8))
+    });
+
+    for window in windows {
+        if device_filter_key
+            .map(|filter_key| filter_key != window.subject.device_key.as_str())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        let source_key = (window.subject.device_key.clone(), window.subject.source_stream_id.clone());
+        if hard_silence_keys.contains(&source_key) {
+            continue;
+        }
+        let Some(expected) = window.expected.as_ref() else {
+            continue;
+        };
+
+        let current = crate::db::source_stream::SourceStreamCurrentWindowV1 {
+            subject: window.subject.clone(),
+            window_start_ts_i64: window.window_start_ts_i64,
+            window_end_ts_i64: window.window_end_ts_i64,
+            observed_lines_u64: window.observed_lines_u64,
+            observed_bytes_u64: window.observed_bytes_u64,
+            bucket_u8: window.bucket_u8,
+        };
+        result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+        result.diagnostics.source_stream_evaluated_subjects =
+            result.diagnostics.source_stream_evaluated_subjects.saturating_add(1);
+        match evaluate_source_stream_sharp_drop_candidate_v1(&current, expected, &source_cfg)
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream sharp-drop evaluation failed: {:?}", e)))?
+        {
+            SharpDropEvaluationV1::Candidate(candidate) => {
+                result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                result.diagnostics.source_stream_candidates =
+                    result.diagnostics.source_stream_candidates.saturating_add(1);
+                if source_stream_open_drop_state_suppresses_candidate_v1(
+                    &window.subject,
+                    &candidate,
+                    open_drop_by_key.get(&source_key),
+                )
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop suppression failed: {:?}", e)))?
+                {
+                    result.diagnostics.suppressed_candidates =
+                        result.diagnostics.suppressed_candidates.saturating_add(1);
+                    result.diagnostics.source_stream_suppressed_candidates = result
+                        .diagnostics
+                        .source_stream_suppressed_candidates
+                        .saturating_add(1);
+                    continue;
+                }
+                let built = build_source_stream_sharp_drop_alert_v1(&window.subject, &candidate, &window.provenance)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream sharp-drop alert build failed: {:?}", e)))?;
+                db.write_primary_alert_v1(&built.alert)?;
+                db.write_source_stream_open_drop_state_v1(
+                    &window.subject.device_key,
+                    &window.subject.source_stream_id,
+                    &built.open_drop,
+                )?;
+                open_drop_by_key.insert(source_key, built.open_drop);
+                result.diagnostics.source_stream_alerts_emitted =
+                    result.diagnostics.source_stream_alerts_emitted.saturating_add(1);
+                result.alerts.push(built.alert);
+            }
+            SharpDropEvaluationV1::Suppressed(reason) => {
+                result.diagnostics.suppressed_candidates =
+                    result.diagnostics.suppressed_candidates.saturating_add(1);
+                result.diagnostics.source_stream_suppressed_candidates = result
+                    .diagnostics
+                    .source_stream_suppressed_candidates
+                    .saturating_add(1);
+                if sharp_drop_suppression_closes_recovery_v1(&reason) {
+                    if let Some(open_drop) = open_drop_by_key.get(&source_key).cloned() {
+                        if open_drop_state_is_open_v1(&open_drop) {
+                            let closed = close_open_drop_state_by_recovery_v1(&open_drop);
+                            db.write_source_stream_open_drop_state_v1(
+                                &window.subject.device_key,
+                                &window.subject.source_stream_id,
+                                &closed,
+                            )?;
+                            open_drop_by_key.insert(source_key, closed);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let open_source_stream_drops = open_drop_by_key
+        .values()
+        .filter(|state| open_drop_state_is_open_v1(state))
+        .count() as u64;
+    result.diagnostics.open_drop_subjects = result
+        .diagnostics
+        .open_drop_subjects
+        .saturating_add(open_source_stream_drops);
+    result.diagnostics.source_stream_open_drop_subjects = result
+        .diagnostics
+        .source_stream_open_drop_subjects
+        .saturating_add(open_source_stream_drops);
+
+    Ok(())
+}
+
+fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
+    db: &crate::db::TenantDbV1,
+    tenant_id: &str,
+    device_filter_key: Option<&str>,
+    policy: &VDropResolvedPolicyV1,
+    sharp_drop_windows: &[SharpDropRuntimeWindowV1],
+    hard_silence_device_keys: &BTreeSet<String>,
+    hard_silence_tenant: bool,
+    device_open_drop_by_key: &mut BTreeMap<String, OpenDropStateV1>,
+    tenant_open_drop: &mut Option<OpenDropStateV1>,
+    result: &mut VDropCollectResultV1,
+) -> Result<(), DbErrorV1> {
+    if policy.device_enabled {
+        let device_cfg = sharp_drop_device_evaluation_config_from_policy_v1(policy);
+        let mut windows: Vec<&SharpDropRuntimeWindowV1> = sharp_drop_windows.iter().collect();
+        windows.sort_by(|a, b| {
+            a.device_key
+                .cmp(&b.device_key)
+                .then(a.window_start_ts_i64.cmp(&b.window_start_ts_i64))
+                .then(a.window_end_ts_i64.cmp(&b.window_end_ts_i64))
+                .then(a.bucket_u8.cmp(&b.bucket_u8))
+        });
+
+        for window in windows {
+            if device_filter_key
+                .map(|filter_key| filter_key != window.device_key.as_str())
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            if hard_silence_device_keys.contains(&window.device_key) {
+                continue;
+            }
+            let Some(expected) = window.expected.as_ref() else {
+                continue;
+            };
+
+            let current = sharp_drop_current_window_for_device_v1(tenant_id, window);
+            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            match evaluate_sharp_drop_candidate_v1(&current, expected, &device_cfg) {
+                SharpDropEvaluationV1::Candidate(candidate) => {
+                    result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                    if open_drop_state_suppresses_candidate_v1(
+                        &candidate,
+                        device_open_drop_by_key.get(&window.device_key),
+                    ) {
+                        result.diagnostics.suppressed_candidates =
+                            result.diagnostics.suppressed_candidates.saturating_add(1);
+                        continue;
+                    }
+                    let built = build_sharp_drop_alert_v1(&candidate, &window.provenance)
+                        .map_err(|e| DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e)))?;
+                    db.write_primary_alert_v1(&built.alert)?;
+                    db.write_device_open_drop_state_v1(&window.device_key, &built.open_drop)?;
+                    device_open_drop_by_key.insert(window.device_key.clone(), built.open_drop);
+                    result.alerts.push(built.alert);
+                }
+                SharpDropEvaluationV1::Suppressed(reason) => {
+                    result.diagnostics.suppressed_candidates =
+                        result.diagnostics.suppressed_candidates.saturating_add(1);
+                    if sharp_drop_suppression_closes_recovery_v1(&reason) {
+                        if let Some(open_drop) = device_open_drop_by_key.get(&window.device_key).cloned() {
+                            if open_drop_state_is_open_v1(&open_drop) {
+                                let closed = close_open_drop_state_by_recovery_v1(&open_drop);
+                                db.write_device_open_drop_state_v1(&window.device_key, &closed)?;
+                                device_open_drop_by_key.insert(window.device_key.clone(), closed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if policy.tenant_enabled && device_filter_key.is_none() && !hard_silence_tenant {
+        let tenant_cfg = sharp_drop_tenant_evaluation_config_from_policy_v1(policy);
+        let mut groups: BTreeMap<(i64, i64, u8), Vec<&SharpDropRuntimeWindowV1>> = BTreeMap::new();
+        for window in sharp_drop_windows {
+            if hard_silence_device_keys.contains(&window.device_key) {
+                continue;
+            }
+            groups
+                .entry((window.window_start_ts_i64, window.window_end_ts_i64, window.bucket_u8))
+                .or_default()
+                .push(window);
+        }
+
+        for ((window_start_ts_i64, window_end_ts_i64, bucket_u8), mut group) in groups {
+            group.sort_by(|a, b| a.device_key.cmp(&b.device_key));
+            let mut expected_parts: Vec<SharpDropExpectedVolumeV1> = Vec::new();
+            let mut observed_lines_u64 = 0u64;
+            let mut observed_bytes_u64 = 0u64;
+            for window in group {
+                let Some(expected) = window.expected.as_ref() else {
+                    continue;
+                };
+                if u64::from(expected.maturity_count_u32) < policy.min_mature_windows_u64 {
+                    continue;
+                }
+                if expected.expected_lines_f64 < policy.min_expected_lines_u64 as f64 {
+                    continue;
+                }
+                expected_parts.push(expected.clone());
+                observed_lines_u64 = observed_lines_u64.saturating_add(window.observed_lines_u64);
+                observed_bytes_u64 = observed_bytes_u64.saturating_add(window.observed_bytes_u64);
+            }
+            if expected_parts.len() < SHARP_DROP_DEFAULT_TENANT_MATURE_DEVICE_FLOOR_V1 as usize {
+                continue;
+            }
+
+            let expected = sum_sharp_drop_expected_volumes_v1(&expected_parts);
+            let current = SharpDropCurrentWindowV1 {
+                subject_kind_u8: SILENCE_SUBJECT_KIND_TENANT_V1,
+                subject_key: tenant_id.to_string(),
+                tenant_id: tenant_id.to_string(),
+                window_start_ts_i64,
+                window_end_ts_i64,
+                observed_lines_u64,
+                observed_bytes_u64,
+                bucket_u8,
+            };
+
+            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            match evaluate_sharp_drop_candidate_v1(&current, &expected, &tenant_cfg) {
+                SharpDropEvaluationV1::Candidate(candidate) => {
+                    result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
+                    if open_drop_state_suppresses_candidate_v1(&candidate, tenant_open_drop.as_ref()) {
+                        result.diagnostics.suppressed_candidates =
+                            result.diagnostics.suppressed_candidates.saturating_add(1);
+                        continue;
+                    }
+                    let built = build_sharp_drop_alert_v1(&candidate, &[])
+                        .map_err(|e| DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e)))?;
+                    db.write_primary_alert_v1(&built.alert)?;
+                    db.write_tenant_open_drop_state_v1(&built.open_drop)?;
+                    *tenant_open_drop = Some(built.open_drop);
+                    result.alerts.push(built.alert);
+                }
+                SharpDropEvaluationV1::Suppressed(reason) => {
+                    result.diagnostics.suppressed_candidates =
+                        result.diagnostics.suppressed_candidates.saturating_add(1);
+                    if sharp_drop_suppression_closes_recovery_v1(&reason) {
+                        if let Some(open_drop) = tenant_open_drop.clone() {
+                            if open_drop_state_is_open_v1(&open_drop) {
+                                let closed = close_open_drop_state_by_recovery_v1(&open_drop);
+                                db.write_tenant_open_drop_state_v1(&closed)?;
+                                *tenant_open_drop = Some(closed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn sharp_drop_current_window_for_device_v1(
+    tenant_id: &str,
+    window: &SharpDropRuntimeWindowV1,
+) -> SharpDropCurrentWindowV1 {
+    SharpDropCurrentWindowV1 {
+        subject_kind_u8: SILENCE_SUBJECT_KIND_DEVICE_V1,
+        subject_key: window.device_key.clone(),
+        tenant_id: tenant_id.to_string(),
+        window_start_ts_i64: window.window_start_ts_i64,
+        window_end_ts_i64: window.window_end_ts_i64,
+        observed_lines_u64: window.observed_lines_u64,
+        observed_bytes_u64: window.observed_bytes_u64,
+        bucket_u8: window.bucket_u8,
+    }
+}
+
+fn sharp_drop_suppression_closes_recovery_v1(reason: &SharpDropSuppressionReasonV1) -> bool {
+    matches!(
+        reason,
+        SharpDropSuppressionReasonV1::AbsoluteDropBelowFloor { .. }
+            | SharpDropSuppressionReasonV1::ObservedRatioAboveThreshold { .. }
+            | SharpDropSuppressionReasonV1::DropRatioBelowThreshold { .. }
+    )
+}
+
+fn open_drop_state_is_open_v1(state: &OpenDropStateV1) -> bool {
+    (state.state_flags_u8 & OPEN_DROP_FLAG_OPEN_V1) != 0
+}
+
+
+fn open_silence_state_is_open_v1(state: &OpenSilenceStateV1) -> bool {
+    (state.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) != 0
 }
 
 fn observed_file_state_for_path_v1(path: &Path, is_gzip: bool) -> Result<ObservedFileStateV1, std::io::Error> {
@@ -2973,16 +5649,16 @@ fn load_dict_from_tenant_db_v1(
     db: &crate::db::TenantDbV1,
     cfg: FeatureDictionaryConfigV1,
 ) -> Result<FeatureDictionaryV1, DbErrorV1> {
-    let next_id = db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_next_id_v1().as_bytes())?;
-    if next_id.is_none() {
-        return Ok(FeatureDictionaryV1::new_empty_v1(cfg, 1, 0));
-    }
+    let next_id_bytes = match db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_next_id_v1().as_bytes())? {
+        Some(bytes) => bytes,
+        None => return Ok(FeatureDictionaryV1::new_empty_v1(cfg, 1, 0)),
+    };
     let entries = db
         .get_raw_v1(crate::db::keys::key_tenant_feature_dict_entries_v1().as_bytes())?
         .ok_or_else(|| DbErrorV1::new_v1("feature dict missing entries"))?;
     let last_gc_ts = db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_last_gc_ts_v1().as_bytes())?;
     let meta = FeatureDictionaryMetaV1 {
-        next_id: decode_feat_dict_meta_next_id_v1(&next_id.expect("checked above"))
+        next_id: decode_feat_dict_meta_next_id_v1(&next_id_bytes)
             .map_err(|e| DbErrorV1::new_v1(format!("feature dict next_id decode failed: {:?}", e)))?,
         entries: decode_feat_dict_meta_entries_v1(&entries)
             .map_err(|e| DbErrorV1::new_v1(format!("feature dict entries decode failed: {:?}", e)))?,
@@ -3049,7 +5725,9 @@ fn load_df_meta_from_tenant_db_v1(
     db: &crate::db::TenantDbV1,
     cfg: &DfRingConfigV1,
 ) -> Result<DfRingMetaStateV1, DbErrorV1> {
-    let mut day_slot_epochs = vec![None; usize::try_from(cfg.df_ring_slots).unwrap()];
+    let slot_count = usize::try_from(cfg.df_ring_slots)
+        .map_err(|_| DbErrorV1::new_v1("df ring slot count does not fit usize"))?;
+    let mut day_slot_epochs = vec![None; slot_count];
     for slot in 0..cfg.df_ring_slots {
         if let Some(value) = db.get_raw_v1(crate::db::keys::key_tenant_df_ring_day_slot_epoch_v1(slot as u8).as_bytes())? {
             day_slot_epochs[slot as usize] = Some(
@@ -3221,6 +5899,60 @@ fn update_active_spans_v1(
     });
 }
 
+
+fn update_active_source_stream_observation_v1(
+    observations: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
+    device: &TenantDeviceV1,
+    file: &DiscoveredFileV1,
+    inode: u64,
+    offset_start: u64,
+    offset_end: u64,
+    byte_len: u64,
+) -> Result<(), String> {
+    let identity = source_stream_identity_from_path_v1(
+        &device.tenant_id,
+        &device.device_key,
+        &file.file_rel,
+    )
+    .map_err(|e| format!("source-stream identity failed: {:?}", e))?;
+    let subject = source_stream_subject_from_identity_v1(&identity);
+    let entry = observations
+        .entry(identity.source_stream_id.clone())
+        .or_insert_with(|| SourceStreamActiveObservationV1 {
+            identity,
+            subject,
+            observed_lines_u64: 0,
+            observed_bytes_u64: 0,
+            spans: Vec::new(),
+        });
+    entry.observed_lines_u64 = entry.observed_lines_u64.saturating_add(1);
+    entry.observed_bytes_u64 = entry.observed_bytes_u64.saturating_add(byte_len);
+    update_active_spans_v1(&mut entry.spans, file, inode, offset_start, offset_end);
+    Ok(())
+}
+
+fn take_source_stream_observations_v1(
+    observations: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
+) -> Vec<SourceStreamActiveObservationV1> {
+    std::mem::take(observations)
+        .into_values()
+        .collect::<Vec<SourceStreamActiveObservationV1>>()
+}
+
+fn take_file_spans_from_active_values_v1(spans: Vec<ActiveSpanStateV1>) -> Vec<FileSpanV1> {
+    spans
+        .into_iter()
+        .map(|span| FileSpanV1 {
+            file_rel: span.file_rel,
+            file_key: span.file_key,
+            inode: span.inode,
+            offset_start: span.offset_start,
+            offset_end: span.offset_end,
+            is_gzip: span.is_gzip,
+        })
+        .collect()
+}
+
 fn take_file_spans_from_active_v1(spans: &mut Vec<ActiveSpanStateV1>) -> Vec<FileSpanV1> {
     let mut out = Vec::with_capacity(spans.len());
     for span in spans.drain(..) {
@@ -3235,7 +5967,6 @@ fn take_file_spans_from_active_v1(spans: &mut Vec<ActiveSpanStateV1>) -> Vec<Fil
     }
     out
 }
-
 
 fn route_status_v1(cfg: &ConfigV1, json: bool) -> RouteResultV1 {
     let runtime = match SparxRuntimeV1::open_from_config_v1(cfg) {
@@ -3285,7 +6016,7 @@ fn route_status_v1(cfg: &ConfigV1, json: bool) -> RouteResultV1 {
 fn route_config_check_v1(cfg: &ConfigV1) -> RouteResultV1 {
     // Validate that required directories exist or are creatable.
     // This remains a best-effort filesystem check; real DB open checks land in
-    // later phases, but canonical path derivation now comes from db::layout.
+    // later stages, but canonical path derivation now comes from db::layout.
     let mut errs: Vec<String> = Vec::new();
     let layout = filesystem_layout_v1(cfg);
 

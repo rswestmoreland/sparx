@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use std::fs;
 
 use tempfile::tempdir;
@@ -150,7 +153,7 @@ fn replay_spool_partial_failure_preserves_failed_files_v1() {
     let cfg = temp_cfg_v1();
     let alert = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tenant a summary");
     let good_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
-    let bad_dir = spool_alert_dir_v1(&cfg.sparx.data_root, "tenant-a");
+    let bad_dir = spool_alert_dir_v1(&cfg.sparx.data_root, "tenant-a").unwrap();
     fs::create_dir_all(&bad_dir).unwrap();
     let bad_path = bad_dir.join("spool_broken.json");
     fs::write(&bad_path, b"not-json").unwrap();

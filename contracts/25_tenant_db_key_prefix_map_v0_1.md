@@ -148,7 +148,7 @@ Alert id:
 - `alert_idx_time/v1/<device_key>/<window_start_ts>/<alert_id>` -> empty
 
 Notes:
-- Phase 15c activates this index for list/search/export candidate selection when the tenant DB has complete time-index coverage for the current primary alert set.
+- the current release activates this index for list/search/export candidate selection when the tenant DB has complete time-index coverage for the current primary alert set.
 - Query/export correctness still falls back to primary alert scans when the time index is absent or incomplete.
 
 ### 6.3 Category index
@@ -157,7 +157,7 @@ Notes:
 Category values use the alert label categories: `outlier`, `noise_suspect`, `info`.
 
 Notes:
-- Phase 15d activates this index for structured category-filter candidate selection when the category index fully covers the tenant primary alert set.
+- the current release activates this index for structured category-filter candidate selection when the category index fully covers the tenant primary alert set.
 - Structured category filters still fall back to primary-alert scans when the category index is absent or incomplete.
 
 ### 6.4 Entity index
@@ -166,26 +166,105 @@ Notes:
 Entity kinds use the canonical alert entity families: `srcip`, `dstip`, `userid`, `domain`, `host`.
 
 Notes:
-- Phase 15d activates this index for structured entity-filter candidate selection when the specific entity filter matches the primary alert set exactly.
+- the current release activates this index for structured entity-filter candidate selection when the specific entity filter matches the primary alert set exactly.
 - Structured entity filters still fall back to primary-alert scans when the relevant entity index coverage is absent or incomplete.
 
 ---
 
-## 7) Metrics counters (optional persistence)
+## 7) Expected-source silence state
+
+the current release added canonical key builders and value encodings for future `V_DROP` / sudden
+loss-of-log detection. the current release activates runtime writes for `silence_subject/*`
+expected-source state from finalized windows. `silence_open/*` is active for hard-silence dedup writes and closure after the current release.
+
+### 7.1 Device expected-source state
+
+- `silence_subject/v1/device/<device_key>/state` -> `ExpectedSourceStateV1`
+
+### 7.2 Tenant aggregate expected-source state
+
+- `silence_subject/v1/tenant/state` -> `ExpectedSourceStateV1`
+
+### 7.3 Open/last emitted silence state
+
+- `silence_open/v1/device/<device_key>` -> `OpenSilenceStateV1`
+- `silence_open/v1/tenant` -> `OpenSilenceStateV1`
+
+Notes:
+- `silence_subject/*` and `silence_open/*` are tenant-scoped.
+- the current release actively writes `silence_subject/*` expected-source state from finalized
+  windows.
+- `silence_open/*` keys are active for the current release and later hard-silence duplicate suppression and closure.
+- Hard-silence `V_DROP` candidate evaluation and alert emission are active for device and tenant aggregate subjects.
+- Sharp-drop runtime detection is active as of the current release and uses the separately scoped `drop_open/*` key family.
+
+---
+
+## 8) Metrics counters (optional persistence)
 
 If enabled, persist selected counters for restart continuity:
 
 - `metrics/v1/counter/<name>` -> u64
 - `metrics/v1/gauge/<name>` -> f64
 
-This is active in Phase 13a and later for the small persisted observability surface used by `status`, `/metrics`, and `/healthz` continuity across restarts.
+This is active in the current release and later for the small persisted observability surface used by `status`, `/metrics`, and `/healthz` continuity across restarts.
 
 ---
 
-## 8) Migrations
+## 9) Migrations
 
 ### 8.1 Migration journal
 - `migrate/v1/journal/<ts>/<name>` -> bytes (result/status)
 
 Rules:
 - Any key/value encoding changes require schema version bump and migration steps.
+
+
+## Current release open-silence helper activation
+
+the current release activates direct tenant DB read/write helpers for:
+
+- `silence_open/v1/device/<device_key>`
+- `silence_open/v1/tenant`
+
+the current release calls these helpers from the runtime hard-silence integration. `silence_open/*` state now suppresses duplicate `V_DROP` alerts during an ongoing silence interval and is marked closed when a later finalized window is observed for the subject.
+
+
+## Current release open-silence runtime activation
+
+the current release activates runtime writes for:
+
+- `silence_open/v1/device/<device_key>`
+- `silence_open/v1/tenant`
+
+These keys are written only for emitted hard-silence `V_DROP` alerts and are used to
+suppress duplicates for an ongoing silence interval. Matching open states are closed
+when the subject is observed again.
+
+
+## Current release sharp-drop and source-stream key status
+
+Sharp-drop detection is active for device and tenant aggregate subjects and uses a
+separate key family from hard-silence state:
+
+- `drop_open/v1/device/<device_key>` -> `OpenDropStateV1`
+- `drop_open/v1/tenant` -> `OpenDropStateV1`
+
+Source-stream V_DROP is active behind the default-off source-stream gate and uses
+separate catalog, stats, expected-source, provenance, and open-state key families:
+
+- `source_stream/v1/<device_key>/<source_stream_id>/catalog` -> `SourceStreamCatalogV1`
+- `source_stats/v1/<device_key>/<source_stream_id>/<bucket>` -> `SourceStreamStatsV1`
+- `source_prov/v1/<device_key>/<source_stream_id>/<window_start>` -> source-stream provenance value
+- `silence_subject/v1/source_stream/<device_key>/<source_stream_id>/state` -> `ExpectedSourceStateV1` with source-stream subject kind
+- `silence_open/v1/source_stream/<device_key>/<source_stream_id>` -> `OpenSilenceStateV1` with source-stream subject kind
+- `drop_open/v1/source_stream/<device_key>/<source_stream_id>` -> `OpenDropStateV1` with source-stream subject kind
+
+Rules:
+
+- `silence_open/*` is reserved for hard-silence intervals.
+- `drop_open/*` is reserved for sharp-drop intervals.
+- source-stream keys must not alter existing device or tenant keys.
+- source-stream keys must not alter `DeviceStatsV1` layout.
+- `source_stream_id` is a subject identifier, not a `FeatureId`.
+- Prometheus metrics must not label by source path or source-stream id.

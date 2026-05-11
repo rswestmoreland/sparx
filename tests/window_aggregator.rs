@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use std::collections::BTreeMap;
 
 use chrono::{TimeZone, Utc};

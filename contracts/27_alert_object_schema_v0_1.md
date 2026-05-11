@@ -146,6 +146,7 @@ FileSpanV1:
 Notes:
 - For gzip, offsets are in compressed byte stream.
 - These spans allow drilldown later without storing full raw lines.
+- Future `V_DROP` absence-of-data alerts may have empty provenance because there may be no raw source span for missing data; drill/extract must fail closed with a clear explanation for that case.
 
 ---
 
@@ -171,3 +172,60 @@ This ensures:
 - entities ordering deterministic on ties
 - reasons include expected codes for synthetic scoring cases
 - provenance spans capped deterministically
+
+
+## Current release V_DROP construction note
+
+the current release adds deterministic construction of `AlertV1` for hard-silence `V_DROP` candidates. The constructed alert keeps the v0.1 schema unchanged and uses absence-of-data fields:
+
+- `reasons[0].code = "V_DROP"`
+- `label = info`
+- `confidence = medium`
+- `lines = 0`
+- `bytes = 0`
+- `top_features = []`
+- `provenance = []`
+
+the current release calls this construction path from `run` and `oneshot` for mature hard-silence device and tenant aggregate subjects. The primary alert object path remains authoritative, and `silence_open/*` state suppresses duplicate alerts for an ongoing silence interval.
+
+
+## Current release V_DROP runtime integration note
+
+No schema fields changed in the current release. Runtime hard-silence `V_DROP` alerts use the existing `AlertV1` schema and may have empty provenance because the finding represents absence of expected data rather than a raw source span.
+
+
+## Current release V_DROP validation closeout note
+
+the current release adds validation hardening around the active hard-silence `V_DROP` alert path.
+No AlertV1 schema fields changed. `V_DROP` alerts continue to use the existing schema,
+reason code `V_DROP`, and empty provenance for absence-of-data findings.
+
+
+## Sharp-drop schema note
+
+Sharp-drop alerts reuse the existing AlertV1 schema. They use reason code `V_DROP` and
+deterministic detail `drop_kind=sharp_drop`. The required ratio details are
+`observed_expected_ratio` and `drop_ratio = 1.0 - observed_expected_ratio`.
+
+Field usage:
+
+- `label = info`
+- `confidence = medium`
+- `score_volume = clamp01(drop_ratio)`
+- `score_total = score_volume`
+- `score_rarity = 0.0`
+- `score_drift = 0.0`
+- `top_features = []`
+
+Device and source-stream sharp-drop alerts should carry deterministic capped current
+provenance when available. Tenant aggregate sharp-drop alerts may use empty provenance.
+Alert id inputs include `sharp_drop` so hard-silence and sharp-drop V_DROP alerts do not
+collide for the same subject/window.
+
+## Source-stream V_DROP schema note
+
+Source-stream V_DROP alerts reuse the existing AlertV1 schema. Reason details include
+`subject_kind=source_stream`, `source_stream_id`, `device_key`, and safe source-path detail
+when available. Source-stream hard-silence alerts may have empty provenance. Source-stream
+sharp-drop alerts should include deterministic capped current-source spans when available.
+No `source_files` field or alternate drilldown model may be introduced.

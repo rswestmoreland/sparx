@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Output sink interfaces and implementations.
 // See: contracts/29_output_sink_contract_v0_1.md
 //
@@ -9,6 +12,7 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{Datelike, TimeZone, Utc};
 
@@ -91,6 +95,17 @@ pub struct SpoolCapReportV1 {
 pub struct SpoolBacklogSummaryV1 {
     pub files: u64,
     pub bytes: u64,
+    pub oldest_file_ts: Option<u64>,
+    pub oldest_age_s: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SpoolBacklogTenantSummaryV1 {
+    pub tenant_id: String,
+    pub files: u64,
+    pub bytes: u64,
+    pub oldest_file_ts: Option<u64>,
+    pub oldest_age_s: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -394,6 +409,8 @@ pub fn jsonl_day_dir_v1(
     device_key: &str,
     window_start_ts: i64,
 ) -> Result<PathBuf, SinkErrorV1> {
+    validate_fs_component_v1("tenant_id", tenant_id)?;
+    validate_fs_component_v1("device_key", device_key)?;
     let ymd = ymd_for_ts_v1(window_start_ts)?;
     let mut out = PathBuf::from(alert_out_root);
     out.push(format!("tenant={}", tenant_id));
@@ -405,6 +422,7 @@ pub fn jsonl_day_dir_v1(
 }
 
 pub fn jsonl_file_name_v1(device_key: &str, window_start_ts: i64, seq: u32) -> Result<String, SinkErrorV1> {
+    validate_fs_component_v1("device_key", device_key)?;
     let ymd = ymd_for_ts_v1(window_start_ts)?;
     Ok(format!(
         "alerts_{}_{:04}{:02}{:02}_{:04}.jsonl",
@@ -424,32 +442,39 @@ pub fn jsonl_alert_path_v1(
     Ok(out)
 }
 
-pub fn spool_alert_dir_v1(data_root: &str, tenant_id: &str) -> PathBuf {
+pub fn spool_alert_dir_v1(data_root: &str, tenant_id: &str) -> Result<PathBuf, SinkErrorV1> {
+    validate_fs_component_v1("tenant_id", tenant_id)?;
     let mut out = PathBuf::from(data_root);
     out.push("spool");
     out.push("alerts");
     out.push(format!("tenant={}", tenant_id));
-    out
+    Ok(out)
 }
 
-pub fn spool_alert_file_name_v1(alert_id: &str) -> String {
-    format!("spool_{}.json", alert_id)
+pub fn spool_alert_file_name_v1(alert_id: &str) -> Result<String, SinkErrorV1> {
+    validate_fs_component_v1("alert_id", alert_id)?;
+    Ok(format!("spool_{}.json", alert_id))
 }
 
-pub fn spool_alert_path_v1(data_root: &str, tenant_id: &str, alert_id: &str) -> PathBuf {
-    let mut out = spool_alert_dir_v1(data_root, tenant_id);
-    out.push(spool_alert_file_name_v1(alert_id));
-    out
+pub fn spool_alert_path_v1(data_root: &str, tenant_id: &str, alert_id: &str) -> Result<PathBuf, SinkErrorV1> {
+    let mut out = spool_alert_dir_v1(data_root, tenant_id)?;
+    out.push(spool_alert_file_name_v1(alert_id)?);
+    Ok(out)
 }
 
 pub fn write_spool_alert_v1(data_root: &str, alert: &AlertV1) -> Result<PathBuf, SinkErrorV1> {
-    let dir = spool_alert_dir_v1(data_root, &alert.tenant_id);
+    let dir = spool_alert_dir_v1(data_root, &alert.tenant_id)?;
     ensure_dir_with_mode_v1(&dir, 0o750)?;
-    let path = spool_alert_path_v1(data_root, &alert.tenant_id, &alert.alert_id);
+    let path = spool_alert_path_v1(data_root, &alert.tenant_id, &alert.alert_id)?;
     let bytes = serde_json::to_vec(alert).map_err(|e| SinkErrorV1 {
         msg: format!("serialize alert json failed: {}", e),
     })?;
-    fs::write(&path, bytes).map_err(io_err_v1)?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(io_err_v1)?;
+    file.write_all(&bytes).map_err(io_err_v1)?;
     set_file_mode_v1(&path, 0o640)?;
     Ok(path)
 }
@@ -472,15 +497,80 @@ pub fn sorted_spool_files_for_replay_v1(data_root: &str) -> Result<Vec<PathBuf>,
 }
 
 pub fn spool_backlog_summary_v1(data_root: &str) -> Result<SpoolBacklogSummaryV1, SinkErrorV1> {
-    let files = collect_spool_files_v1(data_root)?;
+    let tenants = spool_backlog_per_tenant_v1(data_root)?;
+    let mut total_files = 0u64;
     let mut total_bytes = 0u64;
-    for path in &files {
-        total_bytes = total_bytes.saturating_add(file_len_v1(path)?);
+    let mut oldest_file_ts = None;
+    let mut oldest_age_s = None;
+    for tenant in tenants {
+        total_files = total_files.saturating_add(tenant.files);
+        total_bytes = total_bytes.saturating_add(tenant.bytes);
+        oldest_file_ts = min_option_u64_v1(oldest_file_ts, tenant.oldest_file_ts);
+        oldest_age_s = max_option_u64_v1(oldest_age_s, tenant.oldest_age_s);
     }
     Ok(SpoolBacklogSummaryV1 {
-        files: files.len() as u64,
+        files: total_files,
         bytes: total_bytes,
+        oldest_file_ts,
+        oldest_age_s,
     })
+}
+
+pub fn spool_backlog_per_tenant_v1(data_root: &str) -> Result<Vec<SpoolBacklogTenantSummaryV1>, SinkErrorV1> {
+    let root = PathBuf::from(data_root).join("spool").join("alerts");
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let now_ts = unix_now_ts_v1()?;
+    let mut tenants = Vec::new();
+    for tenant_entry in fs::read_dir(&root).map_err(io_err_v1)? {
+        let tenant_entry = tenant_entry.map_err(io_err_v1)?;
+        let tenant_type = tenant_entry.file_type().map_err(io_err_v1)?;
+        if !tenant_type.is_dir() || tenant_type.is_symlink() {
+            continue;
+        }
+        let tenant_path = tenant_entry.path();
+        let Some(dir_name) = tenant_path.file_name().and_then(|v| v.to_str()) else {
+            continue;
+        };
+        let Some(tenant_id) = dir_name.strip_prefix("tenant=") else {
+            continue;
+        };
+        let mut files = 0u64;
+        let mut bytes = 0u64;
+        let mut oldest_file_ts = None;
+        for file_entry in fs::read_dir(&tenant_path).map_err(io_err_v1)? {
+            let file_entry = file_entry.map_err(io_err_v1)?;
+            let file_type = file_entry.file_type().map_err(io_err_v1)?;
+            if !file_type.is_file() || file_type.is_symlink() {
+                continue;
+            }
+            let file_path = file_entry.path();
+            let Some(name) = file_path.file_name().and_then(|v| v.to_str()) else {
+                continue;
+            };
+            if !name.starts_with("spool_") || !name.ends_with(".json") {
+                continue;
+            }
+            files = files.saturating_add(1);
+            bytes = bytes.saturating_add(file_len_v1(&file_path)?);
+            oldest_file_ts = min_option_u64_v1(oldest_file_ts, Some(file_mtime_ts_v1(&file_path)?));
+        }
+        if files == 0 {
+            continue;
+        }
+        let oldest_age_s = oldest_file_ts.map(|ts| now_ts.saturating_sub(ts));
+        tenants.push(SpoolBacklogTenantSummaryV1 {
+            tenant_id: tenant_id.to_string(),
+            files,
+            bytes,
+            oldest_file_ts,
+            oldest_age_s,
+        });
+    }
+    tenants.sort_by(|a, b| a.tenant_id.cmp(&b.tenant_id));
+    Ok(tenants)
 }
 
 pub fn enforce_spool_cap_v1(data_root: &str, spool_max_mb: u32) -> Result<SpoolCapReportV1, SinkErrorV1> {
@@ -531,6 +621,40 @@ fn flush_due_v1(last_flush_ts: Option<i64>, now_ts: i64, interval_s: u32) -> boo
     }
 }
 
+fn min_option_u64_v1(left: Option<u64>, right: Option<u64>) -> Option<u64> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.min(right)),
+        (Some(left), None) => Some(left),
+        (None, Some(right)) => Some(right),
+        (None, None) => None,
+    }
+}
+
+fn max_option_u64_v1(left: Option<u64>, right: Option<u64>) -> Option<u64> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.max(right)),
+        (Some(left), None) => Some(left),
+        (None, Some(right)) => Some(right),
+        (None, None) => None,
+    }
+}
+
+fn unix_now_ts_v1() -> Result<u64, SinkErrorV1> {
+    let now = SystemTime::now();
+    let duration = now.duration_since(UNIX_EPOCH).map_err(|e| SinkErrorV1 {
+        msg: format!("current time before unix epoch: {}", e),
+    })?;
+    Ok(duration.as_secs())
+}
+
+fn file_mtime_ts_v1(path: &Path) -> Result<u64, SinkErrorV1> {
+    let modified = fs::metadata(path).map_err(io_err_v1)?.modified().map_err(io_err_v1)?;
+    let duration = modified.duration_since(UNIX_EPOCH).map_err(|e| SinkErrorV1 {
+        msg: format!("file modified time before unix epoch for {}: {}", path.display(), e),
+    })?;
+    Ok(duration.as_secs())
+}
+
 fn collect_spool_files_v1(data_root: &str) -> Result<Vec<PathBuf>, SinkErrorV1> {
     let root = PathBuf::from(data_root).join("spool").join("alerts");
     if !root.exists() {
@@ -540,16 +664,18 @@ fn collect_spool_files_v1(data_root: &str) -> Result<Vec<PathBuf>, SinkErrorV1> 
     let mut files = Vec::new();
     for tenant_entry in fs::read_dir(&root).map_err(io_err_v1)? {
         let tenant_entry = tenant_entry.map_err(io_err_v1)?;
-        let tenant_path = tenant_entry.path();
-        if !tenant_path.is_dir() {
+        let tenant_type = tenant_entry.file_type().map_err(io_err_v1)?;
+        if !tenant_type.is_dir() || tenant_type.is_symlink() {
             continue;
         }
+        let tenant_path = tenant_entry.path();
         for file_entry in fs::read_dir(&tenant_path).map_err(io_err_v1)? {
             let file_entry = file_entry.map_err(io_err_v1)?;
-            let file_path = file_entry.path();
-            if !file_path.is_file() {
+            let file_type = file_entry.file_type().map_err(io_err_v1)?;
+            if !file_type.is_file() || file_type.is_symlink() {
                 continue;
             }
+            let file_path = file_entry.path();
             let Some(name) = file_path.file_name().and_then(|v| v.to_str()) else {
                 continue;
             };
@@ -594,6 +720,20 @@ fn set_file_mode_v1(path: &Path, mode: u32) -> Result<(), SinkErrorV1> {
 
 #[cfg(not(unix))]
 fn set_file_mode_v1(_path: &Path, _mode: u32) -> Result<(), SinkErrorV1> {
+    Ok(())
+}
+
+fn validate_fs_component_v1(field: &str, value: &str) -> Result<(), SinkErrorV1> {
+    if value.is_empty() || value == "." || value == ".." {
+        return Err(SinkErrorV1 {
+            msg: format!("invalid {} filesystem component", field),
+        });
+    }
+    if value.bytes().any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f) {
+        return Err(SinkErrorV1 {
+            msg: format!("invalid {} filesystem component", field),
+        });
+    }
     Ok(())
 }
 

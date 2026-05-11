@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::config::FeaturesSectionV1;
 use sparx::db::keys::{
     key_tenant_feature_dict_entries_v1, key_tenant_feature_dict_id_v1,

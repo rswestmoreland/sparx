@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Baseline sketch encodings.
 // See: contracts/22_baseline_sketch_encoding_v0_1.md
-// Phase 2d covers DF maps, centroid maps, and device stats encodings.
+// Covers DF maps, centroid maps, and device stats encodings.
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BaselineSketchErrorV1 {

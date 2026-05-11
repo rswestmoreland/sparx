@@ -1,6 +1,8 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Library root for sparx.
 //
-// Phase 0b: types-only skeleton modules.
 // Keep ASCII-only text in this repo.
 
 pub mod alert;

@@ -1,7 +1,10 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Cursor state machine helpers.
 // See: contracts/04_state_retention_v0_1.md
 //   and contracts/31_tenant_db_simple_value_encodings_v0_1.md
-// Phase 3b: deterministic per-file cursor reconciliation.
+// Performs deterministic per-file cursor reconciliation.
 
 use crate::ingest::FileCursorV1;
 use crate::types::UnixSec;

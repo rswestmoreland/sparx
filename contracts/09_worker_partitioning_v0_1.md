@@ -1,7 +1,7 @@
 # Worker Partitioning Contract v0.1
 
 ## Model
-- Tenant-scoped processing: only one worker mutates a tenant’s state at a time.
+- Tenant-scoped processing: only one worker mutates a tenant's state at a time.
 
 ## Stages
 A) IO + decode (pollers): scan/tail/decompress -> batches of raw lines

@@ -96,6 +96,9 @@ Env:
 - `follow_symlinks: bool` (default: false)
 - `read_chunk_bytes: u32` (default: 262144) (256 KiB)
 
+Rules:
+- `read_chunk_bytes` must be 1 through 16777216.
+
 Env:
 - `SPARX_POLL_INTERVAL_MS`
 - `SPARX_MAX_OPEN_FILES`
@@ -117,6 +120,13 @@ Env:
 - `max_tokens_per_line: u32` (default: 256)
 - `max_kv_per_line: u32` (default: 64)
 - `max_words_from_quoted_value: u32` (default: 32)
+
+Rules:
+- `max_line_len` must be 1 through 1048576.
+- `max_tokens_per_line` must be 1 through 4096.
+- `max_kv_per_line` must be 1 through 1024.
+- `max_words_from_quoted_value` must be 1 through 1024.
+- runtime line buffering must stay bounded by `max_line_len`.
 
 Env:
 - `SPARX_MAX_LINE_LEN`
@@ -187,8 +197,8 @@ Env:
 Notes:
 - Threshold interpretation is defined by Scoring Math + Thresholding contract v0.1.
 - `outlier_threshold` and `noise_threshold` are active scoring inputs in v0.1.
-- `cold_start_days` is active in Phase 15a. It defines the day-based maturity floor for bucket scoring as `cold_start_days * (3600 / window_size_s)`. A value of `0` disables the count-based cold-start floor and leaves only the empty-centroid cold-start rule.
-- `min_lines_per_window` is active in Phase 15a. If a finalized window has fewer lines than this value, alert emission is suppressed for that window while scoring preview and baseline updates still proceed. A value of `0` disables the line floor.
+- `cold_start_days` is active in the current release. It defines the day-based maturity floor for bucket scoring as `cold_start_days * (3600 / window_size_s)`. A value of `0` disables the count-based cold-start floor and leaves only the empty-centroid cold-start rule.
+- `min_lines_per_window` is active in the current release. If a finalized window has fewer lines than this value, alert emission is suppressed for that window while scoring preview and baseline updates still proceed. A value of `0` disables the line floor.
 
 ---
 
@@ -226,7 +236,7 @@ TOML: `[storage]`
 
 Notes:
 - v0.1 runtime work targets Fjall for the real DB/runtime layer.
-- The field names below are retained for config continuity while the exact Fjall wiring is locked in Phase 10c.
+- The field names below are retained for config continuity while the exact Fjall wiring is locked in the current release.
 - `tenant_db_max_open` and `tenant_db_idle_close_s` are the active lifecycle controls in v0.1.
 - `global_db_open_files`, `global_db_write_buffer_mb`, `tenant_db_open_files`, `tenant_db_write_buffer_mb`, and `tenant_db_max_background_jobs` remain reserved continuity fields in v0.1; they stay parseable but are not mapped to current runtime behavior.
 
@@ -258,17 +268,22 @@ TOML: `[output]`
 - `jsonl_flush_interval_s: u32` (default: 5)
 - `include_debug_fields: bool` (default: false)
 - `automated_replay_max_files_per_pass: u32` (default: 128)
+- `automated_replay_interval_s: u32` (default: 1)
+- `spool_max_mb: u32` (default: 2048)
 
 Status:
 - `sink`, `jsonl_rotate_mb`, `jsonl_flush_interval_s`, `include_debug_fields`,
-  and `automated_replay_max_files_per_pass` are the active v0.1 output config
-  surface.
-- Spool cap tuning and replay cadence remain outside the active config contract
-  in v0.1.
+  `automated_replay_max_files_per_pass`, `automated_replay_interval_s`, and
+  `spool_max_mb` are the active v0.1 output config surface.
 - Automatic jsonl-failure-to-spool fallback and bounded automated replay are
   active runtime behaviors in v0.1 for `output.sink=jsonl`.
 - `automated_replay_max_files_per_pass` controls the deterministic per-pass
   replay bound used by `run` and `oneshot` automated recovery.
+- `automated_replay_interval_s` controls the minimum seconds between daemon
+  automated replay attempts at the start of successive `run` cycles. Final
+  shutdown replay remains unconditional.
+- `spool_max_mb` controls the deterministic spool cap enforced by the helper-
+  backed jsonl recovery path in `run` and `oneshot`.
 
 Env:
 - `SPARX_OUTPUT_SINK`
@@ -276,14 +291,52 @@ Env:
 - `SPARX_JSONL_FLUSH_INTERVAL_S`
 - `SPARX_INCLUDE_DEBUG_FIELDS`
 - `SPARX_AUTOMATED_REPLAY_MAX_FILES_PER_PASS`
+- `SPARX_AUTOMATED_REPLAY_INTERVAL_S`
+- `SPARX_SPOOL_MAX_MB`
 
 ---
 
-## 9) Metrics and health
+## 9) V_DROP hard-silence policy controls
+
+TOML: `[vdrop]`
+
+These fields are active as parseable and validator-enforced config surface.
+the current release routes runtime hard-silence V_DROP evaluation through the resolved
+per-tenant policy.
+
+- `enabled: bool` (default: true)
+- `device_enabled: bool` (default: true)
+- `tenant_enabled: bool` (default: true)
+- `source_stream_enabled: bool` (default: false)
+- `min_expected_windows_missed: u32` (default: 3)
+- `min_mature_windows: optional u64` (default: unset; inherit scoring-derived floor)
+- `min_expected_lines: optional u64` (default: unset; inherit scoring-derived floor)
+
+Rules:
+- `min_expected_windows_missed` must be greater than zero.
+- `min_mature_windows` and `min_expected_lines` may be unset. If set, they must parse as
+  `u64` values.
+- Defaults preserve the the current release hard-silence behavior when no tenant-policy override is present.
+- `source_stream_enabled` defaults to `false` and does not activate source-stream runtime
+  evaluation until the later runtime-integration stage wires the gate into `run` and
+  `oneshot`.
+
+Env:
+- `SPARX_VDROP_ENABLED`
+- `SPARX_VDROP_DEVICE_ENABLED`
+- `SPARX_VDROP_TENANT_ENABLED`
+- `SPARX_VDROP_SOURCE_STREAM_ENABLED`
+- `SPARX_VDROP_MIN_EXPECTED_WINDOWS_MISSED`
+- `SPARX_VDROP_MIN_MATURE_WINDOWS`
+- `SPARX_VDROP_MIN_EXPECTED_LINES`
+
+---
+
+## 10) Metrics and health
 
 TOML: `[metrics]`
 
-These fields are active in Phase 13a.
+These fields are active in the current release.
 
 - `prometheus_enabled: bool` (default: true)
 - `prometheus_bind: string` (default: `127.0.0.1:9898`)
@@ -305,11 +358,11 @@ Env:
 - `SPARX_HEALTH_ENABLED`
 - `SPARX_HEALTH_BIND`
 
-The current Phase 13a observability surface is defined by Contract 10.
+The current the current release observability surface is defined by Contract 10.
 
 ---
 
-## 10) Example config (sparx.toml)
+## 11) Example config (sparx.toml)
 
 ```toml
 [sparx]
@@ -362,12 +415,20 @@ prometheus_enabled = true
 prometheus_bind = "127.0.0.1:9898"
 health_enabled = true
 health_bind = "127.0.0.1:9899"
+
+[vdrop]
+enabled = true
+device_enabled = true
+tenant_enabled = true
+source_stream_enabled = false
+min_expected_windows_missed = 3
 ```
 
 ---
 
-## 11) Required tests
+## 12) Required tests
 - precedence: CLI > env > config > defaults
 - window_size whitelist enforced
 - numeric bounds enforced for active numeric fields and reserved compatibility fields that still validate (for example `hash_space_bits`)
 - config serialization roundtrip (TOML) preserves fields
+- V_DROP policy defaults, source-stream default-off gate, file/env overrides, and invalid missed-window threshold validation

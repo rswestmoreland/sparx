@@ -1,8 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // DF ring update planning helpers.
 // See: contracts/22_baseline_sketch_encoding_v0_1.md
 //   and contracts/21_scoring_math_thresholding_v0_1.md
-// Phase 7a: update per-slot DF counts from finalized windows using deterministic
-// mutations only. Centroid/stats updates and scoring remain later phases.
+// Updates per-slot DF counts from finalized windows using deterministic
+// mutations. Centroid, stats, and scoring helpers live in sibling modules.
 
 use std::collections::{BTreeMap, BTreeSet};
 

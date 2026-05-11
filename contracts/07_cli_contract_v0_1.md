@@ -45,6 +45,7 @@ Exit codes:
 - Config-free commands must bypass config load/validation.
 - DB-backed commands must fail closed if the embedded DB path is already owned by another sparx process.
 - Partial checkpoints or stubbed command routes must never return exit `0` for unimplemented operational behavior.
+- Tenant ids supplied to commands must be safe filesystem components: non-empty, not `.` or `..`, and without path separators or control characters. Invalid tenant ids fail with exit `2`.
 
 ### `sparx run`
 Daemon mode (poll + window + score + emit).

@@ -31,13 +31,13 @@ All keys are UTF-8 bytes with a `v1` marker in the key prefix.
 - `dfN/v1/<slot>/<bucket>` -> u32 (windows finalized in that slot/bucket)
 
 Scoring uses:
-- `N_bucket = Σ_slot dfN[slot,bucket]`
+- `N_bucket = sum_slot dfN[slot,bucket]`
 
 ### 2.3 DF maps per slot/bucket
 - `dfM/v1/<slot>/<bucket>` -> encoded list of `(FeatureId, u32 df_count)`
 
 Scoring uses:
-- `df_bucket(f) = Σ_slot dfM[slot,bucket].get(f)` (tenant worker may cache merged views)
+- `df_bucket(f) = sum_slot dfM[slot,bucket].get(f)` (tenant worker may cache merged views)
 
 ### 2.4 Device centroid per bucket
 - `centroid/v1/<device_key>/<bucket>` -> encoded list of `(FeatureId, f32 value)`

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use std::fs;
 use std::io::Write;
 
@@ -272,5 +275,110 @@ fn alert_extract_missing_file_returns_exit_three_v1() -> Result<(), Box<dyn std:
     );
     assert_eq!(3, result.exit_code);
     assert!(result.msg_stderr.unwrap().contains("alert extract io error"));
+    Ok(())
+}
+
+#[test]
+fn alert_drill_resolves_runtime_device_path_with_tenant_prefix_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = temp_cfg_v1();
+    let body = "alpha\nbravo\n";
+    let plain_path = write_plain_log_v1(&cfg, "runtime.log", body)?;
+    let mut alert = sample_alert_v1(
+        "alert-runtime-path",
+        vec![FileSpanV1 {
+            file_rel: "runtime.log".to_string(),
+            file_key: "f-runtime".to_string(),
+            inode: 1,
+            offset_start: 0,
+            offset_end: plain_path.metadata()?.len(),
+            is_gzip: false,
+        }],
+    );
+    alert.device_path = "tenant-a/device-a".to_string();
+    seed_alert_v1(&cfg, &alert)?;
+
+    let result = route_command_v1(
+        &CommandV1::AlertDrill {
+            tenant_id: "tenant-a".to_string(),
+            alert_id: "alert-runtime-path".to_string(),
+            max_bytes: None,
+            max_lines: Some(2),
+        },
+        &cfg,
+    );
+    assert_eq!(0, result.exit_code);
+    let out = result.msg_stdout.unwrap();
+    assert!(out.contains("spans_emitted: 1"));
+    assert!(out.contains("alpha"));
+    assert!(out.contains("bravo"));
+    Ok(())
+}
+
+#[test]
+fn alert_drill_rejects_provenance_path_traversal_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = temp_cfg_v1();
+    write_plain_log_v1(&cfg, "safe.log", "alpha\n")?;
+    let alert = sample_alert_v1(
+        "alert-traversal",
+        vec![FileSpanV1 {
+            file_rel: "../outside.log".to_string(),
+            file_key: "f-bad".to_string(),
+            inode: 1,
+            offset_start: 0,
+            offset_end: 5,
+            is_gzip: false,
+        }],
+    );
+    seed_alert_v1(&cfg, &alert)?;
+
+    let result = route_command_v1(
+        &CommandV1::AlertDrill {
+            tenant_id: "tenant-a".to_string(),
+            alert_id: "alert-traversal".to_string(),
+            max_bytes: None,
+            max_lines: None,
+        },
+        &cfg,
+    );
+    assert_ne!(0, result.exit_code);
+    assert!(result.msg_stderr.unwrap().contains("alert drill io error"));
+    Ok(())
+}
+
+#[test]
+fn alert_drill_resolves_source_stream_display_path_by_device_key_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = temp_cfg_v1();
+    let body = "source-one\nsource-two\n";
+    let plain_path = write_plain_log_v1(&cfg, "source.log", body)?;
+    let device_key = sparx::ingest::device_key_v1("tenant-a", "device-a");
+    let mut alert = sample_alert_v1(
+        "alert-source-stream-drill",
+        vec![FileSpanV1 {
+            file_rel: "source.log".to_string(),
+            file_key: "f-source".to_string(),
+            inode: 1,
+            offset_start: 0,
+            offset_end: plain_path.metadata()?.len(),
+            is_gzip: false,
+        }],
+    );
+    alert.device_key = device_key.clone();
+    alert.device_path = format!("source_stream:{}/source.log", device_key);
+    seed_alert_v1(&cfg, &alert)?;
+
+    let result = route_command_v1(
+        &CommandV1::AlertDrill {
+            tenant_id: "tenant-a".to_string(),
+            alert_id: "alert-source-stream-drill".to_string(),
+            max_bytes: None,
+            max_lines: Some(2),
+        },
+        &cfg,
+    );
+    assert_eq!(0, result.exit_code);
+    let out = result.msg_stdout.unwrap();
+    assert!(out.contains("spans_emitted: 1"));
+    assert!(out.contains("source-one"));
+    assert!(out.contains("source-two"));
     Ok(())
 }

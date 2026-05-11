@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // CLI command model.
 // See: contracts/07_cli_contract_v0_1.md
-// Phase 1b: add CLI parsing + routing (still no ingest/DB logic).
+// Defines the command shapes consumed by the manual parser and routing layer.
 // ASCII-only.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

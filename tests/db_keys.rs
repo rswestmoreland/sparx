@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::db::keys::*;
 
 fn s(k: KeyBytes) -> String {
@@ -84,6 +87,20 @@ fn tenant_window_baseline_and_alert_keys_match_contract_paths() {
     assert_eq!(s(key_tenant_centroid_v1("dev01", 17)), "centroid/v1/dev01/17");
     assert_eq!(s(key_prefix_tenant_stats_v1("dev01")), "stats/v1/dev01");
     assert_eq!(s(key_tenant_stats_v1("dev01", 17)), "stats/v1/dev01/17");
+    assert_eq!(s(key_prefix_tenant_source_stream_v1()), "source_stream/v1");
+    assert_eq!(s(key_prefix_tenant_source_stream_device_v1("dev01")), "source_stream/v1/dev01");
+    assert_eq!(
+        s(key_tenant_source_stream_catalog_v1("dev01", "stream01")),
+        "source_stream/v1/dev01/stream01/catalog"
+    );
+    assert_eq!(
+        s(key_prefix_tenant_source_stats_v1("dev01", "stream01")),
+        "source_stats/v1/dev01/stream01"
+    );
+    assert_eq!(
+        s(key_tenant_source_stats_v1("dev01", "stream01", 17)),
+        "source_stats/v1/dev01/stream01/17"
+    );
     assert_eq!(s(key_prefix_tenant_alert_v1()), "alert/v1");
     assert_eq!(s(key_tenant_alert_v1("alert01")), "alert/v1/alert01");
     assert_eq!(s(key_prefix_tenant_alert_idx_time_v1("dev01")), "alert_idx_time/v1/dev01");
@@ -109,8 +126,43 @@ fn tenant_feature_metrics_and_migration_keys_match_contract_paths() {
     assert_eq!(s(key_tenant_metrics_counter_v1("cursor_resets_total")), "metrics/v1/counter/cursor_resets_total");
     assert_eq!(s(key_prefix_tenant_metrics_gauge_v1()), "metrics/v1/gauge");
     assert_eq!(s(key_tenant_metrics_gauge_v1("ingest_lag_seconds")), "metrics/v1/gauge/ingest_lag_seconds");
+    assert_eq!(s(key_prefix_tenant_silence_subject_v1()), "silence_subject/v1");
+    assert_eq!(s(key_prefix_tenant_silence_subject_device_v1("dev01")), "silence_subject/v1/device/dev01");
+    assert_eq!(s(key_tenant_silence_subject_device_state_v1("dev01")), "silence_subject/v1/device/dev01/state");
+    assert_eq!(s(key_tenant_silence_subject_tenant_state_v1()), "silence_subject/v1/tenant/state");
+    assert_eq!(
+        s(key_prefix_tenant_silence_subject_source_stream_v1("dev01", "stream01")),
+        "silence_subject/v1/source_stream/dev01/stream01"
+    );
+    assert_eq!(
+        s(key_tenant_silence_subject_source_stream_state_v1("dev01", "stream01")),
+        "silence_subject/v1/source_stream/dev01/stream01/state"
+    );
+    assert_eq!(s(key_prefix_tenant_silence_open_v1()), "silence_open/v1");
+    assert_eq!(s(key_tenant_silence_open_device_v1("dev01")), "silence_open/v1/device/dev01");
+    assert_eq!(s(key_tenant_silence_open_tenant_v1()), "silence_open/v1/tenant");
+    assert_eq!(
+        s(key_prefix_tenant_silence_open_source_stream_v1("dev01", "stream01")),
+        "silence_open/v1/source_stream/dev01/stream01"
+    );
+    assert_eq!(
+        s(key_tenant_silence_open_source_stream_v1("dev01", "stream01")),
+        "silence_open/v1/source_stream/dev01/stream01"
+    );
+    assert_eq!(s(key_prefix_tenant_drop_open_v1()), "drop_open/v1");
+    assert_eq!(s(key_prefix_tenant_drop_open_device_v1("dev01")), "drop_open/v1/device/dev01");
+    assert_eq!(s(key_tenant_drop_open_device_v1("dev01")), "drop_open/v1/device/dev01");
+    assert_eq!(s(key_tenant_drop_open_tenant_v1()), "drop_open/v1/tenant");
+    assert_eq!(
+        s(key_prefix_tenant_drop_open_source_stream_v1("dev01", "stream01")),
+        "drop_open/v1/source_stream/dev01/stream01"
+    );
+    assert_eq!(
+        s(key_tenant_drop_open_source_stream_v1("dev01", "stream01")),
+        "drop_open/v1/source_stream/dev01/stream01"
+    );
     assert_eq!(s(key_prefix_tenant_migrate_journal_v1()), "migrate/v1/journal");
-    assert_eq!(s(key_tenant_migrate_journal_v1(1700000000, "phase2a")), "migrate/v1/journal/1700000000/phase2a");
+    assert_eq!(s(key_tenant_migrate_journal_v1(1700000000, "checkpoint_a")), "migrate/v1/journal/1700000000/checkpoint_a");
 }
 
 #[test]
@@ -122,6 +174,14 @@ fn sample_keys_are_ascii_utf8() {
         key_tenant_window_row_ent_domain_v1("dev01", 42),
         key_tenant_feature_dict_str_v1("SourceIp_net@/24"),
         key_tenant_alert_idx_ent_v1("userid", "alice", 1700000000, "alert01"),
+        key_tenant_silence_subject_device_state_v1("dev01"),
+        key_tenant_silence_open_device_v1("dev01"),
+        key_tenant_silence_open_source_stream_v1("dev01", "stream01"),
+        key_tenant_drop_open_device_v1("dev01"),
+        key_tenant_drop_open_source_stream_v1("dev01", "stream01"),
+        key_tenant_source_stream_catalog_v1("dev01", "stream01"),
+        key_tenant_source_stats_v1("dev01", "stream01", 17),
+        key_tenant_silence_subject_source_stream_state_v1("dev01", "stream01"),
     ];
 
     for key in samples {

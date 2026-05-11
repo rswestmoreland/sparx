@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::config::CapsSectionV1;
 use sparx::db::keys::{
     key_tenant_window_row_ent_domain_v1, key_tenant_window_row_ent_dstip_v1,

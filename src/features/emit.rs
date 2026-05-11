@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// Canonical feature emission from parsed events.
+// See: contracts/01_semantic_keys_v0_1.md and contracts/24_feature_emission_catalog_v0_1.md
+
 use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;

@@ -1,14 +1,17 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Config load and merge logic.
 // See: contracts/28_config_schema_v0_1.md
-// Phase 1a: implements file + env + CLI overrides with deterministic defaults.
+// Implements file, environment, and CLI overrides with deterministic defaults.
 
 use std::env;
 use std::fs;
 
 use super::{
-    CapsSectionV1, CliOverridesV1, ConfigV1, FeaturesSectionV1, IngestSectionV1, MetricsSectionV1,
-    OutputSectionV1, SparxSectionV1, StorageSectionV1, BaselineSectionV1, ScoringSectionV1,
-    TomlRootV1,
+    BaselineSectionV1, CapsSectionV1, CliOverridesV1, ConfigV1, FeaturesSectionV1, IngestSectionV1,
+    MetricsSectionV1, OutputSectionV1, ScoringSectionV1, SparxSectionV1, StorageSectionV1,
+    TomlRootV1, VDropSectionV1,
 };
 
 #[derive(Clone, Debug)]
@@ -44,6 +47,10 @@ fn env_u8(name: &str) -> Option<u8> {
 
 fn env_f32(name: &str) -> Option<f32> {
     env_str(name).and_then(|v| v.trim().parse::<f32>().ok())
+}
+
+fn env_u64(name: &str) -> Option<u64> {
+    env_str(name).and_then(|v| v.trim().parse::<u64>().ok())
 }
 
 fn split_csv(v: &str) -> Vec<String> {
@@ -136,6 +143,8 @@ pub fn default_config_v1() -> ConfigV1 {
         jsonl_flush_interval_s: 5,
         include_debug_fields: false,
         automated_replay_max_files_per_pass: 128,
+        automated_replay_interval_s: 1,
+        spool_max_mb: 2048,
     };
 
     let metrics = MetricsSectionV1 {
@@ -143,6 +152,16 @@ pub fn default_config_v1() -> ConfigV1 {
         prometheus_bind: "127.0.0.1:9898".to_string(),
         health_enabled: true,
         health_bind: "127.0.0.1:9899".to_string(),
+    };
+
+    let vdrop = VDropSectionV1 {
+        enabled: true,
+        device_enabled: true,
+        tenant_enabled: true,
+        source_stream_enabled: false,
+        min_expected_windows_missed: 3,
+        min_mature_windows: None,
+        min_expected_lines: None,
     };
 
     ConfigV1 {
@@ -155,6 +174,7 @@ pub fn default_config_v1() -> ConfigV1 {
         storage,
         output,
         metrics,
+        vdrop,
     }
 }
 
@@ -388,6 +408,12 @@ fn apply_toml(cfg: &mut ConfigV1, t: &TomlRootV1) {
         if let Some(v) = o.automated_replay_max_files_per_pass {
             cfg.output.automated_replay_max_files_per_pass = v;
         }
+        if let Some(v) = o.automated_replay_interval_s {
+            cfg.output.automated_replay_interval_s = v;
+        }
+        if let Some(v) = o.spool_max_mb {
+            cfg.output.spool_max_mb = v;
+        }
     }
 
     if let Some(m) = &t.metrics {
@@ -402,6 +428,30 @@ fn apply_toml(cfg: &mut ConfigV1, t: &TomlRootV1) {
         }
         if let Some(v) = &m.health_bind {
             cfg.metrics.health_bind = v.clone();
+        }
+    }
+
+    if let Some(vdrop) = &t.vdrop {
+        if let Some(v) = vdrop.enabled {
+            cfg.vdrop.enabled = v;
+        }
+        if let Some(v) = vdrop.device_enabled {
+            cfg.vdrop.device_enabled = v;
+        }
+        if let Some(v) = vdrop.tenant_enabled {
+            cfg.vdrop.tenant_enabled = v;
+        }
+        if let Some(v) = vdrop.source_stream_enabled {
+            cfg.vdrop.source_stream_enabled = v;
+        }
+        if let Some(v) = vdrop.min_expected_windows_missed {
+            cfg.vdrop.min_expected_windows_missed = v;
+        }
+        if vdrop.min_mature_windows.is_some() {
+            cfg.vdrop.min_mature_windows = vdrop.min_mature_windows;
+        }
+        if vdrop.min_expected_lines.is_some() {
+            cfg.vdrop.min_expected_lines = vdrop.min_expected_lines;
         }
     }
 }
@@ -575,6 +625,12 @@ fn apply_env(cfg: &mut ConfigV1) {
     if let Some(v) = env_u32("SPARX_AUTOMATED_REPLAY_MAX_FILES_PER_PASS") {
         cfg.output.automated_replay_max_files_per_pass = v;
     }
+    if let Some(v) = env_u32("SPARX_AUTOMATED_REPLAY_INTERVAL_S") {
+        cfg.output.automated_replay_interval_s = v;
+    }
+    if let Some(v) = env_u32("SPARX_SPOOL_MAX_MB") {
+        cfg.output.spool_max_mb = v;
+    }
 
     // metrics
     if let Some(v) = env_bool("SPARX_PROMETHEUS_ENABLED") {
@@ -588,6 +644,29 @@ fn apply_env(cfg: &mut ConfigV1) {
     }
     if let Some(v) = env_str("SPARX_HEALTH_BIND") {
         cfg.metrics.health_bind = v;
+    }
+
+    // vdrop
+    if let Some(v) = env_bool("SPARX_VDROP_ENABLED") {
+        cfg.vdrop.enabled = v;
+    }
+    if let Some(v) = env_bool("SPARX_VDROP_DEVICE_ENABLED") {
+        cfg.vdrop.device_enabled = v;
+    }
+    if let Some(v) = env_bool("SPARX_VDROP_TENANT_ENABLED") {
+        cfg.vdrop.tenant_enabled = v;
+    }
+    if let Some(v) = env_bool("SPARX_VDROP_SOURCE_STREAM_ENABLED") {
+        cfg.vdrop.source_stream_enabled = v;
+    }
+    if let Some(v) = env_u32("SPARX_VDROP_MIN_EXPECTED_WINDOWS_MISSED") {
+        cfg.vdrop.min_expected_windows_missed = v;
+    }
+    if let Some(v) = env_u64("SPARX_VDROP_MIN_MATURE_WINDOWS") {
+        cfg.vdrop.min_mature_windows = Some(v);
+    }
+    if let Some(v) = env_u64("SPARX_VDROP_MIN_EXPECTED_LINES") {
+        cfg.vdrop.min_expected_lines = Some(v);
     }
 }
 

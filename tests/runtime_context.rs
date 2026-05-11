@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use tempfile::tempdir;
 
 use sparx::config::load::default_config_v1;

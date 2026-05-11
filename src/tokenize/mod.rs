@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Tokenization event types.
 // See: contracts/23_tokenizer_details_v0_1.md and contracts/18_syslog_envelope_and_cef_reverse_kv_v0_1.md
 

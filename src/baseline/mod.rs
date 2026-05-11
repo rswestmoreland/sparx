@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Baseline state types and DF ring helpers.
 // See: contracts/22_baseline_sketch_encoding_v0_1.md and contracts/21_scoring_math_thresholding_v0_1.md
 

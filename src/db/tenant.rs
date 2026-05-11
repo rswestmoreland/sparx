@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Fjall-backed tenant DB wrapper and repository helpers.
 //
 // See:
@@ -25,12 +28,32 @@ use crate::db::keys::{
     key_tenant_cursor_offset_v1, key_tenant_cursor_size_v1, key_tenant_dfm_v1, key_tenant_dfn_v1,
     key_tenant_migrate_journal_v1, key_tenant_schema_created_ts_v1,
     key_tenant_schema_last_migrate_ts_v1, key_tenant_schema_version_v1, key_tenant_stats_v1,
+    key_tenant_source_stats_v1, key_tenant_source_stream_catalog_v1,
+    key_prefix_tenant_source_stream_device_v1, key_prefix_tenant_source_stats_v1,
     key_tenant_window_row_ent_domain_v1, key_tenant_window_row_ent_dstip_v1,
     key_tenant_window_row_ent_host_v1, key_tenant_window_row_ent_srcip_v1,
     key_tenant_window_row_ent_userid_v1, key_tenant_window_row_feat_v1,
-    key_tenant_window_row_meta_v1,
+    key_tenant_window_row_meta_v1, key_tenant_silence_open_device_v1,
+    key_tenant_silence_open_source_stream_v1, key_tenant_silence_open_tenant_v1,
+    key_prefix_tenant_silence_open_v1, key_prefix_tenant_silence_open_source_stream_v1,
+    key_tenant_drop_open_device_v1, key_tenant_drop_open_source_stream_v1,
+    key_tenant_drop_open_tenant_v1, key_prefix_tenant_drop_open_device_v1,
+    key_prefix_tenant_drop_open_source_stream_v1, key_prefix_tenant_silence_subject_device_v1,
+    key_prefix_tenant_silence_subject_source_stream_v1,
+    key_tenant_silence_subject_device_state_v1, key_tenant_silence_subject_tenant_state_v1,
+    key_tenant_silence_subject_source_stream_state_v1,
 };
 use crate::db::layout::{filesystem_layout_v1, FilesystemLayoutV1};
+use crate::db::silence::{
+    decode_expected_source_state_v1, decode_open_drop_state_v1, decode_open_silence_state_v1,
+    encode_expected_source_state_v1, encode_open_drop_state_v1, encode_open_silence_state_v1,
+    update_expected_source_state_from_window_v1, ExpectedSourceStateUpdateV1, ExpectedSourceStateV1,
+    OpenDropStateV1, OpenSilenceStateV1,
+};
+use crate::db::source_stream::{
+    decode_source_stream_catalog_v1, decode_source_stream_stats_v1, encode_source_stream_catalog_v1,
+    encode_source_stream_stats_v1, SourceStreamCatalogV1, SourceStreamStatsV1,
+};
 use crate::db::open_window::{
     decode_win_active_v1, decode_win_row_ent_domain_v1, decode_win_row_ent_dstip_v1,
     decode_win_row_ent_host_v1, decode_win_row_ent_srcip_v1, decode_win_row_ent_userid_v1,
@@ -468,6 +491,521 @@ impl TenantDbV1 {
                 .map_err(|e| DbErrorV1::new_v1(format!("df slot bucket dfm decode failed: {:?}", e)))?,
         }))
     }
+
+    pub fn read_device_expected_source_state_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_subject_device_state_v1(device_key).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_expected_source_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_device_expected_source_state_v1(
+        &self,
+        device_key: &str,
+        state: &ExpectedSourceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_subject_device_state_v1(device_key).as_bytes(),
+            &encode_expected_source_state_v1(state),
+        )
+    }
+
+    pub fn update_device_expected_source_state_v1(
+        &self,
+        device_key: &str,
+        update: &ExpectedSourceStateUpdateV1,
+    ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
+        let previous = self.read_device_expected_source_state_v1(device_key)?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
+            .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state update failed: {:?}", e)))?;
+        self.write_device_expected_source_state_v1(device_key, &next)?;
+        Ok(next)
+    }
+
+
+    pub fn list_device_expected_source_states_v1(&self) -> Result<Vec<(String, ExpectedSourceStateV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_silence_subject_device_v1("");
+        let prefix_bytes = prefix.as_bytes();
+        let prefix_text = std::str::from_utf8(prefix_bytes)
+            .map_err(|e| DbErrorV1::new_v1(format!("device expected-source prefix utf8 failed: {}", e)))?;
+        let entries = self.scan_prefix_raw_v1(prefix_bytes)?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("device expected-source key utf8 failed: {}", e)))?;
+            let suffix = key_text
+                .strip_prefix(prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("device expected-source key missing prefix"))?;
+            let device_key = suffix
+                .strip_suffix("/state")
+                .ok_or_else(|| DbErrorV1::new_v1("device expected-source key missing state suffix"))?;
+            out.push((
+                device_key.to_string(),
+                decode_expected_source_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
+    pub fn read_tenant_expected_source_state_v1(&self) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_subject_tenant_state_v1().as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_expected_source_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("tenant expected-source state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_tenant_expected_source_state_v1(
+        &self,
+        state: &ExpectedSourceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_subject_tenant_state_v1().as_bytes(),
+            &encode_expected_source_state_v1(state),
+        )
+    }
+
+    pub fn update_tenant_expected_source_state_v1(
+        &self,
+        update: &ExpectedSourceStateUpdateV1,
+    ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
+        let previous = self.read_tenant_expected_source_state_v1()?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
+            .map_err(|e| DbErrorV1::new_v1(format!("tenant expected-source state update failed: {:?}", e)))?;
+        self.write_tenant_expected_source_state_v1(&next)?;
+        Ok(next)
+    }
+
+    pub fn read_device_open_silence_state_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_open_device_v1(device_key).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_silence_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_device_open_silence_state_v1(
+        &self,
+        device_key: &str,
+        state: &OpenSilenceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_open_device_v1(device_key).as_bytes(),
+            &encode_open_silence_state_v1(state),
+        )
+    }
+
+    pub fn list_device_open_silence_states_v1(&self) -> Result<Vec<(String, OpenSilenceStateV1)>, DbErrorV1> {
+        let base = key_prefix_tenant_silence_open_v1();
+        let prefix_text = format!("{}/device/", std::str::from_utf8(base.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("device open-silence prefix utf8 failed: {}", e)))?);
+        let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("device open-silence key utf8 failed: {}", e)))?;
+            let device_key = key_text
+                .strip_prefix(&prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("device open-silence key missing prefix"))?;
+            out.push((
+                device_key.to_string(),
+                decode_open_silence_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
+    pub fn read_tenant_open_silence_state_v1(&self) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_open_tenant_v1().as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_silence_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("tenant open-silence state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_tenant_open_silence_state_v1(
+        &self,
+        state: &OpenSilenceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_open_tenant_v1().as_bytes(),
+            &encode_open_silence_state_v1(state),
+        )
+    }
+
+    pub fn read_device_open_drop_state_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_drop_open_device_v1(device_key).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_drop_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_device_open_drop_state_v1(
+        &self,
+        device_key: &str,
+        state: &OpenDropStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_drop_open_device_v1(device_key).as_bytes(),
+            &encode_open_drop_state_v1(state),
+        )
+    }
+
+    pub fn list_device_open_drop_states_v1(&self) -> Result<Vec<(String, OpenDropStateV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_drop_open_device_v1("");
+        let prefix_text = std::str::from_utf8(prefix.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("device open-drop prefix utf8 failed: {}", e)))?;
+        let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("device open-drop key utf8 failed: {}", e)))?;
+            let device_key = key_text
+                .strip_prefix(prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("device open-drop key missing prefix"))?;
+            out.push((
+                device_key.to_string(),
+                decode_open_drop_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
+    pub fn read_tenant_open_drop_state_v1(&self) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_drop_open_tenant_v1().as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_drop_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("tenant open-drop state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_tenant_open_drop_state_v1(
+        &self,
+        state: &OpenDropStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_drop_open_tenant_v1().as_bytes(),
+            &encode_open_drop_state_v1(state),
+        )
+    }
+
+
+    pub fn read_source_stream_open_silence_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+    ) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_open_source_stream_v1(device_key, source_stream_id).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_silence_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_source_stream_open_silence_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        state: &OpenSilenceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_open_source_stream_v1(device_key, source_stream_id).as_bytes(),
+            &encode_open_silence_state_v1(state),
+        )
+    }
+
+    pub fn list_source_stream_open_silence_states_for_device_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Vec<(String, OpenSilenceStateV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_silence_open_source_stream_v1(device_key, "");
+        let prefix_text = std::str::from_utf8(prefix.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence prefix utf8 failed: {}", e)))?;
+        let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence key utf8 failed: {}", e)))?;
+            let source_stream_id = key_text
+                .strip_prefix(prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream open-silence key missing prefix"))?;
+            out.push((
+                source_stream_id.to_string(),
+                decode_open_silence_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
+    pub fn read_source_stream_open_drop_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+    ) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_drop_open_source_stream_v1(device_key, source_stream_id).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_open_drop_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_source_stream_open_drop_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        state: &OpenDropStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_drop_open_source_stream_v1(device_key, source_stream_id).as_bytes(),
+            &encode_open_drop_state_v1(state),
+        )
+    }
+
+    pub fn list_source_stream_open_drop_states_for_device_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Vec<(String, OpenDropStateV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_drop_open_source_stream_v1(device_key, "");
+        let prefix_text = std::str::from_utf8(prefix.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop prefix utf8 failed: {}", e)))?;
+        let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop key utf8 failed: {}", e)))?;
+            let source_stream_id = key_text
+                .strip_prefix(prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream open-drop key missing prefix"))?;
+            out.push((
+                source_stream_id.to_string(),
+                decode_open_drop_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
+
+    pub fn read_source_stream_catalog_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+    ) -> Result<Option<SourceStreamCatalogV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_source_stream_catalog_v1(device_key, source_stream_id).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_source_stream_catalog_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_source_stream_catalog_v1(
+        &self,
+        catalog: &SourceStreamCatalogV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_source_stream_catalog_v1(&catalog.device_key, &catalog.source_stream_id).as_bytes(),
+            &encode_source_stream_catalog_v1(catalog)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog encode failed: {:?}", e)))?,
+        )
+    }
+
+    pub fn list_source_stream_catalogs_for_device_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Vec<SourceStreamCatalogV1>, DbErrorV1> {
+        let base = key_prefix_tenant_source_stream_device_v1(device_key);
+        let prefix_text = format!("{}/", std::str::from_utf8(base.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog prefix utf8 failed: {}", e)))?);
+        let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog key utf8 failed: {}", e)))?;
+            let suffix = key_text
+                .strip_prefix(&prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream catalog key missing prefix"))?;
+            let source_stream_id = suffix
+                .strip_suffix("/catalog")
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream catalog key missing catalog suffix"))?;
+            let catalog = decode_source_stream_catalog_v1(&value)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e)))?;
+            if catalog.device_key != device_key || catalog.source_stream_id != source_stream_id {
+                return Err(DbErrorV1::new_v1("source-stream catalog key/value mismatch"));
+            }
+            out.push(catalog);
+        }
+        out.sort_by(|a, b| {
+            a.device_key
+                .cmp(&b.device_key)
+                .then(a.source_stream_id.cmp(&b.source_stream_id))
+                .then(a.canonical_source_path.cmp(&b.canonical_source_path))
+        });
+        Ok(out)
+    }
+
+    pub fn read_source_stream_stats_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        bucket: u8,
+    ) -> Result<Option<SourceStreamStatsV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_source_stats_v1(device_key, source_stream_id, bucket).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_source_stream_stats_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_source_stream_stats_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        bucket: u8,
+        stats: &SourceStreamStatsV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_source_stats_v1(device_key, source_stream_id, bucket).as_bytes(),
+            &encode_source_stream_stats_v1(stats)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats encode failed: {:?}", e)))?,
+        )
+    }
+
+    pub fn list_source_stream_stats_for_device_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+    ) -> Result<Vec<(u8, SourceStreamStatsV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_source_stats_v1(device_key, source_stream_id);
+        let prefix_text = format!("{}/", std::str::from_utf8(prefix.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats prefix utf8 failed: {}", e)))?);
+        let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats key utf8 failed: {}", e)))?;
+            let bucket_text = key_text
+                .strip_prefix(&prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream stats key missing prefix"))?;
+            let bucket = bucket_text
+                .parse::<u8>()
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats bucket parse failed: {}", e)))?;
+            out.push((
+                bucket,
+                decode_source_stream_stats_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by_key(|(bucket, _)| *bucket);
+        Ok(out)
+    }
+
+    pub fn read_source_stream_expected_source_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+    ) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
+        match self.get_raw_v1(key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id).as_bytes())? {
+            Some(bytes) => Ok(Some(
+                decode_expected_source_state_v1(&bytes)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state decode failed: {:?}", e)))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    pub fn write_source_stream_expected_source_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        state: &ExpectedSourceStateV1,
+    ) -> Result<(), DbErrorV1> {
+        self.put_raw_v1(
+            key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id).as_bytes(),
+            &encode_expected_source_state_v1(state),
+        )
+    }
+
+    pub fn update_source_stream_expected_source_state_v1(
+        &self,
+        device_key: &str,
+        source_stream_id: &str,
+        update: &ExpectedSourceStateUpdateV1,
+    ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
+        let previous = self.read_source_stream_expected_source_state_v1(device_key, source_stream_id)?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state update failed: {:?}", e)))?;
+        self.write_source_stream_expected_source_state_v1(device_key, source_stream_id, &next)?;
+        Ok(next)
+    }
+
+    pub fn list_source_stream_expected_source_states_for_device_v1(
+        &self,
+        device_key: &str,
+    ) -> Result<Vec<(String, ExpectedSourceStateV1)>, DbErrorV1> {
+        let prefix = key_prefix_tenant_silence_subject_source_stream_v1(device_key, "");
+        let prefix_text = std::str::from_utf8(prefix.as_bytes())
+            .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source prefix utf8 failed: {}", e)))?;
+        let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
+        let mut out = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_text = String::from_utf8(key)
+                .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source key utf8 failed: {}", e)))?;
+            let suffix = key_text
+                .strip_prefix(prefix_text)
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream expected-source key missing prefix"))?;
+            let source_stream_id = suffix
+                .strip_suffix("/state")
+                .ok_or_else(|| DbErrorV1::new_v1("source-stream expected-source key missing state suffix"))?;
+            out.push((
+                source_stream_id.to_string(),
+                decode_expected_source_state_v1(&value)
+                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state decode failed: {:?}", e)))?,
+            ));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(out)
+    }
+
 
     pub fn write_device_baseline_state_v1(
         &self,

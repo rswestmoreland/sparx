@@ -1,11 +1,15 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use sparx::alert::{AlertV1, CountedStringV1, EntitiesV1, FileSpanV1, ReasonV1, TopFeatureV1, ALERT_SCHEMA_VERSION_V1};
 use sparx::sink::{
     enforce_spool_cap_v1, jsonl_alert_path_v1, jsonl_day_dir_v1, jsonl_file_name_v1, read_spooled_alert_v1, spool_alert_path_v1,
-    write_spool_alert_v1, AlertSinkV1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1, SpoolEmitOutcomeV1,
-    SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
+    spool_backlog_per_tenant_v1, write_spool_alert_v1, AlertSinkV1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1,
+    SpoolEmitOutcomeV1, SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
 };
 use sparx::types::{ConfidenceV1, FeatureFamilyV1, LabelV1};
 
@@ -195,7 +199,7 @@ fn spool_write_on_simulated_jsonl_failure() {
 
     assert_eq!(
         spooled_path,
-        spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap()
     );
     assert!(spooled_path.is_file());
     let spooled_alert = read_spooled_alert_v1(&spooled_path).unwrap();
@@ -267,7 +271,7 @@ fn spool_replay_can_be_bounded_per_pass() {
 
     assert_eq!(report.replayed_paths.len(), 2);
     assert!(report.failed_paths.is_empty());
-    let remaining = spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "0000000000000000000000000000000c");
+    let remaining = spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "0000000000000000000000000000000c").unwrap();
     assert!(remaining.exists());
 
     let out_path = jsonl_alert_path_v1(&jsonl_root.to_string_lossy(), "tenant-a", "device-001", 1_700_000_000, 0).unwrap();
@@ -327,4 +331,68 @@ fn stdout_sink_emits_one_line_per_alert() {
     let second_json: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(first_json["alert_id"], serde_json::Value::String("stdout-a".to_string()));
     assert_eq!(second_json["alert_id"], serde_json::Value::String("stdout-b".to_string()));
+}
+
+#[test]
+fn spool_backlog_per_tenant_is_deterministic_v1() {
+    let root = temp_root("sparx_test_sink_spool_backlog_per_tenant");
+    fs::create_dir_all(&root).unwrap();
+
+    let mut alert_a = sample_alert(1_700_000_000, 1_700_000_060);
+    alert_a.alert_id = "11111111111111111111111111111111".to_string();
+    alert_a.tenant_id = "tenant-b".to_string();
+    write_spool_alert_v1(&root.to_string_lossy(), &alert_a).unwrap();
+    std::thread::sleep(Duration::from_secs(2));
+
+    let mut alert_b = sample_alert(1_700_000_000, 1_700_000_060);
+    alert_b.alert_id = "22222222222222222222222222222222".to_string();
+    alert_b.tenant_id = "tenant-a".to_string();
+    let path_b = write_spool_alert_v1(&root.to_string_lossy(), &alert_b).unwrap();
+
+    let mut alert_c = sample_alert(1_700_000_000, 1_700_000_060);
+    alert_c.alert_id = "33333333333333333333333333333333".to_string();
+    alert_c.tenant_id = "tenant-a".to_string();
+    let path_c = write_spool_alert_v1(&root.to_string_lossy(), &alert_c).unwrap();
+
+    let summaries = spool_backlog_per_tenant_v1(&root.to_string_lossy()).unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries[0].tenant_id, "tenant-a");
+    assert_eq!(summaries[0].files, 2);
+    assert_eq!(summaries[0].bytes, fs::metadata(path_b).unwrap().len() + fs::metadata(path_c).unwrap().len());
+    assert!(summaries[0].oldest_file_ts.is_some());
+    assert!(summaries[0].oldest_age_s.is_some());
+    assert_eq!(summaries[1].tenant_id, "tenant-b");
+    assert_eq!(summaries[1].files, 1);
+    assert!(summaries[1].oldest_file_ts.is_some());
+    assert!(summaries[1].oldest_age_s.is_some());
+    assert!(summaries[1].oldest_age_s.unwrap() >= 1);
+    assert!(summaries[1].oldest_age_s.unwrap() >= summaries[0].oldest_age_s.unwrap());
+}
+
+#[test]
+fn sink_paths_reject_unsafe_filesystem_components_v1() {
+    let ts = 1_700_000_000;
+    assert!(jsonl_day_dir_v1("/tmp/out", "../tenant", "device-001", ts).is_err());
+    assert!(jsonl_day_dir_v1("/tmp/out", "tenant-a", "../device", ts).is_err());
+    assert!(jsonl_file_name_v1("bad/device", ts, 0).is_err());
+    assert!(spool_alert_path_v1("/tmp/out", "tenant-a", "bad/alert").is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn spool_replay_inventory_ignores_symlinked_files_v1() {
+    use std::os::unix::fs::symlink;
+
+    let root = temp_root("sparx_test_sink_spool_symlink_guard");
+    fs::create_dir_all(&root).unwrap();
+    let tenant_dir = root.join("spool").join("alerts").join("tenant=tenant-a");
+    fs::create_dir_all(&tenant_dir).unwrap();
+    let outside = root.join("outside.json");
+    fs::write(&outside, b"{}").unwrap();
+    symlink(&outside, tenant_dir.join("spool_symlink.json")).unwrap();
+
+    let files = sparx::sink::sorted_spool_files_for_replay_v1(&root.to_string_lossy()).unwrap();
+    assert!(files.is_empty());
+    let summaries = spool_backlog_per_tenant_v1(&root.to_string_lossy()).unwrap();
+    assert!(summaries.is_empty());
 }

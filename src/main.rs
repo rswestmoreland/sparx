@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// sparx CLI entrypoint.
+// Keeps process setup minimal and delegates parsing/routing to library modules.
+
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Feature emission and sparse row types.
 // See: contracts/24_feature_emission_catalog_v0_1.md and contracts/05_feature_id_strategy_v0_1.md
 

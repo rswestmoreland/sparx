@@ -1,9 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Ingest discovery and file inventory helpers.
+// See: contracts/08_directory_discovery_v0_1.md
 
 pub mod cursor;
 pub mod reader;
-// See: contracts/08_directory_discovery_v0_1.md
-// Phase 3a: directory discovery.
 
 use std::fs;
 use std::io;

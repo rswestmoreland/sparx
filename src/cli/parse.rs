@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // CLI parsing (manual, std-only).
 // See: contracts/07_cli_contract_v0_1.md
-// Phase 1b: parse args into (CommandV1, CliOverridesV1).
+// Parses argv into deterministic command and override structures.
 // ASCII-only.
 
 use crate::config::CliOverridesV1;

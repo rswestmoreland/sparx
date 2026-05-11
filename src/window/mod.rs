@@ -1,9 +1,12 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Window aggregation and checkpoint helpers.
 // See: contracts/24_feature_emission_catalog_v0_1.md
 //   and contracts/26_open_window_checkpoint_encoding_v0_1.md
-// Phase 6a/6b: aggregate one active window per device, generate deterministic
-// checkpoint writes, and build deterministic finalize plans. Baseline updates
-// and scoring are deferred to later phases.
+// Aggregates one active sparse window per device, emits deterministic checkpoint
+// mutations, and builds deterministic finalize plans. Baseline and scoring
+// modules consume the finalized rows produced here.
 
 use std::collections::BTreeMap;
 

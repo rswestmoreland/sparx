@@ -1,10 +1,10 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Runtime context and repository helpers.
 //
-// Phase 10f:
-// - runtime context holding config, layout, global DB, and tenant DB cache
-// - global repository helper passthroughs
-// - tenant repository helper passthroughs
-// - process metadata helpers
+// Holds effective config, filesystem layout, global DB, tenant DB cache, global
+// and tenant repository passthroughs, and process metadata helpers.
 
 use std::fs;
 use std::path::Path;

@@ -1,11 +1,10 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Tenant DB handle cache and lifecycle helpers.
 //
-// Phase 10e:
-// - max-open cap
-// - deterministic LRU eviction
-// - idle close
-// - explicit close for purge
-// - safe reopen
+// Provides max-open caps, deterministic LRU eviction, idle close, explicit purge
+// close, and safe reopen behavior for per-tenant DB handles.
 
 use std::collections::BTreeMap;
 

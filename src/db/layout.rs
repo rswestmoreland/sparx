@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Canonical filesystem layout helpers.
 //
-// Phase 10b introduces one authoritative path derivation layer for runtime
+// Provides one authoritative path derivation layer for runtime
 // commands and later DB wiring. Paths are derived only from the effective
 // config plus tenant_id where applicable.
 //

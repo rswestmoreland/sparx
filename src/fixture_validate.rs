@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Fixture corpus validation helpers.
 // See: contracts/07_cli_contract_v0_1.md and contracts/12_fixture_corpus_v0_1.md
-// Phase 9a: validate fixture layout and sample files.
+// Validates fixture layout and sample files deterministically.
 // ASCII-only.
 
 use std::fs;

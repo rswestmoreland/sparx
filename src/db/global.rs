@@ -1,7 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Fjall-backed global DB wrapper and repository helpers.
 //
 // See:
 // - contracts/06_rocksdb_topology_v0_1.md
+//   (continuity filename; active contract title is Embedded DB Topology)
 // - contracts/30_global_db_key_prefix_map_v0_1.md
 
 use std::collections::BTreeSet;

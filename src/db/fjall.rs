@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Thin Fjall-backed raw KV wrapper.
 //
 // This module keeps Fjall-specific types inside src/db/ and exposes only the

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::db::tenant_values::*;
 
 #[test]
@@ -155,8 +158,8 @@ fn simple_value_helpers_roundtrip_by_contract_type() {
         3.5
     );
     assert_eq!(
-        decode_migrate_journal_v1(&encode_migrate_journal_v1("ok phase2b")).unwrap(),
-        "ok phase2b"
+        decode_migrate_journal_v1(&encode_migrate_journal_v1("ok checkpoint_b")).unwrap(),
+        "ok checkpoint_b"
     );
 }
 

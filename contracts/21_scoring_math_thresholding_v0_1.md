@@ -30,10 +30,10 @@ For each feature f:
 - `idf(f) = ln((N_bucket + 1) / (df_bucket(f) + 1)) + 1`
 
 ### 1.2 Rarity mass
-- `rarity_mass_raw = Σ_f ( tf_w(f) * idf(f) )`
+- `rarity_mass_raw = sum_f ( tf_w(f) * idf(f) )`
 
 Recommended normalization:
-- `row_mass = Σ_f tf_w(f)`
+- `row_mass = sum_f tf_w(f)`
 - `rarity_mass = rarity_mass_raw / max(row_mass, eps)`
 
 Bounded transform (preferred):
@@ -49,7 +49,7 @@ Let `x(f) = tf_w(f)` for the row and `m(f) = centroid(f)` for the device/bucket.
 - `drift = 1 - clamp(cos, -1, 1)`
 
 Cold start:
-- `cold_start_days` is an active scoring config field in Phase 15a
+- `cold_start_days` is an active scoring config field in the current release
 - `N_MIN = cold_start_days * (3600 / window_size_s)` for the current bucket family
 - if `cold_start_days = 0`, only an empty centroid forces `cold_start=true`
 - otherwise centroid empty or `N_bucket < N_MIN` => `cold_start=true`
@@ -94,7 +94,7 @@ If `cold_start=true`:
 - still update baselines
 
 ### 5.1a Minimum alertable lines
-- `min_lines_per_window` is an active scoring config field in Phase 15a
+- `min_lines_per_window` is an active scoring config field in the current release
 - default: `10`
 - if `min_lines_per_window = 0`, the line floor is disabled
 - if `lines < min_lines_per_window`, no alert is emitted for that window even if the score would otherwise qualify
@@ -168,3 +168,45 @@ DF update is window-presence based:
 - blob_ratio drives noise_suspect without entity focus
 - cold start suppresses outlier/noise_suspect using the active day-based maturity floor
 - min_lines_per_window suppresses alert emission while preserving baseline updates
+
+---
+
+## 9) Active silence / loss-of-log extension
+
+`V_DROP` is active for the first hard-silence runtime path as of the current release. The row-based
+scorer still scores finalized sparse rows that exist; `V_DROP` is derived from the
+separate expected-source missing-window model defined in Contracts 34 and 35.
+
+Active V_DROP scoring scope:
+
+- device hard silence
+- tenant aggregate hard silence
+- device sharp drop
+- tenant aggregate sharp drop
+- source-stream hard silence and sharp drop when the source-stream gate is enabled
+- mature expected-source state only
+- conservative missed-window and expected-volume gating
+- duplicate suppression through `silence_open/*` and `drop_open/*` state
+- existing `AlertV1` persistence and sink emission
+
+High-volume detection remains represented by `V_SPIKE` and `V_EXTREME`. `V_DROP` remains a
+volume-loss signal and must not be derived from high-volume z-score alone.
+
+## Sharp-drop scoring
+
+Sharp-drop uses the existing volume score slot:
+
+- `observed_expected_ratio = observed_lines / expected_lines`
+- `drop_ratio = 1.0 - observed_expected_ratio`
+- `score_volume = clamp01(drop_ratio)`
+- `score_total = score_volume`
+- `score_rarity = 0.0`
+- `score_drift = 0.0`
+- `top_features = []`
+
+Device and tenant aggregate sharp drop derive expected lines from mature bucket-local
+DeviceStatsV1 line-count baselines. Source-stream sharp drop derives expected lines from
+mature bucket-local SourceStreamStatsV1 line-count baselines. Byte-count baselines are
+explanation-only unless a later contract approves a gate.
+
+Hard silence has priority over sharp drop when observed lines are zero.

@@ -10,7 +10,7 @@
 Given a raw key string (KV key / JSON field / CSV header / CEF key):
 
 1. Trim whitespace.
-2. Split CamelCase/PascalCase into word boundaries (insert `_` before upper→lower transitions).
+2. Split CamelCase/PascalCase into word boundaries (insert `_` before upper->lower transitions).
 3. Lowercase.
 4. Replace non-alphanumeric with `_`.
 5. Collapse multiple `_` into one.

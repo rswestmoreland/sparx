@@ -1,10 +1,10 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Tenant policy loading and validation.
 //
-// Phase 11c:
-// - parse tenant policy TOML from the contract-defined watch-root path
-// - validate policy_version, key_overrides categories, optional ip_bucket CIDR,
-//   and default min_identity_confidence
-// - keep output-facing ordering deterministic via BTreeMap
+// Parses tenant policy TOML from the contract-defined watch-root path, validates
+// policy version and override shapes, and keeps output ordering deterministic.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -19,6 +19,13 @@ pub struct TenantPolicyV1 {
     pub key_overrides: BTreeMap<String, String>,
     pub ip_bucket: Option<String>,
     pub min_identity_confidence: u8,
+    pub vdrop_enabled: Option<bool>,
+    pub vdrop_device_enabled: Option<bool>,
+    pub vdrop_tenant_enabled: Option<bool>,
+    pub vdrop_source_stream_enabled: Option<bool>,
+    pub vdrop_min_expected_windows_missed: Option<u32>,
+    pub vdrop_min_mature_windows: Option<u64>,
+    pub vdrop_min_expected_lines: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,6 +50,13 @@ struct TenantPolicyTomlV1 {
     key_overrides: BTreeMap<String, String>,
     ip_bucket: Option<String>,
     min_identity_confidence: Option<u8>,
+    vdrop_enabled: Option<bool>,
+    vdrop_device_enabled: Option<bool>,
+    vdrop_tenant_enabled: Option<bool>,
+    vdrop_source_stream_enabled: Option<bool>,
+    vdrop_min_expected_windows_missed: Option<u32>,
+    vdrop_min_mature_windows: Option<u64>,
+    vdrop_min_expected_lines: Option<u64>,
 }
 
 pub fn load_tenant_policy_v1(
@@ -122,12 +136,25 @@ pub fn load_tenant_policy_v1(
         }
     }
 
+    if let Some(value) = raw.vdrop_min_expected_windows_missed {
+        if value == 0 {
+            details.push("invalid vdrop_min_expected_windows_missed: 0".to_string());
+        }
+    }
+
     if details.is_empty() {
         Ok(TenantPolicyV1 {
             policy_version: 1,
             key_overrides: raw.key_overrides,
             ip_bucket: raw.ip_bucket,
             min_identity_confidence: raw.min_identity_confidence.unwrap_or(2),
+            vdrop_enabled: raw.vdrop_enabled,
+            vdrop_device_enabled: raw.vdrop_device_enabled,
+            vdrop_tenant_enabled: raw.vdrop_tenant_enabled,
+            vdrop_source_stream_enabled: raw.vdrop_source_stream_enabled,
+            vdrop_min_expected_windows_missed: raw.vdrop_min_expected_windows_missed,
+            vdrop_min_mature_windows: raw.vdrop_min_mature_windows,
+            vdrop_min_expected_lines: raw.vdrop_min_expected_lines,
         })
     } else {
         Err(TenantPolicyLoadErrorV1 {
@@ -181,4 +208,19 @@ pub fn tenant_policy_path_parts_v1(tenant_root: &Path, tenant_id: &str) -> (Path
     let tenant_dir = tenant_root.join(tenant_id);
     let policy_path = tenant_dir.join(".sparx").join("policy.toml");
     (tenant_dir, policy_path)
+}
+
+
+pub fn resolve_vdrop_source_stream_enabled_v1(
+    config_vdrop_enabled: bool,
+    config_source_stream_enabled: bool,
+    tenant_policy: Option<&TenantPolicyV1>,
+) -> bool {
+    let vdrop_enabled = tenant_policy
+        .and_then(|policy| policy.vdrop_enabled)
+        .unwrap_or(config_vdrop_enabled);
+    let source_stream_enabled = tenant_policy
+        .and_then(|policy| policy.vdrop_source_stream_enabled)
+        .unwrap_or(config_source_stream_enabled);
+    vdrop_enabled && source_stream_enabled
 }

@@ -1,8 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Key builders for global and tenant DBs.
 // See: contracts/25_tenant_db_key_prefix_map_v0_1.md
 //   and contracts/30_global_db_key_prefix_map_v0_1.md
-// Phase 2a: canonical ASCII UTF-8 key formatting only.
-// No RocksDB wiring or value encodings in this module.
+// This module only defines canonical ASCII UTF-8 key formatting. Engine adapters
+// and value encodings live in separate DB modules.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyBytes {
@@ -232,6 +235,22 @@ pub fn key_prefix_tenant_stats_v1(device_key: &str) -> KeyBytes {
     build_key(&["stats", "v1", device_key])
 }
 
+pub fn key_prefix_tenant_source_stream_v1() -> KeyBytes {
+    build_key(&["source_stream", "v1"])
+}
+
+pub fn key_prefix_tenant_source_stream_device_v1(device_key: &str) -> KeyBytes {
+    build_key(&["source_stream", "v1", device_key])
+}
+
+pub fn key_prefix_tenant_source_stats_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["source_stats", "v1", device_key, source_stream_id])
+}
+
+pub fn key_prefix_tenant_silence_subject_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["silence_subject", "v1", "source_stream", device_key, source_stream_id])
+}
+
 pub fn key_prefix_tenant_alert_v1() -> KeyBytes {
     build_key(&["alert", "v1"])
 }
@@ -254,6 +273,34 @@ pub fn key_prefix_tenant_metrics_counter_v1() -> KeyBytes {
 
 pub fn key_prefix_tenant_metrics_gauge_v1() -> KeyBytes {
     build_key(&["metrics", "v1", "gauge"])
+}
+
+pub fn key_prefix_tenant_silence_subject_v1() -> KeyBytes {
+    build_key(&["silence_subject", "v1"])
+}
+
+pub fn key_prefix_tenant_silence_subject_device_v1(device_key: &str) -> KeyBytes {
+    build_key(&["silence_subject", "v1", "device", device_key])
+}
+
+pub fn key_prefix_tenant_silence_open_v1() -> KeyBytes {
+    build_key(&["silence_open", "v1"])
+}
+
+pub fn key_prefix_tenant_silence_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["silence_open", "v1", "source_stream", device_key, source_stream_id])
+}
+
+pub fn key_prefix_tenant_drop_open_v1() -> KeyBytes {
+    build_key(&["drop_open", "v1"])
+}
+
+pub fn key_prefix_tenant_drop_open_device_v1(device_key: &str) -> KeyBytes {
+    build_key(&["drop_open", "v1", "device", device_key])
+}
+
+pub fn key_prefix_tenant_drop_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["drop_open", "v1", "source_stream", device_key, source_stream_id])
 }
 
 pub fn key_prefix_tenant_migrate_journal_v1() -> KeyBytes {
@@ -411,6 +458,15 @@ pub fn key_tenant_stats_v1(device_key: &str, bucket: u8) -> KeyBytes {
     build_key(&["stats", "v1", device_key, &bucket])
 }
 
+pub fn key_tenant_source_stream_catalog_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["source_stream", "v1", device_key, source_stream_id, "catalog"])
+}
+
+pub fn key_tenant_source_stats_v1(device_key: &str, source_stream_id: &str, bucket: u8) -> KeyBytes {
+    let bucket = u8_part(bucket);
+    build_key(&["source_stats", "v1", device_key, source_stream_id, &bucket])
+}
+
 pub fn key_tenant_alert_v1(alert_id: &str) -> KeyBytes {
     build_key(&["alert", "v1", alert_id])
 }
@@ -441,6 +497,45 @@ pub fn key_tenant_metrics_counter_v1(name: &str) -> KeyBytes {
 
 pub fn key_tenant_metrics_gauge_v1(name: &str) -> KeyBytes {
     build_key(&["metrics", "v1", "gauge", name])
+}
+
+pub fn key_tenant_silence_subject_device_state_v1(device_key: &str) -> KeyBytes {
+    build_key(&["silence_subject", "v1", "device", device_key, "state"])
+}
+
+pub fn key_tenant_silence_subject_tenant_state_v1() -> KeyBytes {
+    build_key(&["silence_subject", "v1", "tenant", "state"])
+}
+
+pub fn key_tenant_silence_subject_source_stream_state_v1(
+    device_key: &str,
+    source_stream_id: &str,
+) -> KeyBytes {
+    build_key(&["silence_subject", "v1", "source_stream", device_key, source_stream_id, "state"])
+}
+
+pub fn key_tenant_silence_open_device_v1(device_key: &str) -> KeyBytes {
+    build_key(&["silence_open", "v1", "device", device_key])
+}
+
+pub fn key_tenant_silence_open_tenant_v1() -> KeyBytes {
+    build_key(&["silence_open", "v1", "tenant"])
+}
+
+pub fn key_tenant_silence_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["silence_open", "v1", "source_stream", device_key, source_stream_id])
+}
+
+pub fn key_tenant_drop_open_device_v1(device_key: &str) -> KeyBytes {
+    build_key(&["drop_open", "v1", "device", device_key])
+}
+
+pub fn key_tenant_drop_open_tenant_v1() -> KeyBytes {
+    build_key(&["drop_open", "v1", "tenant"])
+}
+
+pub fn key_tenant_drop_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
+    build_key(&["drop_open", "v1", "source_stream", device_key, source_stream_id])
 }
 
 pub fn key_tenant_migrate_journal_v1(ts: i64, name: &str) -> KeyBytes {

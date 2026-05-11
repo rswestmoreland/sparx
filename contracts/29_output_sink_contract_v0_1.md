@@ -41,7 +41,7 @@ De-duplication key:
 ### 2.3 Failure behavior
 - For `stdout`: failures are fatal only if the write call fails (rare).
 - For `jsonl`: active runtime writes fail closed on open/write/flush errors.
-- Replay/spool helper behavior is defined in section 4, but automatic fallback from the active `run`/`oneshot` sink path is deferred in v0.1.
+- Replay/spool helper behavior and the active `run`/`oneshot` recovery path are defined in section 4.
 
 ---
 
@@ -136,10 +136,10 @@ Automated replay is deterministic and bounded:
 
 ### 4.5 Spool caps
 The helper-backed spooling sink includes deterministic spool-cap enforcement.
-Spool tuning is still not part of the active config contract in v0.1.
+Spool cap tuning is active in v0.1 through `output.spool_max_mb`.
 
 Current helper/runtime default:
-- spool cap default constant: 2048 MB
+- spool cap default: 2048 MB
 
 Cap behavior:
 - delete deterministic oldest files by lex path order until total spool bytes are
@@ -152,13 +152,52 @@ The active observability surface in v0.1 now exposes recovery state through
 `status`, `/metrics`, and `/healthz`, including:
 - current spool backlog file count
 - current spool backlog total bytes
-- configured automated replay max-files-per-pass value
+- current oldest spool-file timestamp/age when backlog exists
+- current stale-backlog boolean plus stale-tenant count
+- current per-tenant recovery backlog breakdown for tenants that presently have backlog, including oldest backlog age, stale state, per-tenant previous/last snapshot timestamps, per-tenant snapshot interval, per-tenant backlog file/byte deltas, and per-tenant trend direction
+- cumulative recovery counters for spool writes, replay successes, replay failures, and cap drops
+- cumulative automated replay attempt count
+- most recent automated replay timestamp plus replayed/failed file counts when present
+- persisted global recovery trend snapshot timestamps, snapshot interval, backlog file/byte deltas, and trend direction
+- persisted per-tenant recovery trend snapshot timestamps, snapshot interval, backlog file/byte deltas, and trend direction
+- persisted global recovery counter snapshot timestamps, counter snapshot interval, spool write rate, replay success rate, replay failure rate, and automated replay attempt rate
+- persisted global recovery history-start counter snapshot timestamp plus derived long-window replay-rate fields
+- persisted per-tenant recovery counter snapshot timestamps, per-tenant counter snapshot interval, and per-tenant short-window replay-rate fields for tenants that presently have backlog
+- persisted per-tenant recovery history-start counter snapshot timestamp plus derived per-tenant long-window replay-rate fields for tenants that presently have backlog
 
-### 4.7 Deferred spool behavior
-The following remain deferred beyond v0.1's active runtime/config surface:
-- config-exposed spool cap tuning fields
-- configurable replay cadence
-- per-tenant recovery backlog breakdowns
+The global and per-tenant short-window and long-window replay-rate views are analytics-only. Short-window rates are derived from previous/last recovery counter snapshots. Long-window rates are derived from persisted recovery history-start counter snapshots and the current matching last counter snapshots. All four views use the same deterministic nonnegative counter-rate rule: both endpoints must exist, the timestamp interval must be positive, and the counter delta must be nonnegative. Otherwise the derived rate is null or omitted rather than negative or misleading. These analytics do not change replay ordering, delivery semantics, replay cadence, spool cap behavior, or recovery control decisions.
+
+- configured automated replay max-files-per-pass value
+- configured automated replay interval in seconds
+- configured spool cap in megabytes
+
+### 4.7 Replay cadence and remaining deferred spool behavior
+Replay cadence tuning is active in v0.1 through `output.automated_replay_interval_s`.
+
+Cadence behavior:
+- default interval: 1 second
+- daemon `run` attempts a start-of-cycle automated replay only when at least the
+  configured interval has elapsed since the previous daemon replay attempt
+- final daemon shutdown replay remains unconditional
+- `oneshot` keeps deterministic pre/post replay passes and does not use the
+  daemon cadence gate
+
+### 4.8 Path safety
+
+JSONL and spool path helpers must validate filesystem path components before
+constructing paths. Tenant ids, device keys, and alert ids used as path
+components must reject empty values, traversal components, path separators, and
+control characters.
+
+Spool writes must not silently overwrite an existing spool file.
+
+Spool inventory and replay selection must skip symlinked tenant directories and
+symlinked spool files. Replay ordering and cadence semantics remain unchanged.
+
+### 4.9 Remaining deferred spool behavior
+
+Additional sink backends, remote queueing, and exactly-once delivery remain out of
+scope for the current release.
 
 ---
 
@@ -190,4 +229,6 @@ These are not part of v0.1.
 - replay-spool-compatible helper replay succeeds and deletes file
 - spool caps delete oldest and are deterministic
 - replay-spool fails closed for `stdout`
+- unsafe filesystem components are rejected for JSONL and spool paths
+- symlinked spool files are skipped by replay inventory
 - stdout emits one line per alert

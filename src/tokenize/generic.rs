@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
+// Generic tokenizer for JSON, CSV, key/value, CEF, and plaintext fallback.
+// See: contracts/17_format_handling_v0_1.md and contracts/23_tokenizer_details_v0_1.md
+
 use crate::tokenize::cef::parse_cef_message_v1;
 use crate::tokenize::TokenEventV1;
 

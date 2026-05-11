@@ -17,6 +17,10 @@ Gzip:
 - `extract` may stream-decompress with limits
 
 Paths:
-- store tenant-relative paths in `FileSpanV1.file_rel`
-- resolve via `<watch-root>/<tenant_id>/<device_path>/<file_rel>`
-- `device_path` is the authoritative alert field name
+- `FileSpanV1.file_rel` is the authoritative provenance-relative path field
+- drill/extract reject empty, absolute, traversal, control-character, and backslash-containing provenance paths
+- tenant identifiers used for path resolution must be safe single path components
+- device alert paths may be device-relative or tenant-relative; both forms must resolve under the configured tenant root
+- source-stream display paths resolve the physical device directory by `tenant_id` and `device_key`
+- the final path is canonicalized and must remain under the configured tenant root
+- `device_path` is the authoritative alert display field name, but it is not trusted blindly as a filesystem path

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Config validation.
 // See: contracts/28_config_schema_v0_1.md
 //
@@ -7,6 +10,12 @@
 
 use super::load::ConfigErrorV1;
 use super::ConfigV1;
+
+pub const READ_CHUNK_BYTES_MAX_V1: u32 = 16 * 1024 * 1024;
+pub const MAX_LINE_LEN_MAX_V1: u32 = 1024 * 1024;
+pub const MAX_TOKENS_PER_LINE_MAX_V1: u32 = 4096;
+pub const MAX_KV_PER_LINE_MAX_V1: u32 = 1024;
+pub const MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1: u32 = 1024;
 
 
 fn validate_socket_addr_v1(field: &str, value: &str) -> Result<(), ConfigErrorV1> {
@@ -37,6 +46,54 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
             msg: format!(
                 "invalid ingest.max_emit_latency_s: {} (must be >= window_size_s)",
                 cfg.ingest.max_emit_latency_s
+            ),
+        });
+    }
+
+
+    if cfg.ingest.read_chunk_bytes == 0 || cfg.ingest.read_chunk_bytes > READ_CHUNK_BYTES_MAX_V1 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid ingest.read_chunk_bytes: {} (must be 1..={})",
+                cfg.ingest.read_chunk_bytes, READ_CHUNK_BYTES_MAX_V1
+            ),
+        });
+    }
+
+    if cfg.ingest.max_line_len == 0 || cfg.ingest.max_line_len > MAX_LINE_LEN_MAX_V1 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid ingest.max_line_len: {} (must be 1..={})",
+                cfg.ingest.max_line_len, MAX_LINE_LEN_MAX_V1
+            ),
+        });
+    }
+
+    if cfg.ingest.max_tokens_per_line == 0 || cfg.ingest.max_tokens_per_line > MAX_TOKENS_PER_LINE_MAX_V1 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid ingest.max_tokens_per_line: {} (must be 1..={})",
+                cfg.ingest.max_tokens_per_line, MAX_TOKENS_PER_LINE_MAX_V1
+            ),
+        });
+    }
+
+    if cfg.ingest.max_kv_per_line == 0 || cfg.ingest.max_kv_per_line > MAX_KV_PER_LINE_MAX_V1 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid ingest.max_kv_per_line: {} (must be 1..={})",
+                cfg.ingest.max_kv_per_line, MAX_KV_PER_LINE_MAX_V1
+            ),
+        });
+    }
+
+    if cfg.ingest.max_words_from_quoted_value == 0
+        || cfg.ingest.max_words_from_quoted_value > MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1
+    {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid ingest.max_words_from_quoted_value: {} (must be 1..={})",
+                cfg.ingest.max_words_from_quoted_value, MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1
             ),
         });
     }
@@ -85,6 +142,24 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
         });
     }
 
+    if cfg.output.automated_replay_interval_s == 0 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid output.automated_replay_interval_s: {}",
+                cfg.output.automated_replay_interval_s
+            ),
+        });
+    }
+
+    if cfg.output.spool_max_mb == 0 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid output.spool_max_mb: {}",
+                cfg.output.spool_max_mb
+            ),
+        });
+    }
+
     let mode = cfg.sparx.mode.as_str();
     if !one_of(mode, &["daemon", "oneshot"]) {
         return Err(ConfigErrorV1 {
@@ -120,6 +195,15 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
             msg: format!(
                 "invalid metrics binds: prometheus_bind and health_bind must differ when both endpoints are enabled ({})",
                 cfg.metrics.prometheus_bind
+            ),
+        });
+    }
+
+    if cfg.vdrop.min_expected_windows_missed == 0 {
+        return Err(ConfigErrorV1 {
+            msg: format!(
+                "invalid vdrop.min_expected_windows_missed: {}",
+                cfg.vdrop.min_expected_windows_missed
             ),
         });
     }

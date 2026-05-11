@@ -1,131 +1,125 @@
 # Contract Consistency Checklist v0.1
 
-This checklist confirms the v0.1 contract set is complete and internally consistent before implementation.
+This checklist records the active v0.1 consistency gates. Historical checkpoint
+notes are archived under `docs/roadmap/` and are not the active contract surface.
 
-## A) Persistence coverage
+## Persistence coverage
 
-1. Every key prefix has:
-   - a Key Prefix Map entry, AND
-   - a byte-level encoding contract for its values.
+Every active key family must have both:
 
-Global DB:
-- Global DB Key Prefix Map v0.1 exists.
+- a key-prefix contract entry
+- a byte-level value encoding contract when the value is persisted binary data
 
-Tenant DB:
-- Tenant DB Key Prefix Map v0.1 exists.
-- Open-window keys are covered by Open-Window Checkpoint Encoding v0.1.
-- Baseline keys are covered by Baseline Sketch Encoding v0.1.
-- Remaining keys are covered by Tenant DB Simple Value Encodings v0.1.
+Required active coverage:
 
-2. Alert persistence:
-- Alert Object Schema v0.1 exists.
-- Output Sink Contract v0.1 exists.
-- Drilldown model uses `AlertV1.provenance: Vec<FileSpanV1>`.
+- global DB key prefixes
+- tenant DB key prefixes
+- open-window checkpoint values
+- baseline sketch and stats values
+- tenant simple values
+- AlertV1 objects
+- alert secondary indexes
+- expected-source state
+- hard-silence open state
+- sharp-drop open state
+- source-stream catalog, stats, expected-source state, provenance, and open state
 
-3. Migration:
-- Both global and tenant DB include:
-  - schema version keys
-  - migration journal prefixes
+## Feature pipeline coverage
 
----
+Required contracts and docs must cover:
 
-## B) Feature pipeline coverage
+- syslog envelope handling
+- CEF reverse extension parsing
+- key/value, JSON, CSV, and plaintext fallback handling
+- feature emission families
+- feature caps and deterministic drop ordering
+- entity sketches
+- canonical feature IDs
+- no active hashed-fallback FeatureId behavior
 
-4. Tokenization boundary:
-- Syslog envelope rules exist (BSD + ISO variants).
-- CEF reverse extension parse rule exists.
-- Plaintext fallback feature emission rules exist.
+## Baseline and scoring coverage
 
-5. Feature emission:
-- Feature families enumerated.
-- Caps exist per line and per window.
-- Deterministic drop ordering exists.
+Required contracts and docs must cover:
 
-6. Identity handling:
-- Explicit "no redaction" statement exists.
-- UserId normalization exists (email/user/domain backslash forms).
-- Domain extracted separately as metadata (not merged into UserId).
+- window sizing and bucket scheme
+- DF-ring sizing and retention
+- centroid/stats persistence
+- scoring components and thresholds
+- cold-start and low-volume suppression
+- hard-silence and sharp-drop ratio semantics
+- source-stream expected-volume behavior
 
----
+## Alerting coverage
 
-## C) Baselines and scoring coverage
+Required contracts and docs must cover:
 
-7. Windowing:
-- window_size_s and max_emit_latency_s exist.
-- bucket scheme (48) exists.
+- AlertV1 schema
+- deterministic alert IDs
+- reason details
+- top features
+- entity sketches
+- `AlertV1.provenance` as the authoritative drilldown field model
+- primary alert objects and active `alert_idx_*` persistence
+- query/export/show/drill/extract behavior
+- drill/extract path validation and canonical tenant-root containment
 
-8. Baselines:
-- DF ring sizing and retention exist.
-- centroid/stats persistence exists.
+## Operational coverage
 
-9. Scoring:
-- score components and thresholds exist.
-- cold start behavior exists.
+Required contracts and docs must cover:
 
----
+- config schema, defaults, bounds, resource caps, and environment overrides
+- tenant policy schema and inherited defaults
+- CLI commands, exit codes, and fail-closed behavior
+- output sinks and replay-spool behavior
+- filesystem component validation and symlink-resistant spool inventory
+- malformed-readable-log handling remains bounded and stable
+- source comments explain non-obvious safety and performance boundaries
+- single-owner embedded DB behavior
+- service/deployment expectations
+- tenant purge and migration behavior
 
-## D) Operational coverage
+## Metrics and health coverage
 
-10. Config:
-- Config Schema v0.1 exists with:
-  - sources + precedence
-  - defaults
-  - bounds/whitelists
+Required contracts and docs must cover:
 
-11. Deployment:
-- Service/Deployment Contract v0.1 exists:
-  - systemd expectations
-  - permissions/paths
-  - tenant purge behavior
-  - single-process embedded DB ownership rule
+- status text fields
+- JSON status fields
+- Prometheus metric names and allowed labels
+- health output
+- recovery backlog and replay-rate diagnostics
+- hard-silence, sharp-drop, and source-stream diagnostics
+- explicit prohibition of high-cardinality metric labels
 
-12. CLI:
-- CLI Contract v0.1 exists:
-  - commands
-  - exit codes
-  - outputs
-  - config-free command behavior
-  - fail-closed rule for partial checkpoints
+## Current release boundaries
 
-13. Fixtures:
-- Fixture Corpus Contract v0.1 exists and includes:
-  - layout rules
-  - deterministic expected outputs
+The current v1 boundary includes:
 
----
+- active device and tenant aggregate hard-silence `V_DROP`
+- active device and tenant aggregate sharp-drop `V_DROP`
+- source-stream `V_DROP` behind a default-off source-stream gate
+- bounded diagnostics for active volume-loss subjects
 
-## E) Test plan coverage
+The following remain deferred unless explicitly approved:
 
-14. Encoding roundtrips:
-- open-window
-- simple tenant values
-- baseline sketches
-- alert object
+- parser-class volume-loss subjects
+- vendor-event-family volume-loss subjects
+- heartbeat checks
+- maintenance-window calendars
+- cross-tenant outage correlation
+- source-stream-specific threshold knobs
+- AlertV1 schema changes
+- replay or recovery semantic changes
 
-15. Determinism tests:
-- ordering ties
-- caps drop priority
-- stable ids/signatures
+## No-drift gate
 
-16. Operational tests:
-- tenant purge
-- spool replay
-- DB ownership failure path
+Do not merge implementation changes unless active docs and contracts remain
+consistent with source, tests, and persisted encodings. If a change affects a
+contract boundary, update the relevant contract and active user-facing docs in
+the same checkpoint.
 
-17. E2E smoke test exists:
-- ingest -> tokenize -> feature -> window -> score -> alert -> sink -> restart recovery.
+## Open-source metadata consistency
 
----
-
-## F) No-coding gate
-
-Do not begin implementation if any of these are missing:
-- Tokenization boundary contract
-- Feature emission catalog + caps
-- Baseline sketch encoding
-- Open-window checkpoint encoding
-- Alert object schema
-- Tenant and global DB prefix maps + value encodings
-- Config schema
-- Output sink contract
-- Fixture corpus contract
+Active release artifacts must consistently identify sparx as MIT licensed and
+attribute authorship to Richard S. Westmoreland with contact
+`dev@rswestmore.land`. Rust source and test files should carry SPDX MIT
+headers.

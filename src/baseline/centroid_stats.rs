@@ -1,8 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Device centroid and stats update planning helpers.
 // See: contracts/20_feature_weighting_v0_1.md
 //   and contracts/22_baseline_sketch_encoding_v0_1.md
-// Phase 7b: compute weighted row vectors, apply centroid EMA updates, and
-// update per-device stats with deterministic persistence mutations.
+// Computes weighted row vectors, applies centroid EMA updates, and updates
+// per-device stats with deterministic persistence mutations.
 
 use std::collections::BTreeMap;
 

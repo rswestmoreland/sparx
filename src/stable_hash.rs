@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Stable hash helpers for persistent identifiers.
 //
 // Locked v0.1 rule:

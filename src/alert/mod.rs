@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Alert scoring, explainability, and persistence helpers.
 // See: contracts/03_alert_object_explanation_v0_1.md
 //   and contracts/21_scoring_math_thresholding_v0_1.md
@@ -11,6 +14,17 @@ use crate::baseline::{weighted_row_vector_v1, BucketBaselineV1};
 use crate::config::ScoringSectionV1;
 use crate::db::baseline_sketch::{DeviceStatsV1, WelfordF64V1};
 use crate::db::keys::{key_tenant_alert_v1, KeyBytes};
+use crate::db::silence::{
+    open_drop_state_from_candidate_v1, OpenDropStateV1, OpenSilenceStateV1, SharpDropCandidateV1,
+    VDropCandidateV1, OPEN_SILENCE_FLAG_OPEN_V1, SILENCE_SCHEMA_VERSION_V1,
+    SILENCE_SUBJECT_KIND_DEVICE_V1, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+    SILENCE_SUBJECT_KIND_TENANT_V1,
+};
+use crate::db::source_stream::{
+    source_stream_open_drop_state_from_candidate_v1,
+    source_stream_open_silence_state_from_candidate_v1,
+    validate_source_stream_subject_v1, SourceStreamSubjectV1,
+};
 use crate::features::{EntitySketchSnapshotV1, FeatureDictionaryV1};
 use crate::stable_hash::stable_hash_hex128_v1;
 use crate::types::{AlertId, ConfidenceV1, DeviceKey, FeatureFamilyV1, LabelV1, TenantId, UnixSec};
@@ -30,6 +44,8 @@ pub const VOLUME_EXTREME_THRESHOLD_V1: f32 = 0.90;
 pub const VOLUME_Z_MAX_DEFAULT_V1: f32 = 6.0;
 pub const COLD_START_DAYS_DEFAULT_V1: u32 = 2;
 pub const MIN_LINES_PER_WINDOW_DEFAULT_V1: u32 = 10;
+pub const VDROP_REASON_CODE_V1: &str = "V_DROP";
+pub const VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1: &str = "__tenant__";
 
 const EPSILON_F64_V1: f64 = 1.0e-12;
 const ALERT_KIND_NONE_V1: u8 = 0;
@@ -211,6 +227,20 @@ pub struct AlertBuildResultV1 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct VDropAlertBuildResultV1 {
+    pub alert: AlertV1,
+    pub primary_put: AlertKvV1,
+    pub open_silence: OpenSilenceStateV1,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharpDropAlertBuildResultV1 {
+    pub alert: AlertV1,
+    pub primary_put: AlertKvV1,
+    pub open_drop: OpenDropStateV1,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum AlertErrorV1 {
     InvalidOutlierThreshold { value: f32 },
     InvalidNoiseThreshold { value: f32 },
@@ -223,6 +253,8 @@ pub enum AlertErrorV1 {
     BucketMismatch { row_bucket: u8, baseline_bucket: u8 },
     MissingFeatureString { feature_id: u32 },
     Postcard { msg: String },
+    InvalidVDropCandidate { msg: String },
+    InvalidSharpDropCandidate { msg: String },
 }
 
 pub fn build_alert_v1(
@@ -408,6 +440,827 @@ pub fn alert_primary_put_v1(alert: &AlertV1) -> Result<AlertKvV1, AlertErrorV1> 
         key: key_tenant_alert_v1(&alert.alert_id),
         value: encode_alert_v1(alert)?,
     })
+}
+
+pub fn build_vdrop_alert_v1(candidate: &VDropCandidateV1) -> Result<VDropAlertBuildResultV1, AlertErrorV1> {
+    validate_vdrop_candidate_for_alert_v1(candidate)?;
+
+    let reason = ReasonV1 {
+        code: VDROP_REASON_CODE_V1.to_string(),
+        msg: "expected log activity was not observed for this subject".to_string(),
+        details: candidate.reason_details.clone(),
+    };
+    let signature = compute_vdrop_signature_v1(candidate);
+    let alert_id = compute_vdrop_alert_id_v1(candidate);
+    let device_key = vdrop_alert_device_key_v1(candidate);
+    let device_path = vdrop_alert_device_path_v1(candidate);
+    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
+
+    let alert = AlertV1 {
+        schema_version: ALERT_SCHEMA_VERSION_V1,
+        alert_id,
+        tenant_id: candidate.tenant_id.clone(),
+        device_key,
+        device_path,
+        window_start_ts: candidate.window_start_ts_i64,
+        window_end_ts: candidate.window_end_ts_i64,
+        window_size_s,
+        bucket: candidate.bucket_u8,
+        label: LabelV1::Info,
+        confidence: ConfidenceV1::Medium,
+        cold_start: false,
+        score_total: score_volume,
+        score_rarity: 0.0,
+        score_drift: 0.0,
+        score_volume,
+        baseline_n_bucket: None,
+        baseline_centroid_norm: None,
+        reasons: vec![reason],
+        top_features: Vec::new(),
+        summary_analyst: build_vdrop_summary_analyst_v1(candidate),
+        summary_customer: build_vdrop_summary_customer_v1(candidate),
+        entities: EntitiesV1 {
+            src_ips: Vec::new(),
+            dst_ips: Vec::new(),
+            user_ids: Vec::new(),
+            domains: Vec::new(),
+            hosts: Vec::new(),
+        },
+        lines: 0,
+        bytes: 0,
+        dropped_features: 0,
+        dropped_words: 0,
+        dropped_shapes: 0,
+        provenance: Vec::new(),
+        signature,
+    };
+    let primary_put = alert_primary_put_v1(&alert)?;
+    let open_silence = OpenSilenceStateV1 {
+        schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
+        subject_kind_u8: candidate.subject_kind_u8,
+        state_flags_u8: OPEN_SILENCE_FLAG_OPEN_V1,
+        silence_start_ts_i64: candidate.window_start_ts_i64,
+        last_alert_window_start_ts_i64: candidate.window_start_ts_i64,
+        last_alert_window_end_ts_i64: candidate.window_end_ts_i64,
+        last_alert_id: alert.alert_id.clone(),
+    };
+
+    Ok(VDropAlertBuildResultV1 {
+        alert,
+        primary_put,
+        open_silence,
+    })
+}
+
+pub fn build_sharp_drop_alert_v1(
+    candidate: &SharpDropCandidateV1,
+    provenance: &[FileSpanV1],
+) -> Result<SharpDropAlertBuildResultV1, AlertErrorV1> {
+    validate_sharp_drop_candidate_for_alert_v1(candidate)?;
+
+    let reason = ReasonV1 {
+        code: VDROP_REASON_CODE_V1.to_string(),
+        msg: "log volume dropped sharply but did not stop for this subject".to_string(),
+        details: candidate.reason_details.clone(),
+    };
+    let signature = compute_reason_signature_v1(VDROP_REASON_CODE_V1, &candidate.reason_details);
+    let alert_id = compute_sharp_drop_alert_id_v1(candidate);
+    let device_key = sharp_drop_alert_device_key_v1(candidate);
+    let device_path = sharp_drop_alert_device_path_v1(candidate);
+    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
+    let capped_provenance = if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
+        cap_provenance_v1(provenance, PROVENANCE_CAP_DEFAULT_V1)
+    } else {
+        Vec::new()
+    };
+
+    let alert = AlertV1 {
+        schema_version: ALERT_SCHEMA_VERSION_V1,
+        alert_id,
+        tenant_id: candidate.tenant_id.clone(),
+        device_key,
+        device_path,
+        window_start_ts: candidate.window_start_ts_i64,
+        window_end_ts: candidate.window_end_ts_i64,
+        window_size_s,
+        bucket: candidate.bucket_u8,
+        label: LabelV1::Info,
+        confidence: ConfidenceV1::Medium,
+        cold_start: false,
+        score_total: score_volume,
+        score_rarity: 0.0,
+        score_drift: 0.0,
+        score_volume,
+        baseline_n_bucket: None,
+        baseline_centroid_norm: None,
+        reasons: vec![reason],
+        top_features: Vec::new(),
+        summary_analyst: build_sharp_drop_summary_analyst_v1(candidate),
+        summary_customer: build_sharp_drop_summary_customer_v1(candidate),
+        entities: EntitiesV1 {
+            src_ips: Vec::new(),
+            dst_ips: Vec::new(),
+            user_ids: Vec::new(),
+            domains: Vec::new(),
+            hosts: Vec::new(),
+        },
+        lines: u32::try_from(candidate.observed_lines_u64).unwrap_or(u32::MAX),
+        bytes: candidate.observed_bytes_u64,
+        dropped_features: 0,
+        dropped_words: 0,
+        dropped_shapes: 0,
+        provenance: capped_provenance,
+        signature,
+    };
+    let primary_put = alert_primary_put_v1(&alert)?;
+    let open_drop = open_drop_state_from_candidate_v1(candidate, &alert.alert_id);
+
+    Ok(SharpDropAlertBuildResultV1 {
+        alert,
+        primary_put,
+        open_drop,
+    })
+}
+
+
+pub fn build_source_stream_vdrop_alert_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &VDropCandidateV1,
+) -> Result<VDropAlertBuildResultV1, AlertErrorV1> {
+    validate_source_stream_vdrop_candidate_for_alert_v1(subject, candidate)?;
+
+    let reason_details = source_stream_hard_silence_reason_details_v1(subject, candidate);
+    let reason = ReasonV1 {
+        code: VDROP_REASON_CODE_V1.to_string(),
+        msg: "expected log activity was not observed for this source stream".to_string(),
+        details: reason_details.clone(),
+    };
+    let signature = compute_reason_signature_v1(VDROP_REASON_CODE_V1, &reason_details);
+    let alert_id = compute_source_stream_vdrop_alert_id_v1(candidate);
+    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
+
+    let alert = AlertV1 {
+        schema_version: ALERT_SCHEMA_VERSION_V1,
+        alert_id,
+        tenant_id: candidate.tenant_id.clone(),
+        device_key: subject.device_key.clone(),
+        device_path: source_stream_alert_device_path_v1(subject),
+        window_start_ts: candidate.window_start_ts_i64,
+        window_end_ts: candidate.window_end_ts_i64,
+        window_size_s,
+        bucket: candidate.bucket_u8,
+        label: LabelV1::Info,
+        confidence: ConfidenceV1::Medium,
+        cold_start: false,
+        score_total: score_volume,
+        score_rarity: 0.0,
+        score_drift: 0.0,
+        score_volume,
+        baseline_n_bucket: None,
+        baseline_centroid_norm: None,
+        reasons: vec![reason],
+        top_features: Vec::new(),
+        summary_analyst: build_source_stream_vdrop_summary_analyst_v1(subject, candidate),
+        summary_customer: build_source_stream_vdrop_summary_customer_v1(subject, candidate),
+        entities: EntitiesV1 {
+            src_ips: Vec::new(),
+            dst_ips: Vec::new(),
+            user_ids: Vec::new(),
+            domains: Vec::new(),
+            hosts: Vec::new(),
+        },
+        lines: 0,
+        bytes: 0,
+        dropped_features: 0,
+        dropped_words: 0,
+        dropped_shapes: 0,
+        provenance: Vec::new(),
+        signature,
+    };
+    let primary_put = alert_primary_put_v1(&alert)?;
+    let open_silence = source_stream_open_silence_state_from_candidate_v1(subject, candidate, &alert.alert_id)
+        .map_err(|e| AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("source-stream open-silence construction failed: {:?}", e),
+        })?;
+
+    Ok(VDropAlertBuildResultV1 {
+        alert,
+        primary_put,
+        open_silence,
+    })
+}
+
+pub fn build_source_stream_sharp_drop_alert_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &SharpDropCandidateV1,
+    provenance: &[FileSpanV1],
+) -> Result<SharpDropAlertBuildResultV1, AlertErrorV1> {
+    validate_source_stream_sharp_drop_candidate_for_alert_v1(subject, candidate)?;
+
+    let reason = ReasonV1 {
+        code: VDROP_REASON_CODE_V1.to_string(),
+        msg: "log volume dropped sharply but did not stop for this source stream".to_string(),
+        details: candidate.reason_details.clone(),
+    };
+    let signature = compute_reason_signature_v1(VDROP_REASON_CODE_V1, &candidate.reason_details);
+    let alert_id = compute_source_stream_sharp_drop_alert_id_v1(candidate);
+    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
+    let capped_provenance = cap_provenance_v1(provenance, PROVENANCE_CAP_DEFAULT_V1);
+
+    let alert = AlertV1 {
+        schema_version: ALERT_SCHEMA_VERSION_V1,
+        alert_id,
+        tenant_id: candidate.tenant_id.clone(),
+        device_key: subject.device_key.clone(),
+        device_path: source_stream_alert_device_path_v1(subject),
+        window_start_ts: candidate.window_start_ts_i64,
+        window_end_ts: candidate.window_end_ts_i64,
+        window_size_s,
+        bucket: candidate.bucket_u8,
+        label: LabelV1::Info,
+        confidence: ConfidenceV1::Medium,
+        cold_start: false,
+        score_total: score_volume,
+        score_rarity: 0.0,
+        score_drift: 0.0,
+        score_volume,
+        baseline_n_bucket: None,
+        baseline_centroid_norm: None,
+        reasons: vec![reason],
+        top_features: Vec::new(),
+        summary_analyst: build_source_stream_sharp_drop_summary_analyst_v1(subject, candidate),
+        summary_customer: build_source_stream_sharp_drop_summary_customer_v1(subject, candidate),
+        entities: EntitiesV1 {
+            src_ips: Vec::new(),
+            dst_ips: Vec::new(),
+            user_ids: Vec::new(),
+            domains: Vec::new(),
+            hosts: Vec::new(),
+        },
+        lines: u32::try_from(candidate.observed_lines_u64).unwrap_or(u32::MAX),
+        bytes: candidate.observed_bytes_u64,
+        dropped_features: 0,
+        dropped_words: 0,
+        dropped_shapes: 0,
+        provenance: capped_provenance,
+        signature,
+    };
+    let primary_put = alert_primary_put_v1(&alert)?;
+    let open_drop = source_stream_open_drop_state_from_candidate_v1(subject, candidate, &alert.alert_id)
+        .map_err(|e| AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("source-stream open-drop construction failed: {:?}", e),
+        })?;
+
+    Ok(SharpDropAlertBuildResultV1 {
+        alert,
+        primary_put,
+        open_drop,
+    })
+}
+
+fn validate_sharp_drop_candidate_for_alert_v1(candidate: &SharpDropCandidateV1) -> Result<(), AlertErrorV1> {
+    match candidate.subject_kind_u8 {
+        SILENCE_SUBJECT_KIND_DEVICE_V1 | SILENCE_SUBJECT_KIND_TENANT_V1 => {}
+        other => {
+            return Err(AlertErrorV1::InvalidSharpDropCandidate {
+                msg: format!("invalid subject kind: {}", other),
+            })
+        }
+    }
+    if candidate.tenant_id.is_empty() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "tenant_id must not be empty".to_string(),
+        });
+    }
+    if candidate.subject_key.is_empty() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "subject_key must not be empty".to_string(),
+        });
+    }
+    if candidate.window_end_ts_i64 <= candidate.window_start_ts_i64 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "window end must be after window start".to_string(),
+        });
+    }
+    if candidate.bucket_u8 > 47 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid bucket: {}", candidate.bucket_u8),
+        });
+    }
+    if candidate.observed_lines_u64 == 0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "observed_lines_u64 must be positive for sharp drop".to_string(),
+        });
+    }
+    if !candidate.expected_lines_f64.is_finite() || candidate.expected_lines_f64 <= 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "expected_lines_f64 must be finite and positive".to_string(),
+        });
+    }
+    if !candidate.expected_bytes_f64.is_finite() || candidate.expected_bytes_f64 < 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "expected_bytes_f64 must be finite and nonnegative".to_string(),
+        });
+    }
+    if !candidate.observed_expected_ratio_f32.is_finite()
+        || candidate.observed_expected_ratio_f32 < 0.0
+        || candidate.observed_expected_ratio_f32 > 1.0
+    {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid observed/expected ratio: {}", candidate.observed_expected_ratio_f32),
+        });
+    }
+    if !candidate.drop_ratio_f32.is_finite() || candidate.drop_ratio_f32 < 0.0 || candidate.drop_ratio_f32 > 1.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
+        });
+    }
+    if !candidate.absolute_drop_lines_f64.is_finite() || candidate.absolute_drop_lines_f64 <= 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "absolute_drop_lines_f64 must be finite and positive".to_string(),
+        });
+    }
+    if candidate.maturity_count_u32 == 0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "maturity_count_u32 must be positive".to_string(),
+        });
+    }
+    match candidate.reason_details.first() {
+        Some((key, value)) if key == "drop_kind" && value == "sharp_drop" => {}
+        _ => {
+            return Err(AlertErrorV1::InvalidSharpDropCandidate {
+                msg: "first reason detail must be drop_kind=sharp_drop".to_string(),
+            })
+        }
+    }
+    Ok(())
+}
+
+fn validate_vdrop_candidate_for_alert_v1(candidate: &VDropCandidateV1) -> Result<(), AlertErrorV1> {
+    match candidate.subject_kind_u8 {
+        SILENCE_SUBJECT_KIND_DEVICE_V1 | SILENCE_SUBJECT_KIND_TENANT_V1 => {}
+        other => {
+            return Err(AlertErrorV1::InvalidVDropCandidate {
+                msg: format!("invalid subject kind: {}", other),
+            })
+        }
+    }
+    if candidate.tenant_id.is_empty() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "tenant_id must not be empty".to_string(),
+        });
+    }
+    if candidate.subject_key.is_empty() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "subject_key must not be empty".to_string(),
+        });
+    }
+    if candidate.window_end_ts_i64 <= candidate.window_start_ts_i64 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "window end must be after window start".to_string(),
+        });
+    }
+    if candidate.expected_windows_missed_u64 == 0 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "expected_windows_missed_u64 must be positive".to_string(),
+        });
+    }
+    if candidate.bucket_u8 > 47 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid bucket: {}", candidate.bucket_u8),
+        });
+    }
+    if !candidate.drop_ratio_f32.is_finite()
+        || candidate.drop_ratio_f32 < 0.0
+        || candidate.drop_ratio_f32 > 1.0
+    {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
+        });
+    }
+    Ok(())
+}
+
+fn vdrop_alert_device_key_v1(candidate: &VDropCandidateV1) -> String {
+    if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
+        candidate.subject_key.clone()
+    } else {
+        VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1.to_string()
+    }
+}
+
+fn vdrop_alert_device_path_v1(candidate: &VDropCandidateV1) -> String {
+    if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
+        candidate.subject_key.clone()
+    } else {
+        format!("tenant:{}", candidate.tenant_id)
+    }
+}
+
+fn compute_reason_signature_v1(code: &str, details: &[(String, String)]) -> String {
+    let mut input = String::new();
+    input.push_str(code);
+    input.push('\n');
+    for (key, value) in details {
+        input.push_str(key);
+        input.push('\t');
+        input.push_str(value);
+        input.push('\n');
+    }
+    stable_hash_hex128_v1(&input)
+}
+
+fn compute_vdrop_signature_v1(candidate: &VDropCandidateV1) -> String {
+    compute_reason_signature_v1(VDROP_REASON_CODE_V1, &candidate.reason_details)
+}
+
+fn compute_vdrop_alert_id_v1(candidate: &VDropCandidateV1) -> String {
+    let input = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        candidate.tenant_id,
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key,
+        candidate.window_start_ts_i64,
+        candidate.window_end_ts_i64,
+        VDROP_REASON_CODE_V1,
+        candidate.expected_windows_missed_u64
+    );
+    stable_hash_hex128_v1(&input)
+}
+
+fn compute_sharp_drop_alert_id_v1(candidate: &SharpDropCandidateV1) -> String {
+    let input = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        candidate.tenant_id,
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key,
+        candidate.window_start_ts_i64,
+        candidate.window_end_ts_i64,
+        VDROP_REASON_CODE_V1,
+        "sharp_drop"
+    );
+    stable_hash_hex128_v1(&input)
+}
+
+fn sharp_drop_alert_device_key_v1(candidate: &SharpDropCandidateV1) -> String {
+    if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
+        candidate.subject_key.clone()
+    } else {
+        VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1.to_string()
+    }
+}
+
+fn sharp_drop_alert_device_path_v1(candidate: &SharpDropCandidateV1) -> String {
+    if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
+        candidate.subject_key.clone()
+    } else {
+        format!("tenant:{}", candidate.tenant_id)
+    }
+}
+
+fn subject_kind_alert_id_part_v1(subject_kind: u8) -> &'static str {
+    match subject_kind {
+        SILENCE_SUBJECT_KIND_DEVICE_V1 => "device",
+        SILENCE_SUBJECT_KIND_TENANT_V1 => "tenant",
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 => "source_stream",
+        _ => "unknown",
+    }
+}
+
+
+fn validate_source_stream_vdrop_candidate_for_alert_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &VDropCandidateV1,
+) -> Result<(), AlertErrorV1> {
+    validate_source_stream_subject_v1(subject).map_err(|e| AlertErrorV1::InvalidVDropCandidate {
+        msg: format!("invalid source-stream subject: {:?}", e),
+    })?;
+    if candidate.subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid source-stream subject kind: {}", candidate.subject_kind_u8),
+        });
+    }
+    if candidate.tenant_id.as_str() != subject.tenant_id.as_str() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "candidate tenant_id does not match source-stream subject".to_string(),
+        });
+    }
+    if candidate.subject_key.as_str() != subject.source_stream_id.as_str() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "candidate subject_key does not match source_stream_id".to_string(),
+        });
+    }
+    validate_vdrop_candidate_core_for_alert_v1(candidate)?;
+    require_reason_detail_v1(&candidate.reason_details, "subject_kind", "source_stream", "vdrop")?;
+    require_reason_detail_v1(&candidate.reason_details, "tenant_id", &subject.tenant_id, "vdrop")?;
+    require_reason_detail_v1(&candidate.reason_details, "device_key", &subject.device_key, "vdrop")?;
+    require_reason_detail_v1(&candidate.reason_details, "source_stream_id", &subject.source_stream_id, "vdrop")?;
+    require_reason_detail_v1(&candidate.reason_details, "source_path", &subject.canonical_source_path, "vdrop")?;
+    Ok(())
+}
+
+fn validate_source_stream_sharp_drop_candidate_for_alert_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &SharpDropCandidateV1,
+) -> Result<(), AlertErrorV1> {
+    validate_source_stream_subject_v1(subject).map_err(|e| AlertErrorV1::InvalidSharpDropCandidate {
+        msg: format!("invalid source-stream subject: {:?}", e),
+    })?;
+    if candidate.subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid source-stream subject kind: {}", candidate.subject_kind_u8),
+        });
+    }
+    if candidate.tenant_id.as_str() != subject.tenant_id.as_str() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "candidate tenant_id does not match source-stream subject".to_string(),
+        });
+    }
+    if candidate.subject_key.as_str() != subject.source_stream_id.as_str() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "candidate subject_key does not match source_stream_id".to_string(),
+        });
+    }
+    validate_sharp_drop_candidate_core_for_alert_v1(candidate)?;
+    require_reason_detail_v1(&candidate.reason_details, "subject_kind", "source_stream", "sharp_drop")?;
+    require_reason_detail_v1(&candidate.reason_details, "tenant_id", &subject.tenant_id, "sharp_drop")?;
+    require_reason_detail_v1(&candidate.reason_details, "device_key", &subject.device_key, "sharp_drop")?;
+    require_reason_detail_v1(&candidate.reason_details, "source_stream_id", &subject.source_stream_id, "sharp_drop")?;
+    require_reason_detail_v1(&candidate.reason_details, "source_path", &subject.canonical_source_path, "sharp_drop")?;
+    Ok(())
+}
+
+fn validate_vdrop_candidate_core_for_alert_v1(candidate: &VDropCandidateV1) -> Result<(), AlertErrorV1> {
+    if candidate.tenant_id.is_empty() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "tenant_id must not be empty".to_string(),
+        });
+    }
+    if candidate.subject_key.is_empty() {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "subject_key must not be empty".to_string(),
+        });
+    }
+    if candidate.window_end_ts_i64 <= candidate.window_start_ts_i64 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "window end must be after window start".to_string(),
+        });
+    }
+    if candidate.expected_windows_missed_u64 == 0 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: "expected_windows_missed_u64 must be positive".to_string(),
+        });
+    }
+    if candidate.bucket_u8 > 47 {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid bucket: {}", candidate.bucket_u8),
+        });
+    }
+    if !candidate.drop_ratio_f32.is_finite()
+        || candidate.drop_ratio_f32 < 0.0
+        || candidate.drop_ratio_f32 > 1.0
+    {
+        return Err(AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
+        });
+    }
+    Ok(())
+}
+
+fn validate_sharp_drop_candidate_core_for_alert_v1(candidate: &SharpDropCandidateV1) -> Result<(), AlertErrorV1> {
+    if candidate.tenant_id.is_empty() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "tenant_id must not be empty".to_string(),
+        });
+    }
+    if candidate.subject_key.is_empty() {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "subject_key must not be empty".to_string(),
+        });
+    }
+    if candidate.window_end_ts_i64 <= candidate.window_start_ts_i64 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "window end must be after window start".to_string(),
+        });
+    }
+    if candidate.bucket_u8 > 47 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid bucket: {}", candidate.bucket_u8),
+        });
+    }
+    if candidate.observed_lines_u64 == 0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "observed_lines_u64 must be positive for sharp drop".to_string(),
+        });
+    }
+    if !candidate.expected_lines_f64.is_finite() || candidate.expected_lines_f64 <= 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "expected_lines_f64 must be finite and positive".to_string(),
+        });
+    }
+    if !candidate.expected_bytes_f64.is_finite() || candidate.expected_bytes_f64 < 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "expected_bytes_f64 must be finite and nonnegative".to_string(),
+        });
+    }
+    if !candidate.observed_expected_ratio_f32.is_finite()
+        || candidate.observed_expected_ratio_f32 < 0.0
+        || candidate.observed_expected_ratio_f32 > 1.0
+    {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid observed/expected ratio: {}", candidate.observed_expected_ratio_f32),
+        });
+    }
+    if !candidate.drop_ratio_f32.is_finite() || candidate.drop_ratio_f32 < 0.0 || candidate.drop_ratio_f32 > 1.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
+        });
+    }
+    if !candidate.absolute_drop_lines_f64.is_finite() || candidate.absolute_drop_lines_f64 <= 0.0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "absolute_drop_lines_f64 must be finite and positive".to_string(),
+        });
+    }
+    if candidate.maturity_count_u32 == 0 {
+        return Err(AlertErrorV1::InvalidSharpDropCandidate {
+            msg: "maturity_count_u32 must be positive".to_string(),
+        });
+    }
+    match candidate.reason_details.first() {
+        Some((key, value)) if key == "drop_kind" && value == "sharp_drop" => {}
+        _ => {
+            return Err(AlertErrorV1::InvalidSharpDropCandidate {
+                msg: "first reason detail must be drop_kind=sharp_drop".to_string(),
+            })
+        }
+    }
+    Ok(())
+}
+
+fn require_reason_detail_v1(
+    details: &[(String, String)],
+    key: &str,
+    expected_value: &str,
+    context: &'static str,
+) -> Result<(), AlertErrorV1> {
+    if details.iter().any(|(detail_key, detail_value)| detail_key == key && detail_value == expected_value) {
+        return Ok(());
+    }
+    let msg = format!("missing reason detail {}={} for {}", key, expected_value, context);
+    if context == "sharp_drop" {
+        Err(AlertErrorV1::InvalidSharpDropCandidate { msg })
+    } else {
+        Err(AlertErrorV1::InvalidVDropCandidate { msg })
+    }
+}
+
+fn source_stream_hard_silence_reason_details_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &VDropCandidateV1,
+) -> Vec<(String, String)> {
+    let mut details = Vec::with_capacity(candidate.reason_details.len() + 1);
+    details.push(("drop_kind".to_string(), "hard_silence".to_string()));
+    details.extend(candidate.reason_details.clone());
+    if !details.iter().any(|(key, _)| key == "device_key") {
+        details.push(("device_key".to_string(), subject.device_key.clone()));
+    }
+    if !details.iter().any(|(key, _)| key == "source_stream_id") {
+        details.push(("source_stream_id".to_string(), subject.source_stream_id.clone()));
+    }
+    if !details.iter().any(|(key, _)| key == "source_path") {
+        details.push(("source_path".to_string(), subject.canonical_source_path.clone()));
+    }
+    details
+}
+
+fn source_stream_alert_device_path_v1(subject: &SourceStreamSubjectV1) -> String {
+    format!("source_stream:{}/{}", subject.device_key, subject.canonical_source_path)
+}
+
+fn compute_source_stream_vdrop_alert_id_v1(candidate: &VDropCandidateV1) -> String {
+    let input = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        candidate.tenant_id,
+        "source_stream",
+        candidate.subject_key,
+        candidate.window_start_ts_i64,
+        candidate.window_end_ts_i64,
+        VDROP_REASON_CODE_V1,
+        "hard_silence"
+    );
+    stable_hash_hex128_v1(&input)
+}
+
+fn compute_source_stream_sharp_drop_alert_id_v1(candidate: &SharpDropCandidateV1) -> String {
+    let input = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        candidate.tenant_id,
+        "source_stream",
+        candidate.subject_key,
+        candidate.window_start_ts_i64,
+        candidate.window_end_ts_i64,
+        VDROP_REASON_CODE_V1,
+        "sharp_drop"
+    );
+    stable_hash_hex128_v1(&input)
+}
+
+fn build_vdrop_summary_analyst_v1(candidate: &VDropCandidateV1) -> String {
+    format!(
+        "V_DROP score {:.3}. Expected {} lines over {} missed windows for {} {}; observed 0 lines since {}.",
+        candidate.drop_ratio_f32,
+        candidate.expected_lines_u64,
+        candidate.expected_windows_missed_u64,
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key,
+        candidate.last_seen_ts_i64
+    )
+}
+
+fn build_vdrop_summary_customer_v1(candidate: &VDropCandidateV1) -> String {
+    format!(
+        "Expected log activity was not observed for {} {}. The last observed window ended at {}.",
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key,
+        candidate.last_seen_ts_i64
+    )
+}
+
+fn build_sharp_drop_summary_analyst_v1(candidate: &SharpDropCandidateV1) -> String {
+    format!(
+        "V_DROP sharp_drop score {:.3}. Expected {:.6} lines for {} {}; observed {} lines, drop ratio {:.6}.",
+        candidate.drop_ratio_f32,
+        candidate.expected_lines_f64,
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key,
+        candidate.observed_lines_u64,
+        candidate.drop_ratio_f32
+    )
+}
+
+fn build_sharp_drop_summary_customer_v1(candidate: &SharpDropCandidateV1) -> String {
+    format!(
+        "Log activity dropped sharply but did not stop for {} {} during this window.",
+        subject_kind_alert_id_part_v1(candidate.subject_kind_u8),
+        candidate.subject_key
+    )
+}
+
+fn build_source_stream_vdrop_summary_analyst_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &VDropCandidateV1,
+) -> String {
+    format!(
+        "V_DROP hard_silence score {:.3}. Expected {} lines over {} missed windows for source stream {} on device {}; observed 0 lines since {}.",
+        candidate.drop_ratio_f32,
+        candidate.expected_lines_u64,
+        candidate.expected_windows_missed_u64,
+        subject.source_stream_id,
+        subject.device_key,
+        candidate.last_seen_ts_i64
+    )
+}
+
+fn build_source_stream_vdrop_summary_customer_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &VDropCandidateV1,
+) -> String {
+    format!(
+        "Expected log activity was not observed for source stream {} on device {}. The last observed window ended at {}.",
+        subject.canonical_source_path,
+        subject.device_key,
+        candidate.last_seen_ts_i64
+    )
+}
+
+fn build_source_stream_sharp_drop_summary_analyst_v1(
+    subject: &SourceStreamSubjectV1,
+    candidate: &SharpDropCandidateV1,
+) -> String {
+    format!(
+        "V_DROP sharp_drop score {:.3}. Expected {:.6} lines for source stream {} on device {}; observed {} lines, drop ratio {:.6}.",
+        candidate.drop_ratio_f32,
+        candidate.expected_lines_f64,
+        subject.source_stream_id,
+        subject.device_key,
+        candidate.observed_lines_u64,
+        candidate.drop_ratio_f32
+    )
+}
+
+fn build_source_stream_sharp_drop_summary_customer_v1(
+    subject: &SourceStreamSubjectV1,
+    _candidate: &SharpDropCandidateV1,
+) -> String {
+    format!(
+        "Log activity dropped sharply but did not stop for source stream {} on device {} during this window.",
+        subject.canonical_source_path,
+        subject.device_key
+    )
 }
 
 pub fn encode_alert_v1(alert: &AlertV1) -> Result<Vec<u8>, AlertErrorV1> {

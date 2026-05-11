@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use tempfile::tempdir;
 
 use sparx::cli::route::route_command_v1;

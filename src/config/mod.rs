@@ -1,8 +1,11 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Config types for sparx.
 // See: contracts/28_config_schema_v0_1.md
 //
-// Phase 1a: add a load/merge/validate layer (parsing + defaults) while keeping
-// the final effective config in ConfigV1.
+// ConfigV1 is the final effective configuration after parse, merge, defaults,
+// environment overrides, CLI overrides, and validation.
 //
 // ASCII-only.
 
@@ -19,6 +22,7 @@ pub struct ConfigV1 {
     pub storage: StorageSectionV1,
     pub output: OutputSectionV1,
     pub metrics: MetricsSectionV1,
+    pub vdrop: VDropSectionV1,
 }
 
 #[derive(Clone, Debug)]
@@ -72,8 +76,8 @@ pub struct BaselineSectionV1 {
 pub struct ScoringSectionV1 {
     pub outlier_threshold: f32,
     pub noise_threshold: f32,
-    pub cold_start_days: u32, // active in Phase 15a; day-based maturity floor for bucket baselines
-    pub min_lines_per_window: u32, // active in Phase 15a; suppress alerts for windows below this line count
+    pub cold_start_days: u32, // active scoring maturity floor for bucket baselines
+    pub min_lines_per_window: u32, // active alert suppression floor for low-volume windows
 }
 
 #[derive(Clone, Debug)]
@@ -106,15 +110,28 @@ pub struct OutputSectionV1 {
     pub jsonl_rotate_mb: u32,
     pub jsonl_flush_interval_s: u32,
     pub include_debug_fields: bool,
-    pub automated_replay_max_files_per_pass: u32, // active in Phase 14b; bounded deterministic automated replay pass size
+    pub automated_replay_max_files_per_pass: u32, // active bounded deterministic automated replay pass size
+    pub automated_replay_interval_s: u32, // active minimum seconds between daemon replay attempts
+    pub spool_max_mb: u32, // active deterministic spool cap for helper-backed jsonl recovery
 }
 
 #[derive(Clone, Debug)]
 pub struct MetricsSectionV1 {
-    pub prometheus_enabled: bool, // active in Phase 13a; serves /metrics during run when enabled
-    pub prometheus_bind: String, // active in Phase 13a; bind address for the Prometheus text endpoint
-    pub health_enabled: bool, // active in Phase 13a; serves /healthz during run when enabled
-    pub health_bind: String, // active in Phase 13a; bind address for the health endpoint
+    pub prometheus_enabled: bool, // serves /metrics during run when enabled
+    pub prometheus_bind: String, // bind address for the Prometheus text endpoint
+    pub health_enabled: bool, // serves /healthz during run when enabled
+    pub health_bind: String, // bind address for the health endpoint
+}
+
+#[derive(Clone, Debug)]
+pub struct VDropSectionV1 {
+    pub enabled: bool,
+    pub device_enabled: bool,
+    pub tenant_enabled: bool,
+    pub source_stream_enabled: bool,
+    pub min_expected_windows_missed: u32,
+    pub min_mature_windows: Option<u64>,
+    pub min_expected_lines: Option<u64>,
 }
 
 // Overrides provided by CLI flags (highest precedence).
@@ -139,6 +156,7 @@ pub struct TomlRootV1 {
     pub storage: Option<TomlStorageV1>,
     pub output: Option<TomlOutputV1>,
     pub metrics: Option<TomlMetricsV1>,
+    pub vdrop: Option<TomlVDropV1>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -227,6 +245,8 @@ pub struct TomlOutputV1 {
     pub jsonl_flush_interval_s: Option<u32>,
     pub include_debug_fields: Option<bool>,
     pub automated_replay_max_files_per_pass: Option<u32>,
+    pub automated_replay_interval_s: Option<u32>,
+    pub spool_max_mb: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -235,6 +255,17 @@ pub struct TomlMetricsV1 {
     pub prometheus_bind: Option<String>,
     pub health_enabled: Option<bool>,
     pub health_bind: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct TomlVDropV1 {
+    pub enabled: Option<bool>,
+    pub device_enabled: Option<bool>,
+    pub tenant_enabled: Option<bool>,
+    pub source_stream_enabled: Option<bool>,
+    pub min_expected_windows_missed: Option<u32>,
+    pub min_mature_windows: Option<u64>,
+    pub min_expected_lines: Option<u64>,
 }
 
 pub mod load;

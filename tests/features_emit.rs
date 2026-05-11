@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 use sparx::features::{emit_line_features_v1, MetadataIdentityKindV1};
 use sparx::tokenize::{SyslogEnvelopeV1, TokenEventV1};
 use sparx::types::FeatureFamilyV1;

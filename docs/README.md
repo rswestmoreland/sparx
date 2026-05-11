@@ -1,43 +1,44 @@
-# sparx Docs
+# sparx Documentation
 
-Key documents in this folder:
-- `CURRENT_PLAN_CHECKLIST.md`: current implementation plan and progress through the Phase 15d closeout checkpoint.
-- `FJALL_STORAGE_RUNTIME_DESIGN_NOTE.md`: storage/runtime design note for the implemented Fjall-backed DB foundation, reconciled through the Phase 12.5 closeout.
+This directory contains active user-facing documentation for sparx. Historical
+checkpoint notes are archived under `roadmap/` with their original filenames for
+traceability.
 
-Additional history:
-- `../PHASE_HISTORY.txt`: consolidated phase and fix checkpoint history.
+## Active guides
+
+- `ARCHITECTURE.md`: high-level system model and data flow
+- `INGEST_AND_TOKENIZATION.md`: supported log inputs and normalization behavior
+- `SPARSE_MATRIX_MODEL.md`: how sparse rows, features, and baselines work
+- `STORAGE_AND_RETENTION.md`: Fjall storage, key families, retention, and replay
+- `CONFIGURATION_AND_POLICY.md`: configuration, tenant policy, and fail-closed
+  behavior
+- `ALERTING_AND_EXPLANATIONS.md`: AlertV1, scoring, drilldown, and explanations
+- `VDROP_VOLUME_LOSS_DETECTION.md`: hard-silence, sharp-drop, and source-stream
+  volume-loss detection
+- `OPERATIONS.md`: run, oneshot, status, policy, purge, migrate, alert, and
+  replay workflows
+- `METRICS_HEALTH_STATUS.md`: status, JSON status, Prometheus metrics, and
+  health output
+- `VALIDATION_AND_RELEASE_READINESS.md`: external validation and release gates
+- `OPEN_SOURCE_RELEASE_METADATA.md`: MIT license, author, copyright, and SPDX metadata
+- `SECURITY_PERFORMANCE_HARDENING_REVIEW.md`: filesystem, unsafe-data, and resource-use hardening review
+- `CODEBASE_CONSISTENCY_AND_BAD_DATA_REVIEW.md`: maintainability comments and malformed-data stability review
+- `DEFERRED_SCOPE.md`: explicitly deferred capabilities and why they are out of
+  v1 scope
+- `DOCUMENTATION_RECONCILIATION_REVIEW.md`: review note for the user-facing
+  documentation reorganization
+- `CURRENT_PLAN_CHECKLIST.md`: current completion checklist and remaining work
+- `FJALL_STORAGE_RUNTIME_DESIGN_NOTE.md`: storage/runtime design note
 
 Contracts remain under `../contracts/`.
 
----
 
-- Phases 0 through 12 are complete
-- Phase 12e completed tenant lifecycle runtime reconciliation for the daemon path,
-  including disable/terminating enforcement without restart, deterministic active-index
-  reconciliation across discovered and known tenants, and tenant `last_seen_ts` updates
-  during observed inventory cycles
-- Phase 12.5 completed contract/config/docs closure before Phase 13
-- Phase 12.5a completed the scope lock and checklist insertion for that closure work
-- Phase 12.5b completed hashed-fallback retirement across contracts and stale config surface
-- Phase 12.5c completed config contract reconciliation and validator hardening
-- Phase 12.5d completed observability contract narrowing to the current status-centered v0.1 surface
-- Phase 12.5e completed output sink and spool reconciliation against the narrowed active runtime/config surface
-- Phase 12.5f completed Fjall note and doc closure, including removal of stale planning wording and dead doc artifacts
-- Phase 12.5g completed the final consistency sweep and closeout across contracts, docs, config wording, and tests
-- Phase 13a completed observability expansion
-- Phase 13b completed release hardening and final operator ergonomics
-- Phase 14a completed output recovery automation
-- Phase 14b completed recovery visibility and tuning
-- Phase 15a completed scoring policy activation
-- Phase 15b completed secondary alert index persistence
-- Phase 15c completed secondary alert index query activation
-- Phase 15d completed structured alert filter activation
-- next recommended phase: 16a replay cadence and spool-cap tuning
+## License and author
 
-## Current implementation priorities
+sparx is open source under the MIT License.
 
-- Phase 15b activated deterministic secondary `alert_idx_*` persistence alongside the primary alert object
-- Phase 15c activates the persisted `alert_idx_time` path for list/search/export candidate selection when coverage is complete
-- Phase 15d activates structured category/entity alert filters on top of the persisted secondary indexes while preserving backward-safe fallback to primary scans
-- keep the primary `AlertV1` object authoritative for show/export/drill flows
-- next focus: carefully scoped replay cadence and spool-cap tuning for output recovery
+Author: Richard S. Westmoreland  
+Contact: dev@rswestmore.land  
+Copyright (c) 2026 Richard S. Westmoreland.
+
+See `../LICENSE` for the full license text.

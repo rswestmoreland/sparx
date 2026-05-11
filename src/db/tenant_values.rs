@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Richard S. Westmoreland
+// SPDX-License-Identifier: MIT
+
 // Tenant DB simple value encodings.
 // See: contracts/31_tenant_db_simple_value_encodings_v0_1.md
-// Phase 2b covers tenant DB values that are not open-window or baseline sketches.
+// Covers tenant DB values that are not open-window or baseline sketches.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TenantValueErrorV1 {
