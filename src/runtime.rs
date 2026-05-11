@@ -667,19 +667,7 @@ impl SparxRuntimeV1 {
             result.journal_entries.push("complete".to_string());
             result.status_after = Some(3);
         } else {
-            let deleted_count = [
-                result.deleted_db_dir,
-                result.deleted_alert_dir,
-                result.deleted_spool_dir,
-            ]
-            .into_iter()
-            .filter(|v| *v)
-            .count();
-            result.outcome = if deleted_count > 0 {
-                TenantPurgeOutcomeKindV1::Partial
-            } else {
-                TenantPurgeOutcomeKindV1::Partial
-            };
+            result.outcome = TenantPurgeOutcomeKindV1::Partial;
             result.status_after = Some(record.status);
         }
 

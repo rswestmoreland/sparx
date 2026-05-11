@@ -261,6 +261,7 @@ pub enum AlertErrorV1 {
     InvalidSharpDropCandidate { msg: String },
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_alert_v1(
     tenant_id: &str,
     device_path: &str,

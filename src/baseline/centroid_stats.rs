@@ -233,7 +233,7 @@ fn apply_stats_updates_v1(
     score_total: Option<f32>,
     last_update_ts: i64,
 ) -> Result<DeviceStatsV1, CentroidStatsErrorV1> {
-    let mut next = current_stats.cloned().unwrap_or_else(|| DeviceStatsV1 {
+    let mut next = current_stats.cloned().unwrap_or(DeviceStatsV1 {
         line_count: WelfordF64V1 {
             n: 0,
             mean: 0.0,

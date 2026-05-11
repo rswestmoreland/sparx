@@ -54,3 +54,11 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - The benchmark generates deterministic multi-tenant log input and reports total EPS.
 - Added documentation for workload scaling controls and release-performance interpretation.
 - No Rust toolchain validation is claimed for this checkpoint.
+
+## Rust 1.90 validation fix checkpoint
+
+- Addressed externally reported run-mode test compile issues.
+- Applied bounded clippy cleanup and targeted allowances for stable runtime helper signatures.
+- Fixed the tenant/device EPS benchmark timestamp generator so multi-file device workloads stay monotonic.
+- No Rust toolchain validation is claimed for this checkpoint; external revalidation remains required.
+

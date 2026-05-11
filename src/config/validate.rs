@@ -27,7 +27,7 @@ fn validate_socket_addr_v1(field: &str, value: &str) -> Result<(), ConfigErrorV1
 }
 
 fn one_of(value: &str, allowed: &[&str]) -> bool {
-    allowed.iter().any(|v| *v == value)
+    allowed.contains(&value)
 }
 
 pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
@@ -100,7 +100,7 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
     // hash_space_bits remains a reserved continuity field in v0.1, but its
     // stable range is still enforced so the config surface stays deterministic.
     let hb = cfg.features.hash_space_bits;
-    if hb < 20 || hb > 30 {
+    if !(20..=30).contains(&hb) {
         return Err(ConfigErrorV1 {
             msg: format!("invalid features.hash_space_bits: {}", hb),
         });

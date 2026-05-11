@@ -135,7 +135,7 @@ fn gzip_reader_resume_from_saved_compressed_offset_returns_remaining_text() {
     );
 
     let resumed = GzipFileReaderV1::open_v1(&path, saved_offset, 6).unwrap();
-    let mut resumed_reader = FileReaderV1::Gzip(resumed);
+    let mut resumed_reader = FileReaderV1::Gzip(Box::new(resumed));
     let (suffix, spans) = read_all_chunks_text(&mut resumed_reader);
 
     assert_eq!(format!("{}{}", prefix, suffix), body);

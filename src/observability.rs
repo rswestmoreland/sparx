@@ -1108,11 +1108,9 @@ where
 {
     let mut saw_any = false;
     let mut total = 0u64;
-    for value in values {
-        if let Some(value) = value {
-            saw_any = true;
-            total = total.saturating_add(value);
-        }
+    for value in values.into_iter().flatten() {
+        saw_any = true;
+        total = total.saturating_add(value);
     }
     if saw_any {
         Some(total)
@@ -3377,7 +3375,7 @@ fn write_http_response_v1(
         status_code,
         reason,
         content_type,
-        body.as_bytes().len(),
+        body.len(),
         body
     );
     stream

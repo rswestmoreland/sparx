@@ -308,11 +308,7 @@ fn maybe_call_run_test_cycle_hook_v1(
 }
 
 pub fn command_requires_config_v1(cmd: &CommandV1) -> bool {
-    match cmd {
-        CommandV1::Version => false,
-        CommandV1::ValidateFixtures { .. } => false,
-        _ => true,
-    }
+    !matches!(cmd, CommandV1::Version | CommandV1::ValidateFixtures { .. })
 }
 
 pub fn route_command_no_config_v1(cmd: &CommandV1) -> RouteResultV1 {
@@ -2118,7 +2114,7 @@ struct ActiveSpanStateV1 {
 
 #[derive(Debug)]
 enum OneShotSinkV1 {
-    Jsonl(SpoolingJsonlAlertSinkV1),
+    Jsonl(Box<SpoolingJsonlAlertSinkV1>),
     Stdout(StdoutAlertSinkV1<Vec<u8>>),
 }
 
@@ -3270,7 +3266,7 @@ fn run_daemon_inner_v1(
     }
 
     let mut sink = match cfg.output.sink.as_str() {
-        "jsonl" => OneShotSinkV1::Jsonl(SpoolingJsonlAlertSinkV1::new(
+        "jsonl" => OneShotSinkV1::Jsonl(Box::new(SpoolingJsonlAlertSinkV1::new(
             JsonlSinkConfigV1 {
                 alert_out_root: cfg.sparx.alert_out_root.clone(),
                 jsonl_rotate_mb: cfg.output.jsonl_rotate_mb,
@@ -3280,7 +3276,7 @@ fn run_daemon_inner_v1(
                 data_root: cfg.sparx.data_root.clone(),
                 spool_max_mb: cfg.output.spool_max_mb,
             },
-        )),
+        ))),
         "stdout" => OneShotSinkV1::Stdout(StdoutAlertSinkV1::new(Vec::<u8>::new())),
         other => {
             return RouteResultV1 {
@@ -4175,7 +4171,7 @@ fn run_oneshot_inner_v1(
     };
 
     let mut sink = match cfg.output.sink.as_str() {
-        "jsonl" => OneShotSinkV1::Jsonl(SpoolingJsonlAlertSinkV1::new(
+        "jsonl" => OneShotSinkV1::Jsonl(Box::new(SpoolingJsonlAlertSinkV1::new(
             JsonlSinkConfigV1 {
                 alert_out_root: cfg.sparx.alert_out_root.clone(),
                 jsonl_rotate_mb: cfg.output.jsonl_rotate_mb,
@@ -4185,7 +4181,7 @@ fn run_oneshot_inner_v1(
                 data_root: cfg.sparx.data_root.clone(),
                 spool_max_mb: cfg.output.spool_max_mb,
             },
-        )),
+        ))),
         "stdout" => OneShotSinkV1::Stdout(StdoutAlertSinkV1::new(Vec::<u8>::new())),
         other => {
             return RouteResultV1 {
@@ -4744,6 +4740,7 @@ struct FinalizeWindowEmitResultV1 {
     source_stream_windows: Vec<SourceStreamRuntimeWindowV1>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_device_oneshot_v1(
     runtime: &mut SparxRuntimeV1,
     cfg: &ConfigV1,
@@ -5158,12 +5155,11 @@ fn process_line_oneshot_v1(
         );
     }
 
-    loop {
-        let acc = acc_opt
-            .as_mut()
-            .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
-        let result = acc
-            .apply_line_v1(
+    let acc = acc_opt
+        .as_mut()
+        .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
+    let result = acc
+        .apply_line_v1(
                 line_ts,
                 line_ts,
                 usize::try_from(byte_len).unwrap_or(usize::MAX),
@@ -5271,7 +5267,6 @@ fn process_line_oneshot_v1(
                 );
             }
         }
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5670,6 +5665,7 @@ fn sharp_drop_tenant_evaluation_config_from_policy_v1(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_vdrop_alerts_for_tenant_v1(
     runtime: &mut SparxRuntimeV1,
     cfg: &ConfigV1,
@@ -5892,6 +5888,7 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
     db: &crate::db::TenantDbV1,
     tenant_id: &str,
@@ -6181,6 +6178,7 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
     db: &crate::db::TenantDbV1,
     tenant_id: &str,

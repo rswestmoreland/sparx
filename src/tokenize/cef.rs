@@ -13,6 +13,7 @@ pub struct CefParseResultV1 {
     pub residual_text: Option<String>,
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn parse_cef_message_v1(msg: &str) -> Result<Option<CefParseResultV1>, ()> {
     let trimmed = msg.trim_start();
     if !trimmed.starts_with("CEF:") {
@@ -21,8 +22,10 @@ pub fn parse_cef_message_v1(msg: &str) -> Result<Option<CefParseResultV1>, ()> {
 
     let (fields, extension) = parse_cef_header_v1(trimmed).ok_or(())?;
 
-    let mut result = CefParseResultV1::default();
-    result.header_events = build_cef_header_events_v1(&fields);
+    let mut result = CefParseResultV1 {
+        header_events: build_cef_header_events_v1(&fields),
+        ..Default::default()
+    };
 
     let ext_trimmed = extension.trim();
     if ext_trimmed.is_empty() {
@@ -186,7 +189,7 @@ fn find_prev_unescaped_eq_v1(s: &str, end: usize) -> Option<usize> {
             backslashes += 1;
             scan -= 1;
         }
-        if backslashes % 2 == 0 {
+        if backslashes.is_multiple_of(2) {
             return Some(idx);
         }
     }

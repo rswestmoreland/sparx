@@ -22,7 +22,7 @@ pub struct ReadChunkV1 {
 #[derive(Debug)]
 pub enum FileReaderV1 {
     Plain(PlainFileReaderV1),
-    Gzip(GzipFileReaderV1),
+    Gzip(Box<GzipFileReaderV1>),
 }
 
 impl FileReaderV1 {
@@ -186,11 +186,11 @@ pub fn open_file_reader_v1(
     chunk_bytes: usize,
 ) -> io::Result<FileReaderV1> {
     if is_gzip {
-        Ok(FileReaderV1::Gzip(GzipFileReaderV1::open_v1(
+        Ok(FileReaderV1::Gzip(Box::new(GzipFileReaderV1::open_v1(
             path,
             start_offset,
             chunk_bytes,
-        )?))
+        )?)))
     } else {
         Ok(FileReaderV1::Plain(PlainFileReaderV1::open_v1(
             path,

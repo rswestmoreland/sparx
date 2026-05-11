@@ -395,6 +395,6 @@ fn sorted_dir_entries_v1(path: &Path) -> Result<Vec<fs::DirEntry>, String> {
         .map_err(|e| format!("{} read_dir failed: {}", path.display(), e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("{} read_dir entry failed: {}", path.display(), e))?;
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(|entry| entry.file_name());
     Ok(entries)
 }

@@ -14,6 +14,8 @@ use crate::db::DbErrorV1;
 
 pub const PRIMARY_KEYSPACE_NAME_V1: &str = "kv";
 
+pub type RawKvPairsV1 = Vec<(Vec<u8>, Vec<u8>)>;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum KvWriteOpV1 {
     Put { key: Vec<u8>, value: Vec<u8> },
@@ -113,7 +115,7 @@ impl FjallKvDbV1 {
         })
     }
 
-    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<RawKvPairsV1, DbErrorV1> {
         let mut out = Vec::new();
         for guard in self.kv.prefix(prefix) {
             let (key, value) = guard.into_inner().map_err(|e| {
@@ -132,7 +134,7 @@ impl FjallKvDbV1 {
         &self,
         start_inclusive: &[u8],
         end_inclusive: &[u8],
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    ) -> Result<RawKvPairsV1, DbErrorV1> {
         let start = start_inclusive.to_vec();
         let end = end_inclusive.to_vec();
         let mut out = Vec::new();

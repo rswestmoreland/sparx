@@ -24,6 +24,7 @@ traceability.
 - `OPEN_SOURCE_RELEASE_METADATA.md`: MIT license, author, copyright, and SPDX metadata
 - `SECURITY_PERFORMANCE_HARDENING_REVIEW.md`: filesystem, unsafe-data, and resource-use hardening review
 - `CODEBASE_CONSISTENCY_AND_BAD_DATA_REVIEW.md`: maintainability comments and malformed-data stability review
+- `RUST190_VALIDATION_FIX_REVIEW.md`: validation-failure fix review for Rust 1.90 and EPS benchmark rerun
 - `DEFERRED_SCOPE.md`: explicitly deferred capabilities and why they are out of
   v1 scope
 - `DOCUMENTATION_RECONCILIATION_REVIEW.md`: review note for the user-facing

@@ -186,7 +186,7 @@ fn sorted_dir_entries(dir: &Path) -> io::Result<Vec<fs::DirEntry>> {
     for entry in fs::read_dir(dir)? {
         entries.push(entry?);
     }
-    entries.sort_by(|a, b| os_name_to_string(a.file_name()).cmp(&os_name_to_string(b.file_name())));
+    entries.sort_by_key(|entry| os_name_to_string(entry.file_name()));
     Ok(entries)
 }
 

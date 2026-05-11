@@ -19,7 +19,7 @@ use crate::db::baseline_sketch::{
     encode_dfm_v1, encode_dfn_v1, encode_stats_v1, CentroidValuePairV1, DeviceStatsV1,
     DfCountPairV1,
 };
-use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1};
+use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1, RawKvPairsV1};
 use crate::db::keys::{
     key_prefix_tenant_alert_v1, key_prefix_tenant_drop_open_device_v1,
     key_prefix_tenant_drop_open_source_stream_v1, key_prefix_tenant_migrate_journal_v1,
@@ -181,7 +181,7 @@ impl TenantDbV1 {
         self.inner.write_batch_raw_v1(ops)
     }
 
-    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<RawKvPairsV1, DbErrorV1> {
         self.inner.scan_prefix_raw_v1(prefix)
     }
 
@@ -189,7 +189,7 @@ impl TenantDbV1 {
         &self,
         start_inclusive: &[u8],
         end_inclusive: &[u8],
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    ) -> Result<RawKvPairsV1, DbErrorV1> {
         self.inner.scan_range_raw_v1(start_inclusive, end_inclusive)
     }
 
@@ -1475,12 +1475,12 @@ impl TenantDbV1 {
         Ok(out)
     }
 
-    pub fn list_alert_record_keys_v1(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    pub fn list_alert_record_keys_v1(&self) -> Result<RawKvPairsV1, DbErrorV1> {
         let prefix = key_prefix_tenant_alert_v1();
         self.scan_prefix_raw_v1(prefix.as_bytes())
     }
 
-    pub fn list_secondary_alert_index_keys_v1(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    pub fn list_secondary_alert_index_keys_v1(&self) -> Result<RawKvPairsV1, DbErrorV1> {
         let mut out = Vec::new();
         out.extend(self.scan_prefix_raw_v1(b"alert_idx_time/v1")?);
         out.extend(self.scan_prefix_raw_v1(b"alert_idx_cat/v1")?);

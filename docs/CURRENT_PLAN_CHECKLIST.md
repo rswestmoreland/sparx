@@ -69,6 +69,7 @@ validation logs are green, and release packaging is complete.
 - [x] Plain-text runtime reading uses configured chunks and line buffering is capped.
 - [x] Ingest resource cap validation added for configured CPU/memory controls.
 - [ ] User-run Rust toolchain validation remains required before release packaging.
+- [x] Reported Rust 1.90 test compile, clippy, and EPS benchmark harness issues addressed for revalidation.
 
 - malformed but readable log records do not crash runtime processing
 - source modules have concise headers and comments at non-obvious safety boundaries

@@ -263,7 +263,7 @@ fn run_startup_and_shutdown_persist_process_state_and_flush_v1(
     );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let process = runtime.read_process_state_v1()?;
     assert!(process.last_run_start_ts.is_some());
     assert!(process.last_run_end_ts.is_some());
@@ -421,7 +421,7 @@ fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>>
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let paths = runtime.tenant_paths_v1("smoke");
     runtime.upsert_tenant_record_v1(&GlobalTenantRecordV1 {
         tenant_id: "smoke".to_string(),
@@ -588,7 +588,7 @@ fn run_terminating_tenant_no_longer_processes_once_marked_v1(
     );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let file_key = file_key_v1("edge01.log");
     let cursor =
@@ -608,7 +608,7 @@ fn run_active_index_reconciles_deterministically_v1() -> Result<(), Box<dyn std:
     copy_fixture_device_v1(&cfg, "tenant-b", "edge01", &["edge01.log"]);
     copy_fixture_device_v1(&cfg, "tenant-a", "edge01", &["edge01.log"]);
 
-    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let stale_paths = runtime.tenant_paths_v1("tenant-z");
     runtime.upsert_tenant_record_v1(&GlobalTenantRecordV1 {
         tenant_id: "tenant-z".to_string(),

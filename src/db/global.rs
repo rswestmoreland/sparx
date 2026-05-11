@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::config::ConfigV1;
-use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1};
+use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1, RawKvPairsV1};
 use crate::db::keys::{
     key_global_alert_out_root_v1, key_global_metrics_counter_v1, key_global_metrics_gauge_v1,
     key_global_migrate_journal_v1, key_global_process_last_run_end_ts_v1,
@@ -113,7 +113,7 @@ impl GlobalDbV1 {
         self.inner.write_batch_raw_v1(ops)
     }
 
-    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<RawKvPairsV1, DbErrorV1> {
         self.inner.scan_prefix_raw_v1(prefix)
     }
 
@@ -121,7 +121,7 @@ impl GlobalDbV1 {
         &self,
         start_inclusive: &[u8],
         end_inclusive: &[u8],
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    ) -> Result<RawKvPairsV1, DbErrorV1> {
         self.inner.scan_range_raw_v1(start_inclusive, end_inclusive)
     }
 
@@ -469,7 +469,7 @@ impl GlobalDbV1 {
     pub fn list_tenant_record_keys_v1(
         &self,
         tenant_id: &str,
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    ) -> Result<RawKvPairsV1, DbErrorV1> {
         let prefix = key_prefix_global_tenant_v1(tenant_id);
         self.scan_prefix_raw_v1(prefix.as_bytes())
     }

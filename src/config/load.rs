@@ -20,10 +20,7 @@ pub struct ConfigErrorV1 {
 }
 
 fn env_str(name: &str) -> Option<String> {
-    match env::var(name) {
-        Ok(v) => Some(v),
-        Err(_) => None,
-    }
+    env::var(name).ok()
 }
 
 fn env_bool(name: &str) -> Option<bool> {

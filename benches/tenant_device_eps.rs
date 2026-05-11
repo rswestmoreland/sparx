@@ -196,7 +196,7 @@ fn write_device_file_v1(
     let file = File::create(file_path).map_err(|e| format!("create log file failed: {}", e))?;
     let mut writer = BufWriter::new(file);
     for event_idx in 0..events_per_file {
-        let ts = event_timestamp_v1(event_idx);
+        let ts = event_timestamp_v1(file_idx.saturating_mul(events_per_file).saturating_add(event_idx));
         let action = match event_idx % 5 {
             0 => "login",
             1 => "query",
