@@ -973,7 +973,6 @@ fn load_filtered_alerts_v1(
     }
 
     let mut alerts = runtime.with_tenant_db_v1(tenant_id, current_unix_ts_v1(), |db| {
-        let mut out = Vec::new();
         let indexed_ids = if let Some(entity) = &filters.entity {
             db.select_alert_ids_via_entity_index_if_complete_v1(
                 alert_entity_kind_filter_name_v1(entity.kind),
@@ -995,31 +994,23 @@ fn load_filtered_alerts_v1(
         };
 
         if let Some(alert_ids) = indexed_ids {
-            if !alert_ids.is_empty() {
-                let mut indexed_read_failed = false;
-                for alert_id in alert_ids {
-                    match db.read_primary_alert_v1(&alert_id) {
-                        Ok(Some(alert)) => out.push(alert),
-                        Ok(None) | Err(_) => {
-                            indexed_read_failed = true;
-                            break;
-                        }
+            let mut out = Vec::with_capacity(alert_ids.len());
+            let mut indexed_read_failed = false;
+            for alert_id in alert_ids {
+                match db.read_primary_alert_v1(&alert_id) {
+                    Ok(Some(alert)) => out.push(alert),
+                    Ok(None) | Err(_) => {
+                        indexed_read_failed = true;
+                        break;
                     }
                 }
-                if !indexed_read_failed {
-                    return Ok(out);
-                }
+            }
+            if !indexed_read_failed {
+                return Ok(out);
             }
         }
 
-        let alert_prefix = crate::db::keys::key_prefix_tenant_alert_v1();
-        for (_, bytes) in db.scan_prefix_raw_v1(alert_prefix.as_bytes())? {
-            match decode_alert_v1(&bytes) {
-                Ok(alert) if alert_matches_query_filters_v1(&alert, filters) => out.push(alert),
-                Ok(_) | Err(_) => {}
-            }
-        }
-        Ok(out)
+        load_alerts_by_primary_scan_v1(db, filters)
     })?;
 
     alerts.retain(|alert| alert_matches_query_filters_v1(alert, filters));
@@ -1029,6 +1020,21 @@ fn load_filtered_alerts_v1(
             .then_with(|| a.alert_id.cmp(&b.alert_id))
     });
     Ok(alerts)
+}
+
+fn load_alerts_by_primary_scan_v1(
+    db: &crate::db::TenantDbV1,
+    filters: &AlertQueryFiltersV1,
+) -> Result<Vec<AlertV1>, crate::db::DbErrorV1> {
+    let mut out = Vec::new();
+    let alert_prefix = crate::db::keys::key_prefix_tenant_alert_v1();
+    for (_, bytes) in db.scan_prefix_raw_v1(alert_prefix.as_bytes())? {
+        match decode_alert_v1(&bytes) {
+            Ok(alert) if alert_matches_query_filters_v1(&alert, filters) => out.push(alert),
+            Ok(_) | Err(_) => {}
+        }
+    }
+    Ok(out)
 }
 
 fn load_alert_by_id_v1(

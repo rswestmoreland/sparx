@@ -208,6 +208,7 @@ fn run_fixture_v1(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_file_v1(
     tenant_db: &mut BTreeMap<String, Vec<u8>>,
     active_span: &mut Option<ActiveSpanStateV1>,
@@ -232,11 +233,13 @@ fn process_file_v1(
         centroid_alpha: 0.5,
         centroid_cap: 10_000,
     };
-    let mut alert_cfg = AlertScoringConfigV1::default();
-    alert_cfg.outlier_threshold = 0.20;
-    alert_cfg.noise_threshold = 0.75;
-    alert_cfg.cold_start_min_windows = 1;
-    alert_cfg.include_debug_fields = true;
+    let alert_cfg = AlertScoringConfigV1 {
+        outlier_threshold: 0.20,
+        noise_threshold: 0.75,
+        cold_start_min_windows: 1,
+        include_debug_fields: true,
+        ..Default::default()
+    };
 
     let mut dict = load_dict_from_db_v1(tenant_db, dict_cfg.clone());
     let mut acc =
@@ -280,7 +283,7 @@ fn process_file_v1(
                     line.trim_end_matches('\n').trim_end_matches('\r'),
                     line_start_offset,
                     line_end,
-                    line.as_bytes().len() as u64,
+                    line.len() as u64,
                     &df_cfg,
                     &centroid_cfg,
                     &alert_cfg,
@@ -315,7 +318,7 @@ fn process_file_v1(
                 line.trim_end_matches('\n').trim_end_matches('\r'),
                 line_start_offset,
                 line_end,
-                line.as_bytes().len() as u64,
+                line.len() as u64,
                 &df_cfg,
                 &centroid_cfg,
                 &alert_cfg,
@@ -448,6 +451,7 @@ fn process_line_v1(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn finalize_window_v1(
     tenant_db: &mut BTreeMap<String, Vec<u8>>,
     dict: &FeatureDictionaryV1,

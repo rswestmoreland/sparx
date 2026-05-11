@@ -53,6 +53,24 @@ Advantages include:
 - unknown or partially parsed formats can still emit deterministic token and
   shape features
 
+
+## Sparse matrix and signal processing
+
+sparx also treats finalized sparse rows as sampled signal frames. Each window is
+a discrete time step, each `FeatureId` column can be viewed as a signal over
+time, and volume counts form tenant, device, and source-stream signals. This is
+why sparse matrix methods and signal-processing ideas fit together in sparx:
+sparse rows preserve high-dimensional feature state, while baseline, spike,
+extreme-volume, hard-silence, and sharp-drop logic operate over sampled window
+signals.
+
+The current implementation already uses this model through finalized window
+counts, rolling baselines, rarity/drift/spike/extreme scoring, and volume-loss
+detection. The next lean baseline extension is documented in
+`docs/SPARSE_MATRIX_AND_SIGNAL_PROCESSING.md` and focuses on EWMA volume
+smoothing plus hour-of-week periodic volume baselines to reduce false positives
+for normal recurring spikes and drops.
+
 ## Supported input model
 
 sparx reads per-tenant watch roots with per-device log directories. It supports
@@ -77,10 +95,17 @@ authoritative drilldown field model.
 
 Active alert and health signals include:
 
-- rarity, drift, spike, and extreme volume components for sparse rows
-- `V_DROP` hard-silence detection for device and tenant aggregate subjects
-- `V_DROP` sharp-drop detection for reduced-but-nonzero activity
-- `V_DROP` source-stream detection behind a default-off source-stream gate
+- rarity scoring to highlight unusual feature mixes and newly observed
+  canonical features within a finalized sparse row
+- drift scoring to compare the current sparse row against the device baseline
+  centroid and surface behavioral movement over time
+- spike scoring to identify elevated row volume relative to the expected
+  baseline for that tenant/device/window slice
+- extreme volume scoring to flag unusually large windows even when the shape of
+  the row is otherwise familiar
+- hard-silence detection for device and tenant aggregate subjects
+- sharp-drop detection for reduced-but-nonzero activity
+- source-stream volume-loss detection behind a default-off source-stream gate
 - status, JSON status, Prometheus metrics, and health output for bounded
   operator diagnostics
 - alert query/export/drill/extract workflows backed by persisted `AlertV1`
@@ -144,19 +169,20 @@ for workload controls and interpretation guidance.
 
 ## Current status
 
-The current checkpoint includes source-stream `V_DROP` behavior for v1 behind the
-default-off source-stream gate. Parser-class subjects, vendor-event-family
-subjects, source-stream-specific threshold knobs, heartbeat checks, maintenance
-calendars, cross-tenant outage correlation, and AlertV1 schema changes remain
-outside the v1 scope unless explicitly approved.
+sparx can poll tenant/device log directories, parse supported log formats, build
+per-window sparse rows, update behavioral baselines, emit explainable `AlertV1`
+records, and retain provenance for alert drilldown. The current CLI/runtime
+surface includes `run`, `oneshot`, `status`, `status --json`, metrics, health,
+tenant policy show/check, purge, migrate, alert query/search/show/export, alert
+drill/extract, and replay-spool.
 
-Before v1 release, sparx requires Rust 1.90 or newer (see `rust-toolchain.toml`) and
-user-run Rust toolchain validation logs for formatting, build, tests, clippy, and
-benchmarks, followed by release packaging and operator documentation review.
+Source-stream volume-loss detection is available behind the default-off
+source-stream gate. The repository also includes Rust 1.90 toolchain metadata,
+validation guidance, and EPS benchmarks for ingestion and detection throughput.
 
 ## Current hardening status
 
-The current checkpoint includes security, performance, consistency, and bad-data hardening. Covered areas include alert provenance path validation, spool path safety, symlink-resistant spool inventory, bounded ingest resource caps, chunked plain-text runtime reading, coherent source comments, explicit runtime invariant errors, and malformed-readable-log stability coverage. Final release validation still requires user-run Rust toolchain logs.
+The current checkpoint includes security, performance, consistency, and bad-data hardening. Covered areas include alert provenance path validation, spool path safety, symlink-resistant spool inventory, bounded ingest resource caps, chunked plain-text runtime reading, coherent source comments, explicit runtime invariant errors, and malformed-readable-log stability coverage.
 
 ## License
 

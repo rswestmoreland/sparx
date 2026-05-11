@@ -30,4 +30,11 @@ The following capabilities remain outside v1 unless explicitly approved.
 - maintenance-aware volume-loss suppression
 - richer outage-correlation controls
 
+## Deferred signal-processing candidates
+
+- autocorrelation-lite for repeated-interval, heartbeat-like, retry-loop, or beacon-like behavior
+- DFT/FFT-style frequency-domain analysis for offline periodicity review
+
+These candidates are recorded in `../contracts/41_deferred_signal_processing_candidates_v0_1.md` and require a separate contract before implementation.
+
 These items may be revisited after v1 hardening and external validation.

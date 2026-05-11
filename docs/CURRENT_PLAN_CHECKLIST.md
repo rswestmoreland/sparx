@@ -35,20 +35,30 @@
   AlertV1 construction, open-state/dedup helpers, policy gate, runtime
   integration, and bounded diagnostics
 
-## Remaining pre-release work
+## Remaining work order
 
-1. External Rust validation
-   - run formatting, build, test, clippy, and release build checks
-   - provide logs for any failures
-   - fix reported failures before adding features
+1. Finish external Rust validation and EPS benchmark cleanup
+   - run formatting, build, test, clippy, and benchmark checks under Rust 1.90 or newer
+   - fix reported test and clippy failures before adding signal-processing code
+   - record default and 100000-event ingest/detection EPS results
 
-2. Final documentation reconciliation
-   - verify active docs and contracts match implementation behavior
+2. Review active docs, contracts, tests, and supporting files
+   - confirm active docs match current behavior
    - keep historical checkpoint notes archived under `docs/roadmap/`
-   - ensure operator docs are sufficient for install, configure, run, validate,
-     and troubleshoot workflows
+   - keep public README focused on current behavior and concise design explanations
 
-3. Release packaging
+3. Begin lean signal-processing MVP
+   - add EWMA volume state primitives
+   - add hour-of-week periodic volume baseline primitives
+   - integrate mature periodic expected volume conservatively into existing spike/drop evaluation
+   - keep sparse rows, AlertV1, DeviceStatsV1, and SourceStreamStatsV1 unchanged
+
+4. Explore ingest and detection performance tuning
+   - identify parser, sparse-row, durable-write, and detection hot spots using benchmark evidence
+   - prefer small measured changes before parallel or async pipeline work
+   - preserve deterministic behavior and fail-closed path handling
+
+5. Release packaging
    - provide example configuration
    - provide tenant-policy examples
    - provide migration and purge examples
@@ -69,7 +79,7 @@ validation logs are green, and release packaging is complete.
 - [x] Plain-text runtime reading uses configured chunks and line buffering is capped.
 - [x] Ingest resource cap validation added for configured CPU/memory controls.
 - [ ] User-run Rust toolchain validation remains required before release packaging.
-- [x] Reported Rust 1.90 test compile, clippy, and EPS benchmark harness issues addressed for revalidation.
+- [ ] Fresh external Rust 1.90 validation remains required after the current cleanup checkpoint.
 
 - malformed but readable log records do not crash runtime processing
 - source modules have concise headers and comments at non-obvious safety boundaries
@@ -93,7 +103,34 @@ validation logs are green, and release packaging is complete.
 
 ## Benchmark follow-up
 
-- Tenant/device EPS benchmark now reports separate ingestion and detection metrics.
+- Tenant/device EPS benchmark reports separate ingestion and detection metrics.
 - Default workload target: 10000 events.
 - Larger validation workload target: 100000 events.
 - Optional durable oneshot timing remains available through `SPARX_BENCH_DURABLE_ONESHOT=1`.
+- Saved benchmark reports in `validation_results/` are historical diagnostics until Codex produces a fresh green validation run from the current checkpoint.
+
+## Validation cleanup addendum
+
+- [x] Alert query fallback path tightened for incomplete or unreadable secondary indexes.
+- [x] Task/review documents moved under `docs/roadmap/` with phase-oriented filenames.
+- [x] Active docs index reconciled so `/docs` contains public-facing guides only.
+- [ ] Codex must rerun formatting, check, test, clippy, default EPS, and 100000-event EPS validation on this checkpoint.
+- [ ] Treat saved benchmark logs as historical diagnostics until fresh green validation is available.
+
+## Signal-processing MVP addendum
+
+- [x] Signal-processing MVP design contract added.
+- [x] Sparse matrix plus signal-processing guide added.
+- [x] Autocorrelation-lite recorded as deferred scope.
+- [ ] Finish current Rust validation and EPS benchmark cleanup before implementation.
+- [ ] Add EWMA volume state primitives.
+- [ ] Add hour-of-week periodic volume baseline primitives.
+- [ ] Integrate mature periodic expected volume into existing spike/drop evaluation.
+- [ ] Measure benchmark impact before publishing performance claims.
+
+## Ingest performance addendum
+
+- [x] Ingest performance tuning plan added.
+- [ ] Use benchmark output to identify hot spots before changing runtime architecture.
+- [ ] Review parser allocation patterns, sparse-row update costs, durable write batching, and detection evaluation flow.
+- [ ] Evaluate parallel or async pipeline strategies only after the single-threaded hot path is measured and stable.

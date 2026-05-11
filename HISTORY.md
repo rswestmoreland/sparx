@@ -78,3 +78,31 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Updated the documented larger validation workload to 100000 events.
 - Split benchmark output into ingestion EPS and detection EPS metrics.
 - Kept optional durable oneshot timing available through `SPARX_BENCH_DURABLE_ONESHOT=1`.
+
+## README and validation cleanup checkpoint
+
+- Updated the public README alerting scope with clearer rarity, drift, spike, and extreme-volume descriptions.
+- Reworded README current status to describe current capabilities only.
+- Removed release-validation caveat text from the public README hardening section.
+- Added the missing runtime drop in the remaining alert query fallback test.
+- Addressed externally reported clippy diagnostics in the end-to-end smoke test helpers.
+- No Rust toolchain validation is claimed for this checkpoint; external revalidation remains required.
+
+
+
+## Signal-processing MVP documentation checkpoint
+
+- Added a sparse matrix plus signal-processing guide.
+- Added the lean signal-processing MVP plan for EWMA volume smoothing and hour-of-week periodic volume baselines.
+- Added a performance tuning plan focused on parser, sparse-row, durable-write, and detection hot paths.
+- Added contracts for signal-processing baselines and deferred signal-processing candidates.
+- Recorded autocorrelation-lite and frequency-domain analysis as deferred candidates.
+- No runtime behavior changes are claimed for this checkpoint.
+
+## Validation and EPS cleanup checkpoint
+
+- Tightened alert query loading so complete secondary indexes are used directly and incomplete or unreadable indexed paths fall back to primary alert scanning.
+- Moved task, validation, benchmark, and handoff notes from the public docs root into phase-oriented files under `docs/roadmap/`.
+- Updated documentation indexes and the current checklist to keep `/docs` focused on public-facing guides.
+- No Rust toolchain validation is claimed for this checkpoint; external Codex revalidation remains required before signal-processing implementation.
+

@@ -31,6 +31,16 @@ Current v1 scope includes:
 - status, JSON status, metrics, and health output
 - hard-silence and sharp-drop V_DROP for device and tenant aggregate subjects
 - source-stream V_DROP behind the default-off source-stream gate
+- locked signal-processing MVP boundary for planned EWMA and hour-of-week periodic volume baselines
+
+## Signal-processing baseline boundary
+
+Signal-processing extensions are auxiliary baseline state over sampled window
+signals. They must preserve sparse row encoding, AlertV1 schema, DeviceStatsV1,
+SourceStreamStatsV1, and the Fjall adapter boundary. The planned MVP direction
+is EWMA volume smoothing plus hour-of-week periodic volume baselines after
+validation cleanup is complete.
+Autocorrelation-lite and DFT/FFT-style analysis are deferred.
 
 ## Sparse matrix model
 

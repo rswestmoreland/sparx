@@ -349,6 +349,7 @@ fn alerts_list_falls_back_when_entity_index_is_incomplete_v1(
         db.put_raw_v1(key_tenant_alert_v1(&legacy.alert_id).as_bytes(), &encoded)?;
         db.persist_sync_all_v1()
     })?;
+    drop(runtime);
 
     let r = route_command_v1(
         &CommandV1::AlertsList {

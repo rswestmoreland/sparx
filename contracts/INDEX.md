@@ -40,6 +40,8 @@
 38. `37_sharp_drop_detection_scope_v0_1.md`
 39. `38_vdrop_richer_subject_scope_v0_1.md`
 40. `39_source_stream_vdrop_implementation_plan_v0_1.md`
+41. `40_signal_processing_baselines_v0_1.md`
+42. `41_deferred_signal_processing_candidates_v0_1.md`
 
 ## Current release boundary
 
@@ -48,3 +50,11 @@ gate. Parser-class and vendor-event-family V_DROP subjects remain deferred.
 External Rust validation logs are still required before release closure.
 
 Security/performance hardening note: active contracts now require fail-closed drill/extract path resolution, validated output path components, symlink-resistant spool inventory, and bounded ingest resource caps.
+
+## Signal-processing baseline contract note
+
+The lean signal-processing baseline direction is locked in Contract 40. The MVP
+adds EWMA volume smoothing and hour-of-week periodic volume baselines as compact
+auxiliary state. It must not change sparse row encoding, AlertV1, DeviceStatsV1,
+or SourceStreamStatsV1. Autocorrelation-lite and frequency-domain analysis are
+recorded as deferred candidates in Contract 41.

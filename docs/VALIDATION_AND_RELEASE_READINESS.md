@@ -56,7 +56,7 @@ Before release packaging, review these gates in addition to the Rust toolchain c
 - ingest read chunk and line/token caps are validator-enforced
 - plain-text file processing uses bounded chunk and line-buffer behavior
 
-See `SECURITY_PERFORMANCE_HARDENING_REVIEW.md` for the current hardening notes.
+See `roadmap/PHASE32C_SECURITY_PERFORMANCE_HARDENING_REVIEW.md` for the current hardening notes.
 
 
 ## Open-source release metadata
