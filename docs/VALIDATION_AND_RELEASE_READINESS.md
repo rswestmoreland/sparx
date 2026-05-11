@@ -3,6 +3,8 @@
 This environment does not run the Rust toolchain. Release readiness depends on
 external user-run validation logs.
 
+Rust version requirement: **Rust 1.90 or newer** (repo-pinned via `rust-toolchain.toml`).
+
 ## Required external validation
 
 Run and retain logs for:
@@ -10,7 +12,7 @@ Run and retain logs for:
 - `cargo fmt --check`
 - `cargo check`
 - `cargo test`
-- `cargo clippy -- -D warnings`
+- `cargo clippy --all-targets --all-features -- -D warnings`
 - release build as appropriate for the target environment
 - `cargo bench --bench tenant_device_eps` for end-to-end EPS measurement
 

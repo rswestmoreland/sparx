@@ -1,0 +1,527 @@
+# Codex validation and EPS bench (Rust 1.90+)
+Mon May 11 17:16:15 UTC 2026
+$ rustc --version
+rustc 1.90.0 (1159e78c4 2025-09-14)
+$ cargo --version
+cargo 1.90.0 (840b83a10 2025-07-30)
+$ cargo fmt
+exit_code=0
+
+$ cargo fmt --check
+exit_code=0
+
+$ cargo check
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+exit_code=0
+
+$ cargo test
+   Compiling sparx v0.0.0 (/workspace/sparx)
+error[E0596]: cannot borrow `runtime` as mutable, as it is not declared as mutable
+   --> tests/run_mode.rs:266:9
+    |
+266 |     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    |         ^^^^^^^ not mutable
+...
+291 |     let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+    |                      ------- cannot borrow as mutable
+...
+294 |     let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+    |                     ------- cannot borrow as mutable
+...
+298 |         runtime.with_tenant_db_v1("smoke", 0, |db| db.read_open_window_state_v1(&device_key))?;
+    |         ------- cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+266 |     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    |         +++
+
+warning: variable does not need to be mutable
+   --> tests/run_mode.rs:424:9
+    |
+424 |     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+error[E0596]: cannot borrow `runtime` as mutable, as it is not declared as mutable
+   --> tests/run_mode.rs:595:9
+    |
+595 |         runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
+    |         ^^^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+591 |     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    |         +++
+
+warning: variable does not need to be mutable
+   --> tests/run_mode.rs:611:9
+    |
+611 |     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0596`.
+warning: `sparx` (test "run_mode") generated 2 warnings
+error: could not compile `sparx` (test "run_mode") due to 2 previous errors; 2 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+exit_code=101
+
+$ cargo clippy --all-targets --all-features -- -D warnings
+    Checking sparx v0.0.0 (/workspace/sparx)
+error: this function has too many arguments (8/7)
+   --> src/alert/mod.rs:264:1
+    |
+264 | / pub fn build_alert_v1(
+265 | |     tenant_id: &str,
+266 | |     device_path: &str,
+267 | |     row: &FinalizedWindowRowV1,
+...   |
+272 | |     provenance: &[FileSpanV1],
+273 | | ) -> Result<AlertBuildResultV1, AlertErrorV1> {
+    | |_____________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+    = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: unnecessary closure used to substitute value for `Option::None`
+   --> src/baseline/centroid_stats.rs:236:20
+    |
+236 |       let mut next = current_stats.cloned().unwrap_or_else(|| DeviceStatsV1 {
+    |  ____________________^
+237 | |         line_count: WelfordF64V1 {
+238 | |             n: 0,
+239 | |             mean: 0.0,
+...   |
+252 | |         last_update_ts,
+253 | |     });
+    | |______^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_lazy_evaluations
+    = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `unwrap_or` instead
+    |
+236 ~     let mut next = current_stats.cloned().unwrap_or(DeviceStatsV1 {
+237 +         line_count: WelfordF64V1 {
+238 +             n: 0,
+239 +             mean: 0.0,
+240 +             m2: 0.0,
+241 +         },
+242 +         byte_count: WelfordF64V1 {
+243 +             n: 0,
+244 +             mean: 0.0,
+245 +             m2: 0.0,
+246 +         },
+247 +         score_total: WelfordF64V1 {
+248 +             n: 0,
+249 +             mean: 0.0,
+250 +             m2: 0.0,
+251 +         },
+252 +         last_update_ts,
+253 ~     });
+    |
+
+error: match expression looks like `matches!` macro
+   --> src/cli/route.rs:311:5
+    |
+311 | /     match cmd {
+312 | |         CommandV1::Version => false,
+313 | |         CommandV1::ValidateFixtures { .. } => false,
+314 | |         _ => true,
+315 | |     }
+    | |_____^ help: try: `!matches!(cmd, CommandV1::Version | CommandV1::ValidateFixtures { .. })`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_like_matches_macro
+    = note: `-D clippy::match-like-matches-macro` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_like_matches_macro)]`
+
+error: large size difference between variants
+    --> src/cli/route.rs:2120:1
+     |
+2120 | / enum OneShotSinkV1 {
+2121 | |     Jsonl(SpoolingJsonlAlertSinkV1),
+     | |     ------------------------------- the largest variant contains at least 240 bytes
+2122 | |     Stdout(StdoutAlertSinkV1<Vec<u8>>),
+     | |     ---------------------------------- the second-largest variant contains at least 24 bytes
+2123 | | }
+     | |_^ the entire enum is at least 240 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant
+     = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+2121 -     Jsonl(SpoolingJsonlAlertSinkV1),
+2121 +     Jsonl(Box<SpoolingJsonlAlertSinkV1>),
+     |
+
+error: this function has too many arguments (9/7)
+    --> src/cli/route.rs:4747:1
+     |
+4747 | / fn process_device_oneshot_v1(
+4748 | |     runtime: &mut SparxRuntimeV1,
+4749 | |     cfg: &ConfigV1,
+4750 | |     inventory: &crate::ingest::DeviceInventoryV1,
+...    |
+4756 | |     now_ts: i64,
+4757 | | ) -> Result<ProcessDeviceResultV1, String> {
+     | |__________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+error: this loop never actually loops
+    --> src/cli/route.rs:5161:5
+     |
+5161 | /     loop {
+5162 | |         let acc = acc_opt
+5163 | |             .as_mut()
+5164 | |             .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
+...    |
+5274 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#never_loop
+     = note: `#[deny(clippy::never_loop)]` on by default
+
+error: this function has too many arguments (9/7)
+    --> src/cli/route.rs:5673:1
+     |
+5673 | / fn emit_vdrop_alerts_for_tenant_v1(
+5674 | |     runtime: &mut SparxRuntimeV1,
+5675 | |     cfg: &ConfigV1,
+5676 | |     tenant_id: &str,
+...    |
+5682 | |     eval_ts_i64: i64,
+5683 | | ) -> Result<usize, DbErrorV1> {
+     | |_____________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+error: this function has too many arguments (8/7)
+    --> src/cli/route.rs:5895:1
+     |
+5895 | / fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
+5896 | |     db: &crate::db::TenantDbV1,
+5897 | |     tenant_id: &str,
+5898 | |     device_filter_key: Option<&str>,
+...    |
+5903 | |     result: &mut VDropCollectResultV1,
+5904 | | ) -> Result<(), DbErrorV1> {
+     | |__________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+error: this function has too many arguments (10/7)
+    --> src/cli/route.rs:6184:1
+     |
+6184 | / fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
+6185 | |     db: &crate::db::TenantDbV1,
+6186 | |     tenant_id: &str,
+6187 | |     device_filter_key: Option<&str>,
+...    |
+6194 | |     result: &mut VDropCollectResultV1,
+6195 | | ) -> Result<(), DbErrorV1> {
+     | |__________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+error: manual implementation of `ok`
+  --> src/config/load.rs:23:5
+   |
+23 | /     match env::var(name) {
+24 | |         Ok(v) => Some(v),
+25 | |         Err(_) => None,
+26 | |     }
+   | |_____^ help: replace with: `env::var(name).ok()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_ok_err
+   = note: `-D clippy::manual-ok-err` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_ok_err)]`
+
+error: using `contains()` instead of `iter().any()` is more efficient
+  --> src/config/validate.rs:30:5
+   |
+30 |     allowed.iter().any(|v| *v == value)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `allowed.contains(&value)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_contains
+   = note: `-D clippy::manual-contains` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_contains)]`
+
+error: manual `!RangeInclusive::contains` implementation
+   --> src/config/validate.rs:103:8
+    |
+103 |     if hb < 20 || hb > 30 {
+    |        ^^^^^^^^^^^^^^^^^^ help: use: `!(20..=30).contains(&hb)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_range_contains
+    = note: `-D clippy::manual-range-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/fjall.rs:116:56
+    |
+116 |     pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+    = note: `-D clippy::type-complexity` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/fjall.rs:135:10
+    |
+135 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/global.rs:116:56
+    |
+116 |     pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/global.rs:124:10
+    |
+124 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/global.rs:472:10
+    |
+472 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/tenant.rs:184:56
+    |
+184 |     pub fn scan_prefix_raw_v1(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> src/db/tenant.rs:192:10
+    |
+192 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> src/db/tenant.rs:1478:48
+     |
+1478 |     pub fn list_alert_record_keys_v1(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> src/db/tenant.rs:1483:57
+     |
+1483 |     pub fn list_secondary_alert_index_keys_v1(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, DbErrorV1> {
+     |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+error: consider using `sort_by_key`
+   --> src/fixture_validate.rs:398:5
+    |
+398 |     entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `entries.sort_by_key(|a| a.file_name())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_sort_by
+    = note: `-D clippy::unnecessary-sort-by` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_sort_by)]`
+
+error: large size difference between variants
+  --> src/ingest/reader.rs:23:1
+   |
+23 | / pub enum FileReaderV1 {
+24 | |     Plain(PlainFileReaderV1),
+   | |     ------------------------ the second-largest variant contains at least 24 bytes
+25 | |     Gzip(GzipFileReaderV1),
+   | |     ---------------------- the largest variant contains at least 240 bytes
+26 | | }
+   | |_^ the entire enum is at least 240 bytes
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+   |
+25 -     Gzip(GzipFileReaderV1),
+25 +     Gzip(Box<GzipFileReaderV1>),
+   |
+
+error: consider using `sort_by_key`
+   --> src/ingest/mod.rs:189:5
+    |
+189 |     entries.sort_by(|a, b| os_name_to_string(a.file_name()).cmp(&os_name_to_string(b.file_name())));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `entries.sort_by_key(|a| os_name_to_string(a.file_name()))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_sort_by
+
+error: unnecessary `if let` since only the `Some` variant of the iterator element is used
+    --> src/observability.rs:1111:5
+     |
+1111 | /     for value in values {
+1112 | |         if let Some(value) = value {
+1113 | |             saw_any = true;
+1114 | |             total = total.saturating_add(value);
+1115 | |         }
+1116 | |     }
+     | |_____^
+     |
+help: try `.flatten()` and remove the `if let` statement in the for loop
+    --> src/observability.rs:1112:9
+     |
+1112 | /         if let Some(value) = value {
+1113 | |             saw_any = true;
+1114 | |             total = total.saturating_add(value);
+1115 | |         }
+     | |_________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
+     = note: `-D clippy::manual-flatten` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_flatten)]`
+help: try
+     |
+1111 ~     for value in values.into_iter().flatten() {
+1112 +         saw_any = true;
+1113 +         total = total.saturating_add(value);
+1114 +     }
+     |
+
+error: needless call to `as_bytes`
+    --> src/observability.rs:3380:9
+     |
+3380 |         body.as_bytes().len(),
+     |         ^^^^^^^^^^^^^^^^^^^^^ help: `len()` can be called directly on strings: `body.len()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_as_bytes
+     = note: `-D clippy::needless-as-bytes` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::needless_as_bytes)]`
+
+error: this `if` has identical blocks
+   --> src/runtime.rs:678:51
+    |
+678 |               result.outcome = if deleted_count > 0 {
+    |  ___________________________________________________^
+679 | |                 TenantPurgeOutcomeKindV1::Partial
+680 | |             } else {
+    | |_____________^
+    |
+note: same as this
+   --> src/runtime.rs:680:20
+    |
+680 |               } else {
+    |  ____________________^
+681 | |                 TenantPurgeOutcomeKindV1::Partial
+682 | |             };
+    | |_____________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#if_same_then_else
+    = note: `-D clippy::if-same-then-else` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::if_same_then_else)]`
+
+error: this returns a `Result<_, ()>`
+  --> src/tokenize/cef.rs:16:1
+   |
+16 | pub fn parse_cef_message_v1(msg: &str) -> Result<Option<CefParseResultV1>, ()> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use a custom `Error` type instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#result_unit_err
+   = note: `-D clippy::result-unit-err` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::result_unit_err)]`
+
+error: field assignment outside of initializer for an instance created with Default::default()
+  --> src/tokenize/cef.rs:25:5
+   |
+25 |     result.header_events = build_cef_header_events_v1(&fields);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `tokenize::cef::CefParseResultV1 { header_events: build_cef_header_events_v1(&fields), ..Default::default() }` and removing relevant reassignments
+  --> src/tokenize/cef.rs:24:5
+   |
+24 |     let mut result = CefParseResultV1::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+   = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: manual implementation of `.is_multiple_of()`
+   --> src/tokenize/cef.rs:189:12
+    |
+189 |         if backslashes % 2 == 0 {
+    |            ^^^^^^^^^^^^^^^^^^^^ help: replace with: `backslashes.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: could not compile `sparx` (lib) due to 30 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `sparx` (lib test) due to 30 previous errors
+exit_code=101
+
+$ cargo bench --bench tenant_device_eps
+   Compiling sparx v0.0.0 (/workspace/sparx)
+    Finished `bench` profile [optimized] target(s) in 2.30s
+     Running benches/tenant_device_eps.rs (target/release/deps/tenant_device_eps-5b607050718fb41b)
+sparx EPS benchmark failed: oneshot failed for tenant=tenant000 exit_code=6 stderr=oneshot partial failure
+tenant_id: tenant000
+- tenant000/edge000: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge001: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge002: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge003: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge004: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge005: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge006: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+- tenant000/edge007: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070910780, current_window_end_ts: 4070910840, next_window_start_ts: 4070908800 }
+
+error: bench failed, to rerun pass `--bench tenant_device_eps`
+
+Caused by:
+  process didn't exit successfully: `/workspace/sparx/target/release/deps/tenant_device_eps-5b607050718fb41b --bench` (exit status: 1)
+exit_code=1
+
+$ SPARX_BENCH_TENANTS=4 SPARX_BENCH_DEVICES_PER_TENANT=16 SPARX_BENCH_FILES_PER_DEVICE=2 SPARX_BENCH_EVENTS_PER_FILE=5000 cargo bench --bench tenant_device_eps
+    Finished `bench` profile [optimized] target(s) in 0.25s
+     Running benches/tenant_device_eps.rs (target/release/deps/tenant_device_eps-5b607050718fb41b)
+sparx EPS benchmark failed: oneshot failed for tenant=tenant000 exit_code=6 stderr=oneshot partial failure
+tenant_id: tenant000
+- tenant000/edge000: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge001: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge002: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge003: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge004: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge005: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge006: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge007: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge008: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge009: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge010: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge011: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge012: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge013: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge014: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+- tenant000/edge015: finalize and advance failed: InvalidNextWindowStart { current_window_start_ts: 4070913780, current_window_end_ts: 4070913840, next_window_start_ts: 4070908800 }
+
+error: bench failed, to rerun pass `--bench tenant_device_eps`
+
+Caused by:
+  process didn't exit successfully: `/workspace/sparx/target/release/deps/tenant_device_eps-5b607050718fb41b --bench` (exit status: 1)
+exit_code=1
+

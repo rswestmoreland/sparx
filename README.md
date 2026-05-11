@@ -147,9 +147,9 @@ subjects, source-stream-specific threshold knobs, heartbeat checks, maintenance
 calendars, cross-tenant outage correlation, and AlertV1 schema changes remain
 outside the v1 scope unless explicitly approved.
 
-Before v1 release, sparx still needs user-run Rust toolchain validation logs for
-formatting, build, tests, and clippy, followed by release packaging and operator
-documentation review.
+Before v1 release, sparx requires Rust 1.90 or newer (see `rust-toolchain.toml`) and
+user-run Rust toolchain validation logs for formatting, build, tests, clippy, and
+benchmarks, followed by release packaging and operator documentation review.
 
 ## Current hardening status
 
