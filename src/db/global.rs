@@ -466,10 +466,7 @@ impl GlobalDbV1 {
         Ok(out)
     }
 
-    pub fn list_tenant_record_keys_v1(
-        &self,
-        tenant_id: &str,
-    ) -> Result<RawKvPairsV1, DbErrorV1> {
+    pub fn list_tenant_record_keys_v1(&self, tenant_id: &str) -> Result<RawKvPairsV1, DbErrorV1> {
         let prefix = key_prefix_global_tenant_v1(tenant_id);
         self.scan_prefix_raw_v1(prefix.as_bytes())
     }
