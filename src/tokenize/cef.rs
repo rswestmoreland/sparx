@@ -36,7 +36,10 @@ pub fn parse_cef_message_v1(msg: &str) -> Result<Option<CefParseResultV1>, ()> {
 
     result.kv_events = pairs
         .into_iter()
-        .map(|(key_norm, value_raw)| TokenEventV1::Kv { key_norm, value_raw })
+        .map(|(key_norm, value_raw)| TokenEventV1::Kv {
+            key_norm,
+            value_raw,
+        })
         .collect();
     result.residual_text = residual_text;
     Ok(Some(result))
@@ -48,7 +51,11 @@ fn parse_cef_header_v1(msg: &str) -> Option<(Vec<String>, String)> {
     let mut escaped = false;
     let mut chars = msg.chars();
 
-    if chars.next() != Some('C') || chars.next() != Some('E') || chars.next() != Some('F') || chars.next() != Some(':') {
+    if chars.next() != Some('C')
+        || chars.next() != Some('E')
+        || chars.next() != Some('F')
+        || chars.next() != Some(':')
+    {
         return None;
     }
 
@@ -234,7 +241,9 @@ fn normalize_cef_key_v1(key: &str) -> String {
 fn strip_quotes_once_v1(value: &str) -> &str {
     if value.len() >= 2 {
         let bytes = value.as_bytes();
-        if (bytes[0] == b'"' && bytes[value.len() - 1] == b'"') || (bytes[0] == b'\'' && bytes[value.len() - 1] == b'\'') {
+        if (bytes[0] == b'"' && bytes[value.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[value.len() - 1] == b'\'')
+        {
             return &value[1..value.len() - 1];
         }
     }

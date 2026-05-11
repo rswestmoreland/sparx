@@ -170,7 +170,8 @@ fn invalid_gzip_surfaces_read_error() {
     let mut reader = GzipFileReaderV1::open_v1(&path, 0, 8).unwrap();
     let err = reader.read_chunk_v1().unwrap_err();
     assert!(
-        err.kind() == std::io::ErrorKind::InvalidData || err.kind() == std::io::ErrorKind::UnexpectedEof
+        err.kind() == std::io::ErrorKind::InvalidData
+            || err.kind() == std::io::ErrorKind::UnexpectedEof
     );
 
     fs::remove_dir_all(root).unwrap();

@@ -38,7 +38,9 @@ mod tests {
     fn stable_hash_hex128_is_lowercase_ascii_hex() {
         let h = stable_hash_hex128_v1("tenant01/device01");
         assert_eq!(h.len(), STABLE_HASH_HEX128_LEN_V1);
-        assert!(h.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+        assert!(h
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
     }
 
     #[test]

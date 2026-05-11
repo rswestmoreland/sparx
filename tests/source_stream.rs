@@ -19,7 +19,10 @@ fn source_stream_path_canonicalization_accepts_safe_relative_paths_v1() {
 
 #[test]
 fn source_stream_path_canonicalization_rejects_unsafe_paths_v1() {
-    assert_eq!(canonicalize_source_stream_path_v1("").unwrap_err(), SourceStreamErrorV1::EmptyPath);
+    assert_eq!(
+        canonicalize_source_stream_path_v1("").unwrap_err(),
+        SourceStreamErrorV1::EmptyPath
+    );
     assert_eq!(
         canonicalize_source_stream_path_v1("/var/log/auth.log").unwrap_err(),
         SourceStreamErrorV1::AbsolutePath
@@ -44,9 +47,12 @@ fn source_stream_path_canonicalization_rejects_unsafe_paths_v1() {
 
 #[test]
 fn source_stream_id_is_deterministic_and_not_feature_id_v1() {
-    let a = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log").unwrap();
-    let b = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var\\log\\auth.log").unwrap();
-    let c = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/messages").unwrap();
+    let a = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log")
+        .unwrap();
+    let b = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var\\log\\auth.log")
+        .unwrap();
+    let c = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/messages")
+        .unwrap();
 
     assert_eq!(a.source_stream_id, b.source_stream_id);
     assert_ne!(a.source_stream_id, c.source_stream_id);
@@ -60,12 +66,21 @@ fn source_stream_id_is_deterministic_and_not_feature_id_v1() {
 
 #[test]
 fn source_stream_catalog_roundtrips_variable_encoding_v1() {
-    let identity = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log").unwrap();
-    let catalog = source_stream_catalog_from_identity_v1(&identity, 1_700_000_000, 1_700_000_600).unwrap();
+    let identity =
+        source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log")
+            .unwrap();
+    let catalog =
+        source_stream_catalog_from_identity_v1(&identity, 1_700_000_000, 1_700_000_600).unwrap();
     let encoded = encode_source_stream_catalog_v1(&catalog).unwrap();
 
-    assert_eq!(encoded.len(), SOURCE_STREAM_CATALOG_V1_FIXED_LEN + 32 + 14 + 16);
-    assert_eq!(&encoded[0..2], &SOURCE_STREAM_SCHEMA_VERSION_V1.to_le_bytes());
+    assert_eq!(
+        encoded.len(),
+        SOURCE_STREAM_CATALOG_V1_FIXED_LEN + 32 + 14 + 16
+    );
+    assert_eq!(
+        &encoded[0..2],
+        &SOURCE_STREAM_SCHEMA_VERSION_V1.to_le_bytes()
+    );
     assert_eq!(encoded[2], SOURCE_STREAM_FLAG_ACTIVE_V1);
     assert_eq!(encoded[3], 0);
     assert_eq!(&encoded[4..6], &0u16.to_le_bytes());
@@ -79,7 +94,9 @@ fn source_stream_catalog_roundtrips_variable_encoding_v1() {
 
 #[test]
 fn source_stream_catalog_rejects_malformed_values_v1() {
-    let identity = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log").unwrap();
+    let identity =
+        source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log")
+            .unwrap();
     let catalog = source_stream_catalog_from_identity_v1(&identity, 10, 20).unwrap();
 
     let mut encoded = encode_source_stream_catalog_v1(&catalog).unwrap();
@@ -109,7 +126,9 @@ fn source_stream_catalog_rejects_malformed_values_v1() {
 
 #[test]
 fn source_stream_catalog_update_preserves_first_and_latest_seen_v1() {
-    let identity = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log").unwrap();
+    let identity =
+        source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log")
+            .unwrap();
     let initial = update_source_stream_catalog_observed_v1(None, &identity, 100).unwrap();
     let newer = update_source_stream_catalog_observed_v1(Some(&initial), &identity, 200).unwrap();
     let older = update_source_stream_catalog_observed_v1(Some(&newer), &identity, 50).unwrap();
@@ -120,14 +139,24 @@ fn source_stream_catalog_update_preserves_first_and_latest_seen_v1() {
 
 #[test]
 fn source_stream_stats_roundtrip_and_update_v1() {
-    let stats = update_source_stream_stats_from_observation_v1(None, 10, 1000, 1_700_000_000).unwrap();
-    let stats = update_source_stream_stats_from_observation_v1(Some(&stats), 20, 3000, 1_700_000_060).unwrap();
+    let stats =
+        update_source_stream_stats_from_observation_v1(None, 10, 1000, 1_700_000_000).unwrap();
+    let stats =
+        update_source_stream_stats_from_observation_v1(Some(&stats), 20, 3000, 1_700_000_060)
+            .unwrap();
 
     assert_eq!(stats.line_count.n, 2);
     assert_eq!(stats.line_count.mean, 15.0);
     assert_eq!(stats.byte_count.n, 2);
     assert_eq!(stats.byte_count.mean, 2000.0);
-    assert_eq!(stats.score_total, WelfordF64V1 { n: 0, mean: 0.0, m2: 0.0 });
+    assert_eq!(
+        stats.score_total,
+        WelfordF64V1 {
+            n: 0,
+            mean: 0.0,
+            m2: 0.0
+        }
+    );
     assert_eq!(stats.last_update_ts, 1_700_000_060);
 
     let encoded = encode_source_stream_stats_v1(&stats).unwrap();
@@ -146,7 +175,11 @@ fn source_stream_stats_rejects_wrong_length_and_reserved_score_v1() {
     );
 
     let mut stats = empty_source_stream_stats_v1(1);
-    stats.score_total = WelfordF64V1 { n: 1, mean: 1.0, m2: 0.0 };
+    stats.score_total = WelfordF64V1 {
+        n: 1,
+        mean: 1.0,
+        m2: 0.0,
+    };
     assert_eq!(
         encode_source_stream_stats_v1(&stats).unwrap_err(),
         SourceStreamErrorV1::InvalidReservedField {
@@ -156,9 +189,10 @@ fn source_stream_stats_rejects_wrong_length_and_reserved_score_v1() {
     );
 }
 
-
 fn sample_source_stream_subject_v1() -> SourceStreamSubjectV1 {
-    let identity = source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log").unwrap();
+    let identity =
+        source_stream_identity_from_path_v1("tenant-a", "device-key-001", "var/log/auth.log")
+            .unwrap();
     source_stream_subject_from_identity_v1(&identity)
 }
 
@@ -190,7 +224,11 @@ fn sample_source_stream_hard_silence_config_v1() -> VDropEvaluationConfigV1 {
     }
 }
 
-fn sample_source_stream_stats_for_drop_v1(mean_lines: f64, line_stddev: f64, n: u32) -> SourceStreamStatsV1 {
+fn sample_source_stream_stats_for_drop_v1(
+    mean_lines: f64,
+    line_stddev: f64,
+    n: u32,
+) -> SourceStreamStatsV1 {
     SourceStreamStatsV1 {
         line_count: WelfordF64V1 {
             n,
@@ -202,7 +240,11 @@ fn sample_source_stream_stats_for_drop_v1(mean_lines: f64, line_stddev: f64, n: 
             mean: mean_lines * 100.0,
             m2: line_stddev * line_stddev * 10_000.0 * f64::from(n.saturating_sub(1)),
         },
-        score_total: WelfordF64V1 { n: 0, mean: 0.0, m2: 0.0 },
+        score_total: WelfordF64V1 {
+            n: 0,
+            mean: 0.0,
+            m2: 0.0,
+        },
         last_update_ts: 1_700_000_000,
     }
 }
@@ -230,11 +272,17 @@ fn sample_source_stream_sharp_drop_config_v1() -> SharpDropEvaluationConfigV1 {
 }
 
 fn assert_source_close_f32_v1(actual: f32, expected: f32) {
-    assert!((actual - expected).abs() < 0.000_001, "actual={actual} expected={expected}");
+    assert!(
+        (actual - expected).abs() < 0.000_001,
+        "actual={actual} expected={expected}"
+    );
 }
 
 fn assert_source_close_f64_v1(actual: f64, expected: f64) {
-    assert!((actual - expected).abs() < 0.000_001, "actual={actual} expected={expected}");
+    assert!(
+        (actual - expected).abs() < 0.000_001,
+        "actual={actual} expected={expected}"
+    );
 }
 
 #[test]
@@ -255,7 +303,9 @@ fn source_stream_expected_volume_rejects_invalid_stats_without_panic_v1() {
 
     assert_eq!(
         sharp_drop_expected_volume_from_source_stream_stats_v1(&stats).unwrap_err(),
-        SourceStreamErrorV1::InvalidStatsField { field: "line_count" }
+        SourceStreamErrorV1::InvalidStatsField {
+            field: "line_count"
+        }
     );
 }
 
@@ -264,14 +314,21 @@ fn source_stream_hard_silence_evaluator_emits_full_drop_candidate_v1() {
     let subject = sample_source_stream_subject_v1();
     let state = sample_source_stream_expected_state_v1(12);
     let cfg = sample_source_stream_hard_silence_config_v1();
-    let eval = evaluate_source_stream_hard_silence_candidate_v1(&subject, Some(&state), None, &cfg).unwrap();
+    let eval = evaluate_source_stream_hard_silence_candidate_v1(&subject, Some(&state), None, &cfg)
+        .unwrap();
 
     let candidate = match eval {
         VDropEvaluationV1::Candidate(candidate) => candidate,
-        other => panic!("expected source-stream hard-silence candidate, got {:?}", other),
+        other => panic!(
+            "expected source-stream hard-silence candidate, got {:?}",
+            other
+        ),
     };
 
-    assert_eq!(candidate.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        candidate.subject_kind_u8,
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(candidate.subject_key, subject.source_stream_id.clone());
     assert_eq!(candidate.tenant_id, "tenant-a");
     assert_eq!(candidate.window_start_ts_i64, 1_700_000_060);
@@ -287,7 +344,10 @@ fn source_stream_hard_silence_evaluator_emits_full_drop_candidate_v1() {
             ("subject_kind".to_string(), "source_stream".to_string()),
             ("tenant_id".to_string(), "tenant-a".to_string()),
             ("device_key".to_string(), "device-key-001".to_string()),
-            ("source_stream_id".to_string(), candidate.subject_key.clone()),
+            (
+                "source_stream_id".to_string(),
+                candidate.subject_key.clone()
+            ),
             ("source_path".to_string(), "var/log/auth.log".to_string()),
             ("window_start_ts".to_string(), "1700000060".to_string()),
             ("window_end_ts".to_string(), "1700000180".to_string()),
@@ -308,7 +368,8 @@ fn source_stream_hard_silence_evaluator_suppresses_immature_or_wrong_subject_v1(
     let immature = sample_source_stream_expected_state_v1(2);
 
     assert_eq!(
-        evaluate_source_stream_hard_silence_candidate_v1(&subject, Some(&immature), None, &cfg).unwrap(),
+        evaluate_source_stream_hard_silence_candidate_v1(&subject, Some(&immature), None, &cfg)
+            .unwrap(),
         VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::NotMature {
             mature_windows_total: 2,
             min_mature_windows: 3,
@@ -318,8 +379,16 @@ fn source_stream_hard_silence_evaluator_suppresses_immature_or_wrong_subject_v1(
     let mut wrong_subject = sample_source_stream_expected_state_v1(12);
     wrong_subject.subject_kind_u8 = SILENCE_SUBJECT_KIND_DEVICE_V1;
     assert_eq!(
-        evaluate_source_stream_hard_silence_candidate_v1(&subject, Some(&wrong_subject), None, &cfg).unwrap(),
-        VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::InvalidSubjectKind(SILENCE_SUBJECT_KIND_DEVICE_V1))
+        evaluate_source_stream_hard_silence_candidate_v1(
+            &subject,
+            Some(&wrong_subject),
+            None,
+            &cfg
+        )
+        .unwrap(),
+        VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::InvalidSubjectKind(
+            SILENCE_SUBJECT_KIND_DEVICE_V1
+        ))
     );
 }
 
@@ -333,11 +402,20 @@ fn source_stream_sharp_drop_evaluator_emits_reduced_nonzero_candidate_v1() {
 
     let candidate = match eval {
         SharpDropEvaluationV1::Candidate(candidate) => candidate,
-        other => panic!("expected source-stream sharp-drop candidate, got {:?}", other),
+        other => panic!(
+            "expected source-stream sharp-drop candidate, got {:?}",
+            other
+        ),
     };
 
-    assert_eq!(candidate.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
-    assert_eq!(candidate.subject_key, current.subject.source_stream_id.clone());
+    assert_eq!(
+        candidate.subject_kind_u8,
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
+    assert_eq!(
+        candidate.subject_key,
+        current.subject.source_stream_id.clone()
+    );
     assert_eq!(candidate.tenant_id, "tenant-a");
     assert_source_close_f64_v1(candidate.expected_lines_f64, 100.0);
     assert_eq!(candidate.observed_lines_u64, 20);
@@ -347,12 +425,33 @@ fn source_stream_sharp_drop_evaluator_emits_reduced_nonzero_candidate_v1() {
     assert_source_close_f32_v1(candidate.line_stddevs_below_mean_f32.unwrap(), 8.0);
     assert_eq!(candidate.maturity_count_u32, 12);
     assert_eq!(candidate.bucket_u8, 8);
-    assert_eq!(candidate.reason_details[0], ("drop_kind".to_string(), "sharp_drop".to_string()));
-    assert_eq!(candidate.reason_details[1], ("subject_kind".to_string(), "source_stream".to_string()));
-    assert_eq!(candidate.reason_details[2], ("tenant_id".to_string(), "tenant-a".to_string()));
-    assert_eq!(candidate.reason_details[3], ("device_key".to_string(), "device-key-001".to_string()));
-    assert_eq!(candidate.reason_details[4], ("source_stream_id".to_string(), candidate.subject_key.clone()));
-    assert_eq!(candidate.reason_details[5], ("source_path".to_string(), "var/log/auth.log".to_string()));
+    assert_eq!(
+        candidate.reason_details[0],
+        ("drop_kind".to_string(), "sharp_drop".to_string())
+    );
+    assert_eq!(
+        candidate.reason_details[1],
+        ("subject_kind".to_string(), "source_stream".to_string())
+    );
+    assert_eq!(
+        candidate.reason_details[2],
+        ("tenant_id".to_string(), "tenant-a".to_string())
+    );
+    assert_eq!(
+        candidate.reason_details[3],
+        ("device_key".to_string(), "device-key-001".to_string())
+    );
+    assert_eq!(
+        candidate.reason_details[4],
+        (
+            "source_stream_id".to_string(),
+            candidate.subject_key.clone()
+        )
+    );
+    assert_eq!(
+        candidate.reason_details[5],
+        ("source_path".to_string(), "var/log/auth.log".to_string())
+    );
 }
 
 #[test]
@@ -362,13 +461,26 @@ fn source_stream_sharp_drop_evaluator_preserves_suppression_rules_v1() {
     let cfg = sample_source_stream_sharp_drop_config_v1();
 
     assert_eq!(
-        evaluate_source_stream_sharp_drop_candidate_v1(&sample_source_stream_current_window_v1(0), &expected, &cfg).unwrap(),
+        evaluate_source_stream_sharp_drop_candidate_v1(
+            &sample_source_stream_current_window_v1(0),
+            &expected,
+            &cfg
+        )
+        .unwrap(),
         SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::HardSilencePriority)
     );
 
-    let low_expected = sharp_drop_expected_volume_from_source_stream_stats_v1(&sample_source_stream_stats_for_drop_v1(20.0, 10.0, 12)).unwrap();
+    let low_expected = sharp_drop_expected_volume_from_source_stream_stats_v1(
+        &sample_source_stream_stats_for_drop_v1(20.0, 10.0, 12),
+    )
+    .unwrap();
     assert_eq!(
-        evaluate_source_stream_sharp_drop_candidate_v1(&sample_source_stream_current_window_v1(5), &low_expected, &cfg).unwrap(),
+        evaluate_source_stream_sharp_drop_candidate_v1(
+            &sample_source_stream_current_window_v1(5),
+            &low_expected,
+            &cfg
+        )
+        .unwrap(),
         SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::BelowExpectedLineFloor {
             expected_lines: 20.0,
             min_expected_lines: 25.0,
@@ -427,7 +539,10 @@ fn source_stream_open_state_helpers_create_and_suppress_matching_subject_v1() {
     )
     .unwrap();
     assert_eq!(hard_state.schema_version_u16, SILENCE_SCHEMA_VERSION_V1);
-    assert_eq!(hard_state.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        hard_state.subject_kind_u8,
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(hard_state.state_flags_u8, OPEN_SILENCE_FLAG_OPEN_V1);
     assert!(source_stream_open_silence_state_suppresses_candidate_v1(
         &subject,
@@ -444,7 +559,10 @@ fn source_stream_open_state_helpers_create_and_suppress_matching_subject_v1() {
     )
     .unwrap();
     assert_eq!(drop_state.schema_version_u16, SILENCE_SCHEMA_VERSION_V1);
-    assert_eq!(drop_state.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        drop_state.subject_kind_u8,
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(drop_state.state_flags_u8, OPEN_DROP_FLAG_OPEN_V1);
     assert!(source_stream_open_drop_state_suppresses_candidate_v1(
         &subject,

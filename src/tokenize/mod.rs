@@ -9,7 +9,10 @@ mod generic;
 mod syslog;
 
 pub use cef::parse_cef_message_v1;
-pub use generic::{tokenize_message_bytes_v1, tokenize_message_v1, CsvHeaderModeV1, TokenizeResultV1, TokenizeStatsV1};
+pub use generic::{
+    tokenize_message_bytes_v1, tokenize_message_v1, CsvHeaderModeV1, TokenizeResultV1,
+    TokenizeStatsV1,
+};
 pub use syslog::{parse_syslog_envelope_v1, peel_syslog_envelope_v1};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -35,10 +38,26 @@ pub struct ParsedLineV1 {
 // Token events emitted by the tokenizer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenEventV1 {
-    Kv { key_norm: String, value_raw: String },
-    JsonKv { key_path_norm: String, value_raw: String },
-    CsvKv { key_norm: String, value_raw: String },
-    Word { token_raw: String },
-    CefHeader { field: String, value: String },
-    ResidualText { text_raw: String },
+    Kv {
+        key_norm: String,
+        value_raw: String,
+    },
+    JsonKv {
+        key_path_norm: String,
+        value_raw: String,
+    },
+    CsvKv {
+        key_norm: String,
+        value_raw: String,
+    },
+    Word {
+        token_raw: String,
+    },
+    CefHeader {
+        field: String,
+        value: String,
+    },
+    ResidualText {
+        text_raw: String,
+    },
 }

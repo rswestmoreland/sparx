@@ -17,7 +17,6 @@ pub const MAX_TOKENS_PER_LINE_MAX_V1: u32 = 4096;
 pub const MAX_KV_PER_LINE_MAX_V1: u32 = 1024;
 pub const MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1: u32 = 1024;
 
-
 fn validate_socket_addr_v1(field: &str, value: &str) -> Result<(), ConfigErrorV1> {
     value
         .parse::<std::net::SocketAddr>()
@@ -26,7 +25,6 @@ fn validate_socket_addr_v1(field: &str, value: &str) -> Result<(), ConfigErrorV1
             msg: format!("invalid {}: {}", field, value),
         })
 }
-
 
 fn one_of(value: &str, allowed: &[&str]) -> bool {
     allowed.iter().any(|v| *v == value)
@@ -50,7 +48,6 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
         });
     }
 
-
     if cfg.ingest.read_chunk_bytes == 0 || cfg.ingest.read_chunk_bytes > READ_CHUNK_BYTES_MAX_V1 {
         return Err(ConfigErrorV1 {
             msg: format!(
@@ -69,7 +66,9 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
         });
     }
 
-    if cfg.ingest.max_tokens_per_line == 0 || cfg.ingest.max_tokens_per_line > MAX_TOKENS_PER_LINE_MAX_V1 {
+    if cfg.ingest.max_tokens_per_line == 0
+        || cfg.ingest.max_tokens_per_line > MAX_TOKENS_PER_LINE_MAX_V1
+    {
         return Err(ConfigErrorV1 {
             msg: format!(
                 "invalid ingest.max_tokens_per_line: {} (must be 1..={})",
@@ -107,13 +106,15 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
         });
     }
 
-
     if !cfg.scoring.outlier_threshold.is_finite()
         || cfg.scoring.outlier_threshold < 0.0
         || cfg.scoring.outlier_threshold > 1.0
     {
         return Err(ConfigErrorV1 {
-            msg: format!("invalid scoring.outlier_threshold: {}", cfg.scoring.outlier_threshold),
+            msg: format!(
+                "invalid scoring.outlier_threshold: {}",
+                cfg.scoring.outlier_threshold
+            ),
         });
     }
 
@@ -122,7 +123,10 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
         || cfg.scoring.noise_threshold > 1.0
     {
         return Err(ConfigErrorV1 {
-            msg: format!("invalid scoring.noise_threshold: {}", cfg.scoring.noise_threshold),
+            msg: format!(
+                "invalid scoring.noise_threshold: {}",
+                cfg.scoring.noise_threshold
+            ),
         });
     }
 
@@ -153,10 +157,7 @@ pub fn validate_config_v1(cfg: &ConfigV1) -> Result<(), ConfigErrorV1> {
 
     if cfg.output.spool_max_mb == 0 {
         return Err(ConfigErrorV1 {
-            msg: format!(
-                "invalid output.spool_max_mb: {}",
-                cfg.output.spool_max_mb
-            ),
+            msg: format!("invalid output.spool_max_mb: {}", cfg.output.spool_max_mb),
         });
     }
 

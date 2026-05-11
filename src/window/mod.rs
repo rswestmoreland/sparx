@@ -108,14 +108,21 @@ pub enum WindowApplyLineResultV1 {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WindowErrorV1 {
-    InvalidWindowSize { window_size_s: u32 },
-    InvalidWindowBounds { window_start_ts: UnixSec, window_end_ts: UnixSec },
+    InvalidWindowSize {
+        window_size_s: u32,
+    },
+    InvalidWindowBounds {
+        window_start_ts: UnixSec,
+        window_end_ts: UnixSec,
+    },
     MisalignedWindowStart {
         window_start_ts: UnixSec,
         aligned_window_start_ts: UnixSec,
         window_size_s: u32,
     },
-    InvalidTimestamp { ts: UnixSec },
+    InvalidTimestamp {
+        ts: UnixSec,
+    },
     ActiveMetaStartMismatch {
         active_window_start_ts: UnixSec,
         meta_window_start_ts: UnixSec,
@@ -125,8 +132,12 @@ pub enum WindowErrorV1 {
         current_window_end_ts: UnixSec,
         next_window_start_ts: UnixSec,
     },
-    WindowIdOverflow { current_window_id: u64 },
-    MissingFeatureString { feature_id: FeatureId },
+    WindowIdOverflow {
+        current_window_id: u64,
+    },
+    MissingFeatureString {
+        feature_id: FeatureId,
+    },
     FeatureDictionary(FeatureDictionaryErrorV1),
     OpenWindow(OpenWindowErrorV1),
 }
@@ -219,10 +230,11 @@ impl WindowAccumulatorV1 {
                 window_end_ts: meta.window_end_ts,
             });
         }
-        let window_size_s = u32::try_from(delta).map_err(|_| WindowErrorV1::InvalidWindowBounds {
-            window_start_ts: meta.window_start_ts,
-            window_end_ts: meta.window_end_ts,
-        })?;
+        let window_size_s =
+            u32::try_from(delta).map_err(|_| WindowErrorV1::InvalidWindowBounds {
+                window_start_ts: meta.window_start_ts,
+                window_end_ts: meta.window_end_ts,
+            })?;
         let mut counts = BTreeMap::new();
         let mut unique_features = 0u32;
         let mut unique_word_features = 0u32;
@@ -232,11 +244,11 @@ impl WindowAccumulatorV1 {
         for pair in feat_pairs {
             counts.insert(pair.feature_id, pair.count);
             unique_features = unique_features.saturating_add(1);
-            let feature_string = dict
-                .lookup_feature_string_v1(pair.feature_id)
-                .ok_or(WindowErrorV1::MissingFeatureString {
+            let feature_string = dict.lookup_feature_string_v1(pair.feature_id).ok_or(
+                WindowErrorV1::MissingFeatureString {
                     feature_id: pair.feature_id,
-                })?;
+                },
+            )?;
             match feature_cap_class_v1(feature_string) {
                 FeatureCapClassV1::Word => {
                     unique_word_features = unique_word_features.saturating_add(1);
@@ -317,7 +329,9 @@ impl WindowAccumulatorV1 {
     ) -> Result<WindowApplyLineResultV1, WindowErrorV1> {
         let line_window_start_ts = align_window_start_ts_v1(line_ts, self.window_size_s)?;
         if line_window_start_ts != self.meta.window_start_ts {
-            return Ok(WindowApplyLineResultV1::DifferentWindow { line_window_start_ts });
+            return Ok(WindowApplyLineResultV1::DifferentWindow {
+                line_window_start_ts,
+            });
         }
 
         let mut next = self.clone();
@@ -430,9 +444,9 @@ impl WindowAccumulatorV1 {
         for key in self.open_window_delete_keys_v1() {
             mutations.push(WindowFinalizeMutationV1::Delete(key));
         }
-        mutations.push(WindowFinalizeMutationV1::Delete(key_tenant_active_window_v1(
-            &self.device_key,
-        )));
+        mutations.push(WindowFinalizeMutationV1::Delete(
+            key_tenant_active_window_v1(&self.device_key),
+        ));
         WindowFinalizePlanV1 {
             finalized_row: self.finalized_row_v1(),
             mutations,
@@ -478,13 +492,13 @@ impl WindowAccumulatorV1 {
                 next_window_start_ts,
             });
         }
-        let next_window_id = self
-            .active
-            .active_window_id
-            .checked_add(1)
-            .ok_or(WindowErrorV1::WindowIdOverflow {
-                current_window_id: self.active.active_window_id,
-            })?;
+        let next_window_id =
+            self.active
+                .active_window_id
+                .checked_add(1)
+                .ok_or(WindowErrorV1::WindowIdOverflow {
+                    current_window_id: self.active.active_window_id,
+                })?;
         Self::new_v1(
             &self.device_key,
             next_window_start_ts,
@@ -590,7 +604,8 @@ fn feature_drop_counter_v1(feature: &str) -> DropCounterV1 {
 }
 
 fn is_categorized_shape_feature_v1(feature: &str) -> bool {
-    if feature.starts_with("k=") || feature.starts_with("canon=") || feature.starts_with("syslog_") {
+    if feature.starts_with("k=") || feature.starts_with("canon=") || feature.starts_with("syslog_")
+    {
         return false;
     }
     if feature.contains("_net@") {
@@ -607,11 +622,15 @@ pub fn align_window_start_ts_v1(ts: UnixSec, window_size_s: u32) -> Result<UnixS
     Ok(ts.div_euclid(width) * width)
 }
 
-pub fn bucket_for_window_start_ts_v1(window_start_ts: UnixSec) -> Result<BaselineBucket, WindowErrorV1> {
-    let dt = Utc
-        .timestamp_opt(window_start_ts, 0)
-        .single()
-        .ok_or(WindowErrorV1::InvalidTimestamp { ts: window_start_ts })?;
+pub fn bucket_for_window_start_ts_v1(
+    window_start_ts: UnixSec,
+) -> Result<BaselineBucket, WindowErrorV1> {
+    let dt =
+        Utc.timestamp_opt(window_start_ts, 0)
+            .single()
+            .ok_or(WindowErrorV1::InvalidTimestamp {
+                ts: window_start_ts,
+            })?;
     let weekend_group = match dt.weekday() {
         chrono::Weekday::Sat | chrono::Weekday::Sun => 1u8,
         _ => 0u8,

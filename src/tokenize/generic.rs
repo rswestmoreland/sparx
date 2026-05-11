@@ -44,7 +44,10 @@ pub struct TokenizeResultV1 {
     pub stats: TokenizeStatsV1,
 }
 
-pub fn tokenize_message_bytes_v1(msg_bytes: &[u8], csv_header_mode: Option<&CsvHeaderModeV1>) -> TokenizeResultV1 {
+pub fn tokenize_message_bytes_v1(
+    msg_bytes: &[u8],
+    csv_header_mode: Option<&CsvHeaderModeV1>,
+) -> TokenizeResultV1 {
     let mut stats = TokenizeStatsV1::default();
     let bytes = if msg_bytes.len() > MAX_LINE_LEN_V1 {
         stats.lines_too_long_total_delta = 1;
@@ -68,26 +71,41 @@ pub fn tokenize_message_bytes_v1(msg_bytes: &[u8], csv_header_mode: Option<&CsvH
     result
 }
 
-pub fn tokenize_message_v1(msg: &str, csv_header_mode: Option<&CsvHeaderModeV1>) -> TokenizeResultV1 {
+pub fn tokenize_message_v1(
+    msg: &str,
+    csv_header_mode: Option<&CsvHeaderModeV1>,
+) -> TokenizeResultV1 {
     let mut builder = EventBuilderV1::default();
     let trimmed = msg.trim();
 
     match try_tokenize_cef_v1(trimmed, &mut builder) {
         Ok(true) => {
-            return TokenizeResultV1 { msg: msg.to_string(), events: builder.events, stats: builder.stats };
+            return TokenizeResultV1 {
+                msg: msg.to_string(),
+                events: builder.events,
+                stats: builder.stats,
+            };
         }
         Ok(false) => {}
         Err(()) => {
             builder.stats.cef_parse_errors_total_delta = 1;
             emit_words_v1(msg, &mut builder, false);
-            return TokenizeResultV1 { msg: msg.to_string(), events: builder.events, stats: builder.stats };
+            return TokenizeResultV1 {
+                msg: msg.to_string(),
+                events: builder.events,
+                stats: builder.stats,
+            };
         }
     }
 
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         match try_tokenize_json_object_v1(trimmed, &mut builder) {
             Ok(true) => {
-                return TokenizeResultV1 { msg: msg.to_string(), events: builder.events, stats: builder.stats };
+                return TokenizeResultV1 {
+                    msg: msg.to_string(),
+                    events: builder.events,
+                    stats: builder.stats,
+                };
             }
             Ok(false) => {}
             Err(()) => {
@@ -98,7 +116,11 @@ pub fn tokenize_message_v1(msg: &str, csv_header_mode: Option<&CsvHeaderModeV1>)
 
     if let Some(csv_header_mode) = csv_header_mode {
         if try_tokenize_csv_row_v1(msg, csv_header_mode, &mut builder) {
-            return TokenizeResultV1 { msg: msg.to_string(), events: builder.events, stats: builder.stats };
+            return TokenizeResultV1 {
+                msg: msg.to_string(),
+                events: builder.events,
+                stats: builder.stats,
+            };
         }
     }
 
@@ -248,7 +270,13 @@ fn try_tokenize_json_object_v1(msg: &str, builder: &mut EventBuilderV1) -> Resul
     flatten_json_object_v1(&obj, &mut path, 1, &mut json_kv_count, &mut pairs);
 
     for (key_path_norm, value_raw) in pairs {
-        if !builder.push_kv_v1(TokenEventV1::JsonKv { key_path_norm, value_raw }, true) {
+        if !builder.push_kv_v1(
+            TokenEventV1::JsonKv {
+                key_path_norm,
+                value_raw,
+            },
+            true,
+        ) {
             break;
         }
     }
@@ -318,7 +346,10 @@ fn flatten_json_value_v1(
 fn is_json_scalar_v1(value: &serde_json::Value) -> bool {
     matches!(
         value,
-        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) | serde_json::Value::String(_)
+        serde_json::Value::Null
+            | serde_json::Value::Bool(_)
+            | serde_json::Value::Number(_)
+            | serde_json::Value::String(_)
     )
 }
 
@@ -326,7 +357,11 @@ fn json_scalar_to_string_v1(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Null => "null".to_string(),
         serde_json::Value::Bool(v) => {
-            if *v { "true".to_string() } else { "false".to_string() }
+            if *v {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
         }
         serde_json::Value::Number(v) => v.to_string(),
         serde_json::Value::String(v) => v.clone(),
@@ -334,7 +369,11 @@ fn json_scalar_to_string_v1(value: &serde_json::Value) -> String {
     }
 }
 
-fn try_tokenize_csv_row_v1(msg: &str, csv_header_mode: &CsvHeaderModeV1, builder: &mut EventBuilderV1) -> bool {
+fn try_tokenize_csv_row_v1(
+    msg: &str,
+    csv_header_mode: &CsvHeaderModeV1,
+    builder: &mut EventBuilderV1,
+) -> bool {
     if csv_header_mode.columns.is_empty() {
         return false;
     }
@@ -353,7 +392,11 @@ fn try_tokenize_csv_row_v1(msg: &str, csv_header_mode: &CsvHeaderModeV1, builder
         None => return false,
     };
 
-    let max_cols = csv_header_mode.columns.len().min(CSV_MAX_COLS_V1).min(CSV_MAX_KVS_V1);
+    let max_cols = csv_header_mode
+        .columns
+        .len()
+        .min(CSV_MAX_COLS_V1)
+        .min(CSV_MAX_KVS_V1);
     let row_len = record.len();
     if row_len != csv_header_mode.columns.len() {
         builder.stats.csv_parse_errors_total_delta = 1;
@@ -365,7 +408,13 @@ fn try_tokenize_csv_row_v1(msg: &str, csv_header_mode: &CsvHeaderModeV1, builder
             continue;
         }
         let value_raw = record.get(idx).unwrap_or("").to_string();
-        if !builder.push_kv_v1(TokenEventV1::CsvKv { key_norm, value_raw }, false) {
+        if !builder.push_kv_v1(
+            TokenEventV1::CsvKv {
+                key_norm,
+                value_raw,
+            },
+            false,
+        ) {
             break;
         }
     }
@@ -435,10 +484,20 @@ fn tokenize_generic_kv_v1(msg: &str, builder: &mut EventBuilderV1) -> bool {
             residuals.push(msg[residual_start..key_start].to_string());
         }
 
-        if builder.push_kv_v1(TokenEventV1::Kv { key_norm, value_raw: parsed_value.value_raw.clone() }, false) {
+        if builder.push_kv_v1(
+            TokenEventV1::Kv {
+                key_norm,
+                value_raw: parsed_value.value_raw.clone(),
+            },
+            false,
+        ) {
             found_any = true;
         }
-        if parsed_value.was_quoted && parsed_value.value_raw.contains(|ch: char| ch.is_ascii_whitespace()) {
+        if parsed_value.was_quoted
+            && parsed_value
+                .value_raw
+                .contains(|ch: char| ch.is_ascii_whitespace())
+        {
             quoted_texts.push(parsed_value.value_raw.clone());
         }
 
@@ -477,12 +536,20 @@ fn parse_value_v1(msg: &str, value_start: usize) -> ParsedValueV1 {
 
     if first == b'"' || first == b'\'' {
         let (value_raw, end_idx) = parse_quoted_value_v1(msg, value_start, first);
-        return ParsedValueV1 { value_raw, next_index: end_idx, was_quoted: true };
+        return ParsedValueV1 {
+            value_raw,
+            next_index: end_idx,
+            was_quoted: true,
+        };
     }
 
     if matches!(first, b'[' | b'{' | b'(') {
         if let Some((value_raw, end_idx)) = parse_bracketed_value_v1(msg, value_start) {
-            return ParsedValueV1 { value_raw, next_index: end_idx, was_quoted: false };
+            return ParsedValueV1 {
+                value_raw,
+                next_index: end_idx,
+                was_quoted: false,
+            };
         }
     }
 
@@ -500,7 +567,11 @@ fn parse_value_v1(msg: &str, value_start: usize) -> ParsedValueV1 {
             value_raw.pop();
         }
     }
-    ParsedValueV1 { value_raw, next_index: end, was_quoted: false }
+    ParsedValueV1 {
+        value_raw,
+        next_index: end,
+        was_quoted: false,
+    }
 }
 
 fn parse_quoted_value_v1(msg: &str, value_start: usize, quote: u8) -> (String, usize) {
@@ -610,7 +681,16 @@ fn emit_words_v1(text: &str, builder: &mut EventBuilderV1, from_quoted_value: bo
 }
 
 fn push_word_slice_v1(raw: &str, builder: &mut EventBuilderV1, from_quoted_value: bool) {
-    let trimmed = raw.trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_' && ch != '.' && ch != '-' && ch != '/' && ch != ':' && ch != '@' && ch != '\\');
+    let trimmed = raw.trim_matches(|ch: char| {
+        !ch.is_ascii_alphanumeric()
+            && ch != '_'
+            && ch != '.'
+            && ch != '-'
+            && ch != '/'
+            && ch != ':'
+            && ch != '@'
+            && ch != '\\'
+    });
     if trimmed.len() < MIN_WORD_LEN_V1 {
         return;
     }
@@ -652,7 +732,10 @@ fn is_key_boundary_prev_v1(bytes: &[u8], idx: usize) -> bool {
     if idx == 0 {
         return true;
     }
-    matches!(bytes[idx - 1], b' ' | b'\t' | b'\n' | b'\r' | b';' | b',' | b'(' | b'[' | b'{' )
+    matches!(
+        bytes[idx - 1],
+        b' ' | b'\t' | b'\n' | b'\r' | b';' | b',' | b'(' | b'[' | b'{'
+    )
 }
 
 fn is_key_char_v1(b: u8) -> bool {
@@ -678,7 +761,11 @@ fn colon_is_kv_separator_v1(msg: &str, key_start: usize, key_end: usize) -> bool
     if next + 1 < bytes.len() && bytes[next] == b'/' && bytes[next + 1] == b'/' {
         return false;
     }
-    if key.len() == 1 && key.as_bytes()[0].is_ascii_alphabetic() && next < bytes.len() && matches!(bytes[next], b'\\' | b'/') {
+    if key.len() == 1
+        && key.as_bytes()[0].is_ascii_alphabetic()
+        && next < bytes.len()
+        && matches!(bytes[next], b'\\' | b'/')
+    {
         return false;
     }
     true

@@ -91,7 +91,12 @@ fn row(
     }
 }
 
-fn baseline(window_start_ts: i64, n_bucket: u32, df: &[(u32, u32)], centroid: &[(u32, f32)]) -> BucketBaselineV1 {
+fn baseline(
+    window_start_ts: i64,
+    n_bucket: u32,
+    df: &[(u32, u32)],
+    centroid: &[(u32, f32)],
+) -> BucketBaselineV1 {
     BucketBaselineV1 {
         bucket: bucket_for_window_start_ts_v1(window_start_ts).unwrap(),
         n_bucket,
@@ -149,12 +154,44 @@ fn rarity_normalization_is_invariant_to_uniform_row_scaling() {
         .single()
         .unwrap()
         .timestamp();
-    let row_small = row(start, &[(1, 1), (6, 1)], 5, 100, EntitySketchSnapshotV1::default());
-    let row_large = row(start, &[(1, 10), (6, 10)], 5, 100, EntitySketchSnapshotV1::default());
+    let row_small = row(
+        start,
+        &[(1, 1), (6, 1)],
+        5,
+        100,
+        EntitySketchSnapshotV1::default(),
+    );
+    let row_large = row(
+        start,
+        &[(1, 10), (6, 10)],
+        5,
+        100,
+        EntitySketchSnapshotV1::default(),
+    );
     let base = baseline(start, 100, &[(1, 1), (6, 1)], &[]);
 
-    let small = build_alert_v1("acme", "tenant/acme/dev01", &row_small, &dict(), &base, None, &cfg(), &[]).unwrap();
-    let large = build_alert_v1("acme", "tenant/acme/dev01", &row_large, &dict(), &base, None, &cfg(), &[]).unwrap();
+    let small = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row_small,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &[],
+    )
+    .unwrap();
+    let large = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row_large,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &[],
+    )
+    .unwrap();
 
     approx_eq_f32(small.rarity, large.rarity);
 }
@@ -166,12 +203,33 @@ fn drift_is_near_zero_when_weighted_row_matches_centroid() {
         .single()
         .unwrap()
         .timestamp();
-    let row = row(start, &[(1, 1), (6, 2)], 5, 100, EntitySketchSnapshotV1::default());
+    let row = row(
+        start,
+        &[(1, 1), (6, 2)],
+        5,
+        100,
+        EntitySketchSnapshotV1::default(),
+    );
     let tf_shape = 1.0_f64.ln_1p() as f32;
     let tf_word = (0.3_f64 * 2.0_f64.ln_1p()) as f32;
-    let base = baseline(start, 100, &[(1, 10), (6, 10)], &[(1, tf_shape), (6, tf_word)]);
+    let base = baseline(
+        start,
+        100,
+        &[(1, 10), (6, 10)],
+        &[(1, tf_shape), (6, tf_word)],
+    );
 
-    let result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, None, &cfg(), &[]).unwrap();
+    let result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &[],
+    )
+    .unwrap();
 
     assert!(result.drift <= 0.0001, "drift={}", result.drift);
 }
@@ -183,7 +241,13 @@ fn volume_extreme_in_cold_start_emits_info() {
         .single()
         .unwrap()
         .timestamp();
-    let row = row(start, &[(6, 1)], 500, 50000, EntitySketchSnapshotV1::default());
+    let row = row(
+        start,
+        &[(6, 1)],
+        500,
+        50000,
+        EntitySketchSnapshotV1::default(),
+    );
     let base = baseline(start, 0, &[], &[]);
     let current_stats = stats(10.0, 25.0, 1000.0, 250000.0, 10);
 
@@ -223,7 +287,17 @@ fn cold_start_suppresses_outlier_and_keeps_info_only() {
     let row = row(start, &[(5, 3)], 20, 1000, snapshot);
     let base = baseline(start, 10, &[(5, 0)], &[(5, -0.1)]);
 
-    let result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, None, &cfg(), &[]).unwrap();
+    let result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &[],
+    )
+    .unwrap();
 
     assert!(result.cold_start);
     let alert = result.alert.unwrap();
@@ -240,12 +314,29 @@ fn blob_ratio_can_drive_noise_suspect_without_entity_focus() {
     let row = row(start, &[(7, 3)], 10, 100, EntitySketchSnapshotV1::default());
     let base = baseline(start, 120, &[(7, 0)], &[(7, -0.01)]);
 
-    let result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, None, &cfg(), &[]).unwrap();
+    let result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &[],
+    )
+    .unwrap();
 
-    assert!(result.blob_ratio >= 0.60, "blob_ratio={}", result.blob_ratio);
+    assert!(
+        result.blob_ratio >= 0.60,
+        "blob_ratio={}",
+        result.blob_ratio
+    );
     let alert = result.alert.unwrap();
     assert_eq!(alert.label, LabelV1::NoiseSuspect);
-    assert!(alert.reasons.iter().any(|reason| reason.code == "N_HIGH_CARDINALITY"));
+    assert!(alert
+        .reasons
+        .iter()
+        .any(|reason| reason.code == "N_HIGH_CARDINALITY"));
 }
 
 #[test]
@@ -299,8 +390,28 @@ fn top_features_alert_id_entities_and_postcard_roundtrip_are_deterministic() {
         },
     ];
 
-    let first = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, None, &cfg(), &provenance).unwrap();
-    let second = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, None, &cfg(), &provenance).unwrap();
+    let first = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &provenance,
+    )
+    .unwrap();
+    let second = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        None,
+        &cfg(),
+        &provenance,
+    )
+    .unwrap();
     let first_alert = first.alert.unwrap();
     let second_alert = second.alert.unwrap();
 
@@ -342,14 +453,33 @@ fn outlier_reasons_include_new_feature_drift_and_entity_focus() {
     let base = baseline(start, 200, &[(5, 0)], &[(5, -0.5)]);
 
     let outlier_stats = stats(10.0, 9.0, 100.0, 2500.0, 10);
-    let result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, Some(&outlier_stats), &cfg(), &[]).unwrap();
+    let result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        Some(&outlier_stats),
+        &cfg(),
+        &[],
+    )
+    .unwrap();
     let alert = result.alert.unwrap();
 
     assert_eq!(alert.label, LabelV1::Outlier);
     assert_eq!(alert.confidence, ConfidenceV1::High);
-    assert!(alert.reasons.iter().any(|reason| reason.code == "R_NEW_FEATURE"));
-    assert!(alert.reasons.iter().any(|reason| reason.code == "D_HIGH_DRIFT"));
-    assert!(alert.reasons.iter().any(|reason| reason.code == "O_ENTITY_FOCUSED"));
+    assert!(alert
+        .reasons
+        .iter()
+        .any(|reason| reason.code == "R_NEW_FEATURE"));
+    assert!(alert
+        .reasons
+        .iter()
+        .any(|reason| reason.code == "D_HIGH_DRIFT"));
+    assert!(alert
+        .reasons
+        .iter()
+        .any(|reason| reason.code == "O_ENTITY_FOCUSED"));
     assert_eq!(alert.top_features[0].family, FeatureFamilyV1::Shape);
 }
 
@@ -366,8 +496,28 @@ fn cold_start_days_activate_day_based_bucket_floor() {
     let immature = baseline(start, 119, &[(6, 2)], &[(6, 0.15)]);
     let mature = baseline(start, 120, &[(6, 2)], &[(6, 0.15)]);
 
-    let immature_result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &immature, None, &cfg, &[]).unwrap();
-    let mature_result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &mature, None, &cfg, &[]).unwrap();
+    let immature_result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &immature,
+        None,
+        &cfg,
+        &[],
+    )
+    .unwrap();
+    let mature_result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &mature,
+        None,
+        &cfg,
+        &[],
+    )
+    .unwrap();
 
     assert!(immature_result.cold_start);
     assert!(!mature_result.cold_start);
@@ -391,20 +541,38 @@ fn min_lines_per_window_suppresses_alert_but_keeps_score_preview() {
     let base = baseline(start, 200, &[(5, 0)], &[(5, -0.5)]);
     let outlier_stats = stats(10.0, 9.0, 100.0, 2500.0, 10);
 
-    let result = build_alert_v1("acme", "tenant/acme/dev01", &row, &dict(), &base, Some(&outlier_stats), &cfg(), &[]).unwrap();
+    let result = build_alert_v1(
+        "acme",
+        "tenant/acme/dev01",
+        &row,
+        &dict(),
+        &base,
+        Some(&outlier_stats),
+        &cfg(),
+        &[],
+    )
+    .unwrap();
 
     assert!(result.below_min_lines);
-    assert!(result.score_total >= 0.60, "score_total={}", result.score_total);
+    assert!(
+        result.score_total >= 0.60,
+        "score_total={}",
+        result.score_total
+    );
     assert!(result.alert.is_none());
     assert!(result.primary_put.is_none());
 }
 
-fn sample_vdrop_candidate(subject_kind_u8: u8, subject_key: &str) -> sparx::db::silence::VDropCandidateV1 {
-    let subject_kind_label = if subject_kind_u8 == sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1 {
-        "device"
-    } else {
-        "tenant"
-    };
+fn sample_vdrop_candidate(
+    subject_kind_u8: u8,
+    subject_key: &str,
+) -> sparx::db::silence::VDropCandidateV1 {
+    let subject_kind_label =
+        if subject_kind_u8 == sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1 {
+            "device"
+        } else {
+            "tenant"
+        };
     let mut reason_details = vec![
         ("subject_kind".to_string(), subject_kind_label.to_string()),
         ("tenant_id".to_string(), "tenant-a".to_string()),
@@ -439,19 +607,28 @@ fn sample_vdrop_candidate(subject_kind_u8: u8, subject_key: &str) -> sparx::db::
 }
 
 fn is_lower_hex_128(value: &str) -> bool {
-    value.len() == 32 && value.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 #[test]
 fn vdrop_alert_construction_is_deterministic_and_empty_provenance() {
-    let candidate = sample_vdrop_candidate(sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1, "device-a");
+    let candidate = sample_vdrop_candidate(
+        sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1,
+        "device-a",
+    );
     let first = sparx::alert::build_vdrop_alert_v1(&candidate).unwrap();
     let second = sparx::alert::build_vdrop_alert_v1(&candidate).unwrap();
 
     assert_eq!(first, second);
     assert!(is_lower_hex_128(&first.alert.alert_id));
     assert!(is_lower_hex_128(&first.alert.signature));
-    assert_eq!(first.alert.schema_version, sparx::alert::ALERT_SCHEMA_VERSION_V1);
+    assert_eq!(
+        first.alert.schema_version,
+        sparx::alert::ALERT_SCHEMA_VERSION_V1
+    );
     assert_eq!(first.alert.tenant_id, "tenant-a");
     assert_eq!(first.alert.device_key, "device-a");
     assert_eq!(first.alert.device_path, "device-a");
@@ -471,46 +648,86 @@ fn vdrop_alert_construction_is_deterministic_and_empty_provenance() {
     assert!(first.alert.top_features.is_empty());
     assert!(first.alert.provenance.is_empty());
     assert_eq!(first.alert.reasons.len(), 1);
-    assert_eq!(first.alert.reasons[0].code, sparx::alert::VDROP_REASON_CODE_V1);
+    assert_eq!(
+        first.alert.reasons[0].code,
+        sparx::alert::VDROP_REASON_CODE_V1
+    );
     assert_eq!(first.alert.reasons[0].details, candidate.reason_details);
 
-    assert_eq!(s(&first.primary_put.key), s(&key_tenant_alert_v1(&first.alert.alert_id)));
-    assert_eq!(decode_alert_v1(&first.primary_put.value).unwrap(), first.alert);
-    assert_eq!(first.open_silence.schema_version_u16, sparx::db::silence::SILENCE_SCHEMA_VERSION_V1);
-    assert_eq!(first.open_silence.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1);
-    assert_eq!(first.open_silence.state_flags_u8, sparx::db::silence::OPEN_SILENCE_FLAG_OPEN_V1);
-    assert_eq!(first.open_silence.silence_start_ts_i64, candidate.window_start_ts_i64);
-    assert_eq!(first.open_silence.last_alert_window_end_ts_i64, candidate.window_end_ts_i64);
+    assert_eq!(
+        s(&first.primary_put.key),
+        s(&key_tenant_alert_v1(&first.alert.alert_id))
+    );
+    assert_eq!(
+        decode_alert_v1(&first.primary_put.value).unwrap(),
+        first.alert
+    );
+    assert_eq!(
+        first.open_silence.schema_version_u16,
+        sparx::db::silence::SILENCE_SCHEMA_VERSION_V1
+    );
+    assert_eq!(
+        first.open_silence.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1
+    );
+    assert_eq!(
+        first.open_silence.state_flags_u8,
+        sparx::db::silence::OPEN_SILENCE_FLAG_OPEN_V1
+    );
+    assert_eq!(
+        first.open_silence.silence_start_ts_i64,
+        candidate.window_start_ts_i64
+    );
+    assert_eq!(
+        first.open_silence.last_alert_window_end_ts_i64,
+        candidate.window_end_ts_i64
+    );
     assert_eq!(first.open_silence.last_alert_id, first.alert.alert_id);
 }
 
 #[test]
 fn vdrop_alert_construction_maps_tenant_aggregate_to_sentinel_device_key() {
-    let candidate = sample_vdrop_candidate(sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1, "tenant-a");
+    let candidate = sample_vdrop_candidate(
+        sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1,
+        "tenant-a",
+    );
     let result = sparx::alert::build_vdrop_alert_v1(&candidate).unwrap();
 
-    assert_eq!(result.alert.device_key, sparx::alert::VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1);
+    assert_eq!(
+        result.alert.device_key,
+        sparx::alert::VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1
+    );
     assert_eq!(result.alert.device_path, "tenant:tenant-a");
-    assert_eq!(result.alert.reasons[0].details[0], ("subject_kind".to_string(), "tenant".to_string()));
-    assert!(!result
-        .alert
-        .reasons[0]
+    assert_eq!(
+        result.alert.reasons[0].details[0],
+        ("subject_kind".to_string(), "tenant".to_string())
+    );
+    assert!(!result.alert.reasons[0]
         .details
         .iter()
         .any(|(key, _)| key == "device_key"));
-    assert_eq!(result.open_silence.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1);
+    assert_eq!(
+        result.open_silence.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1
+    );
 }
 
 #[test]
 fn vdrop_alert_construction_rejects_invalid_candidates() {
-    let mut candidate = sample_vdrop_candidate(sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1, "device-a");
+    let mut candidate = sample_vdrop_candidate(
+        sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1,
+        "device-a",
+    );
     candidate.subject_kind_u8 = 99;
     assert!(matches!(
         sparx::alert::build_vdrop_alert_v1(&candidate).unwrap_err(),
         sparx::alert::AlertErrorV1::InvalidVDropCandidate { .. }
     ));
 
-    let mut candidate = sample_vdrop_candidate(sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1, "device-a");
+    let mut candidate = sample_vdrop_candidate(
+        sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1,
+        "device-a",
+    );
     candidate.drop_ratio_f32 = f32::NAN;
     assert!(matches!(
         sparx::alert::build_vdrop_alert_v1(&candidate).unwrap_err(),
@@ -518,7 +735,10 @@ fn vdrop_alert_construction_rejects_invalid_candidates() {
     ));
 }
 
-fn sample_sharp_drop_candidate(subject_kind_u8: u8, subject_key: &str) -> sparx::db::silence::SharpDropCandidateV1 {
+fn sample_sharp_drop_candidate(
+    subject_kind_u8: u8,
+    subject_key: &str,
+) -> sparx::db::silence::SharpDropCandidateV1 {
     let mut reason_details = vec![
         ("drop_kind".to_string(), "sharp_drop".to_string()),
         (
@@ -540,15 +760,24 @@ fn sample_sharp_drop_candidate(subject_kind_u8: u8, subject_key: &str) -> sparx:
         ("bucket".to_string(), "8".to_string()),
         ("expected_lines".to_string(), "100.000000".to_string()),
         ("observed_lines".to_string(), "20".to_string()),
-        ("observed_expected_ratio".to_string(), "0.200000".to_string()),
+        (
+            "observed_expected_ratio".to_string(),
+            "0.200000".to_string(),
+        ),
         ("drop_ratio".to_string(), "0.800000".to_string()),
         ("baseline_n".to_string(), "12".to_string()),
         ("baseline_mean_lines".to_string(), "100.000000".to_string()),
         ("baseline_stddev_lines".to_string(), "10.000000".to_string()),
         ("z_drop".to_string(), "8.000000".to_string()),
-        ("max_observed_expected_ratio".to_string(), "0.250000".to_string()),
+        (
+            "max_observed_expected_ratio".to_string(),
+            "0.250000".to_string(),
+        ),
         ("min_drop_ratio".to_string(), "0.750000".to_string()),
-        ("min_absolute_drop_lines".to_string(), "25.000000".to_string()),
+        (
+            "min_absolute_drop_lines".to_string(),
+            "25.000000".to_string(),
+        ),
         ("expected_bytes".to_string(), "10000.000000".to_string()),
         ("observed_bytes".to_string(), "2000".to_string()),
         ("absolute_drop_lines".to_string(), "80.000000".to_string()),
@@ -591,14 +820,20 @@ fn sharp_drop_alert_construction_is_deterministic_and_preserves_device_provenanc
         sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1,
         "device-a",
     );
-    let provenance = vec![sample_file_span("b.log", 200), sample_file_span("a.log", 100)];
+    let provenance = vec![
+        sample_file_span("b.log", 200),
+        sample_file_span("a.log", 100),
+    ];
     let first = sparx::alert::build_sharp_drop_alert_v1(&candidate, &provenance).unwrap();
     let second = sparx::alert::build_sharp_drop_alert_v1(&candidate, &provenance).unwrap();
 
     assert_eq!(first, second);
     assert!(is_lower_hex_128(&first.alert.alert_id));
     assert!(is_lower_hex_128(&first.alert.signature));
-    assert_eq!(first.alert.schema_version, sparx::alert::ALERT_SCHEMA_VERSION_V1);
+    assert_eq!(
+        first.alert.schema_version,
+        sparx::alert::ALERT_SCHEMA_VERSION_V1
+    );
     assert_eq!(first.alert.tenant_id, "tenant-a");
     assert_eq!(first.alert.device_key, "device-a");
     assert_eq!(first.alert.device_path, "device-a");
@@ -620,23 +855,50 @@ fn sharp_drop_alert_construction_is_deterministic_and_preserves_device_provenanc
     assert_eq!(first.alert.provenance[0].file_rel, "a.log");
     assert_eq!(first.alert.provenance[1].file_rel, "b.log");
     assert_eq!(first.alert.reasons.len(), 1);
-    assert_eq!(first.alert.reasons[0].code, sparx::alert::VDROP_REASON_CODE_V1);
+    assert_eq!(
+        first.alert.reasons[0].code,
+        sparx::alert::VDROP_REASON_CODE_V1
+    );
     assert_eq!(
         first.alert.reasons[0].msg,
         "log volume dropped sharply but did not stop for this subject"
     );
     assert_eq!(first.alert.reasons[0].details, candidate.reason_details);
-    assert_eq!(first.alert.reasons[0].details[0], ("drop_kind".to_string(), "sharp_drop".to_string()));
+    assert_eq!(
+        first.alert.reasons[0].details[0],
+        ("drop_kind".to_string(), "sharp_drop".to_string())
+    );
     assert!(first.alert.summary_analyst.contains("sharp_drop"));
     assert!(first.alert.summary_customer.contains("dropped sharply"));
 
-    assert_eq!(s(&first.primary_put.key), s(&key_tenant_alert_v1(&first.alert.alert_id)));
-    assert_eq!(decode_alert_v1(&first.primary_put.value).unwrap(), first.alert);
-    assert_eq!(first.open_drop.schema_version_u16, sparx::db::silence::SILENCE_SCHEMA_VERSION_V1);
-    assert_eq!(first.open_drop.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1);
-    assert_eq!(first.open_drop.state_flags_u8, sparx::db::silence::OPEN_DROP_FLAG_OPEN_V1);
-    assert_eq!(first.open_drop.drop_start_ts_i64, candidate.window_start_ts_i64);
-    assert_eq!(first.open_drop.last_alert_window_end_ts_i64, candidate.window_end_ts_i64);
+    assert_eq!(
+        s(&first.primary_put.key),
+        s(&key_tenant_alert_v1(&first.alert.alert_id))
+    );
+    assert_eq!(
+        decode_alert_v1(&first.primary_put.value).unwrap(),
+        first.alert
+    );
+    assert_eq!(
+        first.open_drop.schema_version_u16,
+        sparx::db::silence::SILENCE_SCHEMA_VERSION_V1
+    );
+    assert_eq!(
+        first.open_drop.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_DEVICE_V1
+    );
+    assert_eq!(
+        first.open_drop.state_flags_u8,
+        sparx::db::silence::OPEN_DROP_FLAG_OPEN_V1
+    );
+    assert_eq!(
+        first.open_drop.drop_start_ts_i64,
+        candidate.window_start_ts_i64
+    );
+    assert_eq!(
+        first.open_drop.last_alert_window_end_ts_i64,
+        candidate.window_end_ts_i64
+    );
     assert_eq!(first.open_drop.last_alert_id, first.alert.alert_id);
 }
 
@@ -649,13 +911,17 @@ fn sharp_drop_alert_construction_maps_tenant_aggregate_to_sentinel_and_empty_pro
     let provenance = vec![sample_file_span("tenant-source.log", 0)];
     let result = sparx::alert::build_sharp_drop_alert_v1(&candidate, &provenance).unwrap();
 
-    assert_eq!(result.alert.device_key, sparx::alert::VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1);
+    assert_eq!(
+        result.alert.device_key,
+        sparx::alert::VDROP_TENANT_AGGREGATE_DEVICE_KEY_V1
+    );
     assert_eq!(result.alert.device_path, "tenant:tenant-a");
     assert!(result.alert.provenance.is_empty());
-    assert_eq!(result.open_drop.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1);
-    assert!(!result
-        .alert
-        .reasons[0]
+    assert_eq!(
+        result.open_drop.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_TENANT_V1
+    );
+    assert!(!result.alert.reasons[0]
         .details
         .iter()
         .any(|(key, _)| key == "device_key"));
@@ -678,8 +944,14 @@ fn sharp_drop_alert_id_does_not_collide_with_hard_silence_vdrop() {
     let hard_alert = sparx::alert::build_vdrop_alert_v1(&hard).unwrap();
 
     assert_ne!(sharp_alert.alert.alert_id, hard_alert.alert.alert_id);
-    assert_eq!(sharp_alert.alert.reasons[0].details[0], ("drop_kind".to_string(), "sharp_drop".to_string()));
-    assert_ne!(hard_alert.alert.reasons[0].details.first().unwrap().0, "drop_kind");
+    assert_eq!(
+        sharp_alert.alert.reasons[0].details[0],
+        ("drop_kind".to_string(), "sharp_drop".to_string())
+    );
+    assert_ne!(
+        hard_alert.alert.reasons[0].details.first().unwrap().0,
+        "drop_kind"
+    );
 }
 
 #[test]
@@ -776,15 +1048,24 @@ fn sample_source_stream_sharp_drop_candidate_v1() -> sparx::db::silence::SharpDr
             ("bucket".to_string(), "8".to_string()),
             ("expected_lines".to_string(), "100.000000".to_string()),
             ("observed_lines".to_string(), "20".to_string()),
-            ("observed_expected_ratio".to_string(), "0.200000".to_string()),
+            (
+                "observed_expected_ratio".to_string(),
+                "0.200000".to_string(),
+            ),
             ("drop_ratio".to_string(), "0.800000".to_string()),
             ("baseline_n".to_string(), "12".to_string()),
             ("baseline_mean_lines".to_string(), "100.000000".to_string()),
             ("baseline_stddev_lines".to_string(), "10.000000".to_string()),
             ("z_drop".to_string(), "8.000000".to_string()),
-            ("max_observed_expected_ratio".to_string(), "0.250000".to_string()),
+            (
+                "max_observed_expected_ratio".to_string(),
+                "0.250000".to_string(),
+            ),
             ("min_drop_ratio".to_string(), "0.750000".to_string()),
-            ("min_absolute_drop_lines".to_string(), "25.000000".to_string()),
+            (
+                "min_absolute_drop_lines".to_string(),
+                "25.000000".to_string(),
+            ),
             ("expected_bytes".to_string(), "10000.000000".to_string()),
             ("observed_bytes".to_string(), "2000".to_string()),
             ("absolute_drop_lines".to_string(), "80.000000".to_string()),
@@ -803,12 +1084,18 @@ fn source_stream_vdrop_alert_construction_is_deterministic_and_runtime_inactive_
     assert!(is_lower_hex_128(&first.alert.alert_id));
     assert!(is_lower_hex_128(&first.alert.signature));
     assert_eq!(first.alert.device_key, "device-a");
-    assert_eq!(first.alert.device_path, "source_stream:device-a/var/log/auth.log");
+    assert_eq!(
+        first.alert.device_path,
+        "source_stream:device-a/var/log/auth.log"
+    );
     assert_eq!(first.alert.lines, 0);
     assert_eq!(first.alert.bytes, 0);
     assert!(first.alert.provenance.is_empty());
     assert_eq!(first.alert.reasons.len(), 1);
-    assert_eq!(first.alert.reasons[0].details[0], ("drop_kind".to_string(), "hard_silence".to_string()));
+    assert_eq!(
+        first.alert.reasons[0].details[0],
+        ("drop_kind".to_string(), "hard_silence".to_string())
+    );
     assert!(first.alert.reasons[0]
         .details
         .iter()
@@ -817,9 +1104,18 @@ fn source_stream_vdrop_alert_construction_is_deterministic_and_runtime_inactive_
         .details
         .iter()
         .any(|(key, value)| key == "source_path" && value == "var/log/auth.log"));
-    assert_eq!(s(&first.primary_put.key), s(&key_tenant_alert_v1(&first.alert.alert_id)));
-    assert_eq!(decode_alert_v1(&first.primary_put.value).unwrap(), first.alert);
-    assert_eq!(first.open_silence.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        s(&first.primary_put.key),
+        s(&key_tenant_alert_v1(&first.alert.alert_id))
+    );
+    assert_eq!(
+        decode_alert_v1(&first.primary_put.value).unwrap(),
+        first.alert
+    );
+    assert_eq!(
+        first.open_silence.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(first.open_silence.last_alert_id, first.alert.alert_id);
 }
 
@@ -831,20 +1127,31 @@ fn source_stream_sharp_drop_alert_construction_preserves_source_provenance_v1() 
         sample_file_span("var/log/auth.log", 0),
         sample_file_span("var/log/auth.log", 100),
     ];
-    let result = sparx::alert::build_source_stream_sharp_drop_alert_v1(&subject, &candidate, &spans).unwrap();
+    let result =
+        sparx::alert::build_source_stream_sharp_drop_alert_v1(&subject, &candidate, &spans)
+            .unwrap();
 
     assert!(is_lower_hex_128(&result.alert.alert_id));
     assert_eq!(result.alert.device_key, "device-a");
-    assert_eq!(result.alert.device_path, "source_stream:device-a/var/log/auth.log");
+    assert_eq!(
+        result.alert.device_path,
+        "source_stream:device-a/var/log/auth.log"
+    );
     assert_eq!(result.alert.lines, 20);
     assert_eq!(result.alert.bytes, 2_000);
     assert_eq!(result.alert.provenance, spans);
-    assert_eq!(result.alert.reasons[0].details[0], ("drop_kind".to_string(), "sharp_drop".to_string()));
+    assert_eq!(
+        result.alert.reasons[0].details[0],
+        ("drop_kind".to_string(), "sharp_drop".to_string())
+    );
     assert!(result.alert.reasons[0]
         .details
         .iter()
         .any(|(key, value)| key == "source_stream_id" && value == &subject.source_stream_id));
-    assert_eq!(result.open_drop.subject_kind_u8, sparx::db::silence::SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        result.open_drop.subject_kind_u8,
+        sparx::db::silence::SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(result.open_drop.last_alert_id, result.alert.alert_id);
 }
 

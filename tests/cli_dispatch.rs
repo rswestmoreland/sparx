@@ -11,7 +11,13 @@ fn unique_temp_path(name: &str, ext: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("sparx_{}_{}_{}.{}", name, std::process::id(), ts, ext))
+    std::env::temp_dir().join(format!(
+        "sparx_{}_{}_{}.{}",
+        name,
+        std::process::id(),
+        ts,
+        ext
+    ))
 }
 
 #[test]
@@ -117,4 +123,3 @@ fn run_runtime_failure_is_nonzero_and_fail_closed() {
     let _ = fs::remove_file(cfg);
     let _ = fs::remove_dir_all(root);
 }
-

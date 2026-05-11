@@ -170,11 +170,26 @@ fn checkpoint_write_order_keeps_win_active_last_and_finalize_advances_determinis
 
     let feat_key = s(key_tenant_window_row_feat_v1(device_key, current_window_id));
     let meta_key = s(key_tenant_window_row_meta_v1(device_key, current_window_id));
-    let srcip_key = s(key_tenant_window_row_ent_srcip_v1(device_key, current_window_id));
-    let dstip_key = s(key_tenant_window_row_ent_dstip_v1(device_key, current_window_id));
-    let userid_key = s(key_tenant_window_row_ent_userid_v1(device_key, current_window_id));
-    let domain_key = s(key_tenant_window_row_ent_domain_v1(device_key, current_window_id));
-    let host_key = s(key_tenant_window_row_ent_host_v1(device_key, current_window_id));
+    let srcip_key = s(key_tenant_window_row_ent_srcip_v1(
+        device_key,
+        current_window_id,
+    ));
+    let dstip_key = s(key_tenant_window_row_ent_dstip_v1(
+        device_key,
+        current_window_id,
+    ));
+    let userid_key = s(key_tenant_window_row_ent_userid_v1(
+        device_key,
+        current_window_id,
+    ));
+    let domain_key = s(key_tenant_window_row_ent_domain_v1(
+        device_key,
+        current_window_id,
+    ));
+    let host_key = s(key_tenant_window_row_ent_host_v1(
+        device_key,
+        current_window_id,
+    ));
     let active_key = s(key_tenant_active_window_v1(device_key));
 
     kv.insert(
@@ -199,8 +214,14 @@ fn checkpoint_write_order_keeps_win_active_last_and_finalize_advances_determinis
     );
     kv.insert(srcip_key.clone(), encode_win_row_ent_srcip_v1(&[]).unwrap());
     kv.insert(dstip_key.clone(), encode_win_row_ent_dstip_v1(&[]).unwrap());
-    kv.insert(userid_key.clone(), encode_win_row_ent_userid_v1(&[]).unwrap());
-    kv.insert(domain_key.clone(), encode_win_row_ent_domain_v1(&[]).unwrap());
+    kv.insert(
+        userid_key.clone(),
+        encode_win_row_ent_userid_v1(&[]).unwrap(),
+    );
+    kv.insert(
+        domain_key.clone(),
+        encode_win_row_ent_domain_v1(&[]).unwrap(),
+    );
     kv.insert(host_key.clone(), encode_win_row_ent_host_v1(&[]).unwrap());
 
     assert!(!kv.contains_key(&active_key));

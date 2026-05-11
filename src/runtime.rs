@@ -13,7 +13,8 @@ use crate::config::ConfigV1;
 use crate::db::layout::{filesystem_layout_v1, FilesystemLayoutV1};
 use crate::db::{
     DbErrorV1, GlobalDbV1, GlobalMigrateJournalEntryV1, GlobalProcessStateV1, GlobalSchemaStateV1,
-    GlobalTenantPurgeEntryV1, GlobalTenantRecordV1, TenantDbCacheV1, TenantDbV1, TenantSchemaStateV1,
+    GlobalTenantPurgeEntryV1, GlobalTenantRecordV1, TenantDbCacheV1, TenantDbV1,
+    TenantSchemaStateV1,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,7 +124,11 @@ impl SparxRuntimeV1 {
         ];
         for root in roots {
             fs::create_dir_all(&root).map_err(|e| {
-                DbErrorV1::new_v1(format!("failed to create runtime storage root {}: {}", root.display(), e))
+                DbErrorV1::new_v1(format!(
+                    "failed to create runtime storage root {}: {}",
+                    root.display(),
+                    e
+                ))
             })?;
         }
         Ok(())
@@ -179,7 +184,10 @@ impl SparxRuntimeV1 {
         self.global_db.read_schema_state_v1()
     }
 
-    pub fn write_global_schema_state_v1(&self, state: &GlobalSchemaStateV1) -> Result<(), DbErrorV1> {
+    pub fn write_global_schema_state_v1(
+        &self,
+        state: &GlobalSchemaStateV1,
+    ) -> Result<(), DbErrorV1> {
         self.global_db.write_schema_state_v1(state)
     }
 
@@ -237,7 +245,8 @@ impl SparxRuntimeV1 {
         tenant_id: &str,
         last_seen_ts: i64,
     ) -> Result<(), DbErrorV1> {
-        self.global_db.set_tenant_last_seen_ts_v1(tenant_id, last_seen_ts)
+        self.global_db
+            .set_tenant_last_seen_ts_v1(tenant_id, last_seen_ts)
     }
 
     pub fn set_tenant_active_index_v1(
@@ -245,7 +254,8 @@ impl SparxRuntimeV1 {
         tenant_id: &str,
         is_active: bool,
     ) -> Result<(), DbErrorV1> {
-        self.global_db.set_tenant_active_index_v1(tenant_id, is_active)
+        self.global_db
+            .set_tenant_active_index_v1(tenant_id, is_active)
     }
 
     pub fn list_active_tenants_v1(&self) -> Result<Vec<String>, DbErrorV1> {
@@ -262,7 +272,8 @@ impl SparxRuntimeV1 {
         ts: i64,
         status: &str,
     ) -> Result<(), DbErrorV1> {
-        self.global_db.append_tenant_purge_entry_v1(tenant_id, ts, status)
+        self.global_db
+            .append_tenant_purge_entry_v1(tenant_id, ts, status)
     }
 
     pub fn scan_tenant_purge_entries_v1(
@@ -278,7 +289,8 @@ impl SparxRuntimeV1 {
         name: &str,
         payload: &[u8],
     ) -> Result<(), DbErrorV1> {
-        self.global_db.append_migrate_journal_entry_v1(ts, name, payload)
+        self.global_db
+            .append_migrate_journal_entry_v1(ts, name, payload)
     }
 
     pub fn scan_global_migrate_journal_entries_v1(
@@ -375,8 +387,7 @@ impl SparxRuntimeV1 {
                 journal_entries: Vec::new(),
                 failure_details: vec![format!(
                     "global schema version {} is newer than binary schema {}",
-                    state.version,
-                    current_version
+                    state.version, current_version
                 )],
             }),
         }
@@ -417,7 +428,8 @@ impl SparxRuntimeV1 {
         }
 
         let current_version = TENANT_SCHEMA_VERSION_CURRENT_V1;
-        let schema_before = self.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
+        let schema_before =
+            self.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
 
         match schema_before {
             None => {
@@ -447,7 +459,10 @@ impl SparxRuntimeV1 {
                     status_after: Some(record.status),
                     version_before: None,
                     version_after: Some(current_version),
-                    journal_entries: vec!["init_schema".to_string(), "tenant_schema_init".to_string()],
+                    journal_entries: vec![
+                        "init_schema".to_string(),
+                        "tenant_schema_init".to_string(),
+                    ],
                     failure_details: Vec::new(),
                 })
             }
@@ -478,8 +493,11 @@ impl SparxRuntimeV1 {
                 self.append_global_migrate_journal_entry_v1(
                     now_ts + 1,
                     "tenant_schema_upgrade",
-                    format!("tenant_id={} from={} to={}", tenant_id, state.version, current_version)
-                        .as_bytes(),
+                    format!(
+                        "tenant_id={} from={} to={}",
+                        tenant_id, state.version, current_version
+                    )
+                    .as_bytes(),
                 )?;
                 self.global_db.persist_sync_all_v1()?;
                 Ok(TenantSchemaMigrateResultV1 {
@@ -489,7 +507,10 @@ impl SparxRuntimeV1 {
                     status_after: Some(record.status),
                     version_before: Some(state.version),
                     version_after: Some(current_version),
-                    journal_entries: vec!["upgrade_schema".to_string(), "tenant_schema_upgrade".to_string()],
+                    journal_entries: vec![
+                        "upgrade_schema".to_string(),
+                        "tenant_schema_upgrade".to_string(),
+                    ],
                     failure_details: Vec::new(),
                 })
             }
@@ -516,9 +537,7 @@ impl SparxRuntimeV1 {
                     journal_entries: vec!["tenant_schema_refused_downgrade".to_string()],
                     failure_details: vec![format!(
                         "tenant {} schema version {} is newer than binary schema {}",
-                        tenant_id,
-                        state.version,
-                        current_version
+                        tenant_id, state.version, current_version
                     )],
                 })
             }
@@ -580,8 +599,7 @@ impl SparxRuntimeV1 {
                 journal_entries: Vec::new(),
                 failure_details: vec![format!(
                     "tenant {} status is {} but terminating (2) is required unless --force",
-                    tenant_id,
-                    record.status
+                    tenant_id, record.status
                 )],
             });
         }

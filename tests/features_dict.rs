@@ -43,17 +43,32 @@ fn new_insert_emits_forward_reverse_and_meta_writes() {
     assert!(out.inserted);
     assert_eq!(out.writes.len(), 4);
 
-    assert_eq!(out.writes[0].key, key_tenant_feature_dict_str_v1("k=src_ip"));
-    assert_eq!(decode_feat_dict_str_to_id_v1(&out.writes[0].value).unwrap(), 1);
+    assert_eq!(
+        out.writes[0].key,
+        key_tenant_feature_dict_str_v1("k=src_ip")
+    );
+    assert_eq!(
+        decode_feat_dict_str_to_id_v1(&out.writes[0].value).unwrap(),
+        1
+    );
 
     assert_eq!(out.writes[1].key, key_tenant_feature_dict_id_v1(1));
-    assert_eq!(decode_feat_dict_id_to_str_v1(&out.writes[1].value).unwrap(), "k=src_ip");
+    assert_eq!(
+        decode_feat_dict_id_to_str_v1(&out.writes[1].value).unwrap(),
+        "k=src_ip"
+    );
 
     assert_eq!(out.writes[2].key, key_tenant_feature_dict_next_id_v1());
-    assert_eq!(decode_feat_dict_meta_next_id_v1(&out.writes[2].value).unwrap(), 2);
+    assert_eq!(
+        decode_feat_dict_meta_next_id_v1(&out.writes[2].value).unwrap(),
+        2
+    );
 
     assert_eq!(out.writes[3].key, key_tenant_feature_dict_entries_v1());
-    assert_eq!(decode_feat_dict_meta_entries_v1(&out.writes[3].value).unwrap(), 1);
+    assert_eq!(
+        decode_feat_dict_meta_entries_v1(&out.writes[3].value).unwrap(),
+        1
+    );
 }
 
 #[test]
@@ -154,10 +169,7 @@ fn load_persisted_rejects_reverse_value_mismatch() {
             ("k=src_ip".to_string(), 1),
             ("canon=SourceIp".to_string(), 2),
         ],
-        vec![
-            (1, "k=src_ip".to_string()),
-            (2, "canon=DestIp".to_string()),
-        ],
+        vec![(1, "k=src_ip".to_string()), (2, "canon=DestIp".to_string())],
     )
     .unwrap_err();
 
@@ -192,7 +204,10 @@ fn dict_cap_is_enforced_without_eviction() {
     dict.resolve_or_insert_v1("b").unwrap();
     dict.resolve_or_insert_v1("c").unwrap();
     let err = dict.resolve_or_insert_v1("d").unwrap_err();
-    assert_eq!(err, FeatureDictionaryErrorV1::DictionaryFull { max_entries: 3 });
+    assert_eq!(
+        err,
+        FeatureDictionaryErrorV1::DictionaryFull { max_entries: 3 }
+    );
     assert_eq!(dict.lookup_feature_id_v1("a"), Some(1));
     assert_eq!(dict.lookup_feature_id_v1("b"), Some(2));
     assert_eq!(dict.lookup_feature_id_v1("c"), Some(3));

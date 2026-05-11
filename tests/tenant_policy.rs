@@ -223,20 +223,21 @@ fn tenant_policy_rejects_zero_vdrop_missed_window_threshold_v1() {
     assert!(err.contains("invalid vdrop_min_expected_windows_missed: 0"));
 }
 
-
 #[test]
 fn tenant_policy_source_stream_gate_resolves_default_off_v1() {
     let td = tempfile::tempdir().unwrap();
     let cfg = cfg_for_root_v1(td.path());
     let tenant_dir = td.path().join("tenants").join("acme").join(".sparx");
     fs::create_dir_all(&tenant_dir).unwrap();
-    fs::write(tenant_dir.join("policy.toml"), "policy_version = 1
-").unwrap();
+    fs::write(
+        tenant_dir.join("policy.toml"),
+        "policy_version = 1
+",
+    )
+    .unwrap();
 
-    let (tenant_base, policy_path) = tenant_policy_path_parts_v1(
-        std::path::Path::new(&cfg.sparx.tenant_root),
-        "acme",
-    );
+    let (tenant_base, policy_path) =
+        tenant_policy_path_parts_v1(std::path::Path::new(&cfg.sparx.tenant_root), "acme");
     let policy = load_tenant_policy_v1(&tenant_base, &policy_path).unwrap();
 
     assert!(!cfg.vdrop.source_stream_enabled);
@@ -262,10 +263,8 @@ vdrop_source_stream_enabled = true
     )
     .unwrap();
 
-    let (tenant_base, policy_path) = tenant_policy_path_parts_v1(
-        std::path::Path::new(&cfg.sparx.tenant_root),
-        "acme",
-    );
+    let (tenant_base, policy_path) =
+        tenant_policy_path_parts_v1(std::path::Path::new(&cfg.sparx.tenant_root), "acme");
     let policy = load_tenant_policy_v1(&tenant_base, &policy_path).unwrap();
 
     assert!(resolve_vdrop_source_stream_enabled_v1(
@@ -291,10 +290,8 @@ vdrop_source_stream_enabled = true
     )
     .unwrap();
 
-    let (tenant_base, policy_path) = tenant_policy_path_parts_v1(
-        std::path::Path::new(&cfg.sparx.tenant_root),
-        "acme",
-    );
+    let (tenant_base, policy_path) =
+        tenant_policy_path_parts_v1(std::path::Path::new(&cfg.sparx.tenant_root), "acme");
     let policy = load_tenant_policy_v1(&tenant_base, &policy_path).unwrap();
 
     assert!(!resolve_vdrop_source_stream_enabled_v1(
@@ -316,7 +313,10 @@ fn tenant_cli_commands_reject_unsafe_tenant_components_v1() {
         &cfg,
     );
     assert_eq!(show.exit_code, 2);
-    assert!(show.msg_stderr.unwrap().contains("invalid tenant_id filesystem component"));
+    assert!(show
+        .msg_stderr
+        .unwrap()
+        .contains("invalid tenant_id filesystem component"));
 
     let replay = route_command_v1(
         &CommandV1::ReplaySpool {
@@ -325,5 +325,8 @@ fn tenant_cli_commands_reject_unsafe_tenant_components_v1() {
         &cfg,
     );
     assert_eq!(replay.exit_code, 2);
-    assert!(replay.msg_stderr.unwrap().contains("invalid tenant_id filesystem component"));
+    assert!(replay
+        .msg_stderr
+        .unwrap()
+        .contains("invalid tenant_id filesystem component"));
 }

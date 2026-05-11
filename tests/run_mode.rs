@@ -13,7 +13,9 @@ use sparx::alert::{
     AlertV1, CountedStringV1, EntitiesV1, FileSpanV1, ReasonV1, TopFeatureV1,
     ALERT_SCHEMA_VERSION_V1,
 };
-use sparx::cli::route::{clear_run_test_cycle_hook_v1, install_run_test_cycle_hook_v1, route_command_v1};
+use sparx::cli::route::{
+    clear_run_test_cycle_hook_v1, install_run_test_cycle_hook_v1, route_command_v1,
+};
 use sparx::cli::{CommandV1, MigrateModeV1};
 use sparx::config::load::default_config_v1;
 use sparx::db::GlobalTenantRecordV1;
@@ -49,8 +51,15 @@ fn fixture_source_v1(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn copy_fixture_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device: &str, files: &[&str]) {
-    let device_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device);
+fn copy_fixture_device_v1(
+    cfg: &sparx::config::ConfigV1,
+    tenant_id: &str,
+    device: &str,
+    files: &[&str],
+) {
+    let device_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device);
     fs::create_dir_all(&device_dir).unwrap();
     for file in files {
         fs::copy(fixture_source_v1(file), device_dir.join(file)).unwrap();
@@ -58,7 +67,9 @@ fn copy_fixture_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device
 }
 
 fn write_tenant_policy_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, body: &str) {
-    let policy_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(".sparx");
+    let policy_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(".sparx");
     fs::create_dir_all(&policy_dir).unwrap();
     fs::write(policy_dir.join("policy.toml"), body).unwrap();
 }
@@ -195,7 +206,10 @@ fn count_spool_files_v1(root: &Path) -> usize {
     count
 }
 
-fn count_vdrop_alerts_v1(runtime: &mut SparxRuntimeV1, tenant_id: &str) -> Result<usize, sparx::db::DbErrorV1> {
+fn count_vdrop_alerts_v1(
+    runtime: &mut SparxRuntimeV1,
+    tenant_id: &str,
+) -> Result<usize, sparx::db::DbErrorV1> {
     runtime.with_tenant_db_v1(tenant_id, 0, |db| {
         let mut count = 0usize;
         for alert_id in db.list_primary_alert_ids_v1()? {
@@ -232,19 +246,24 @@ fn count_source_stream_vdrop_alerts_v1(
     })
 }
 
-
 #[test]
-fn run_startup_and_shutdown_persist_process_state_and_flush_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_startup_and_shutdown_persist_process_state_and_flush_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
 
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log", "edge01.gz"]);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let process = runtime.read_process_state_v1()?;
     assert!(process.last_run_start_ts.is_some());
     assert!(process.last_run_end_ts.is_some());
@@ -254,12 +273,29 @@ fn run_startup_and_shutdown_persist_process_state_and_flush_v1() -> Result<(), B
     let device_key = device_key_v1("smoke", "edge01");
     let log_file_key = file_key_v1("edge01.log");
     let gz_file_key = file_key_v1("edge01.gz");
-    let log_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log"))?.len();
-    let gz_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.gz"))?.len();
+    let log_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log"),
+    )?
+    .len();
+    let gz_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.gz"),
+    )?
+    .len();
 
-    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &log_file_key))?;
-    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &gz_file_key))?;
-    let open_window = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_open_window_state_v1(&device_key))?;
+    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &log_file_key)
+    })?;
+    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &gz_file_key)
+    })?;
+    let open_window =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_open_window_state_v1(&device_key))?;
 
     assert_eq!(log_cursor.unwrap().offset, log_size);
     assert_eq!(gz_cursor.unwrap().offset, gz_size);
@@ -277,36 +313,52 @@ fn run_runtime_emits_vdrop_alerts_v1() -> Result<(), Box<dyn std::error::Error>>
     cfg.scoring.min_lines_per_window = 1;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_candidates_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_alerts_emitted_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_alerts_emitted_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_tracked_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_tracked_subjects__smoke")?,
         Some(2.0)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
         Some(2.0)
     );
     Ok(())
 }
 
 #[test]
-fn run_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_source_stream_gate_emits_runtime_hard_silence_alert_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
 
@@ -316,13 +368,21 @@ fn run_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<(), Bo
     cfg.vdrop.source_stream_enabled = true;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 3);
-    assert_eq!(count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?, 1);
+    assert_eq!(
+        count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?,
+        1
+    );
     let catalogs = runtime.with_tenant_db_v1("smoke", 0, |db| {
         db.list_source_stream_catalogs_for_device_v1(&device_key)
     })?;
@@ -341,7 +401,12 @@ fn run_tenant_policy_can_disable_all_vdrop_subjects_v1() -> Result<(), Box<dyn s
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
     write_tenant_policy_v1(&cfg, "smoke", "policy_version = 1\nvdrop_enabled = false\n");
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
@@ -356,7 +421,7 @@ fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>>
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let paths = runtime.tenant_paths_v1("smoke");
     runtime.upsert_tenant_record_v1(&GlobalTenantRecordV1 {
         tenant_id: "smoke".to_string(),
@@ -370,13 +435,19 @@ fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>>
     runtime.set_tenant_active_index_v1("smoke", false)?;
     drop(runtime);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let file_key = file_key_v1("edge01.log");
-    let cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
+    let cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
     assert!(cursor.is_none());
     assert!(runtime.list_active_tenants_v1()?.is_empty());
     Ok(())
@@ -390,20 +461,46 @@ fn run_second_start_after_clean_shutdown_is_stable_v1() -> Result<(), Box<dyn st
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log", "edge01.gz"]);
 
-    let first = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let first = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(first.exit_code, 0, "stderr={:?}", first.msg_stderr);
 
-    let second = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let second = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(second.exit_code, 0, "stderr={:?}", second.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let log_file_key = file_key_v1("edge01.log");
     let gz_file_key = file_key_v1("edge01.gz");
-    let log_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log"))?.len();
-    let gz_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.gz"))?.len();
-    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &log_file_key))?;
-    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &gz_file_key))?;
+    let log_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log"),
+    )?
+    .len();
+    let gz_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.gz"),
+    )?
+    .len();
+    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &log_file_key)
+    })?;
+    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &gz_file_key)
+    })?;
     assert_eq!(log_cursor.unwrap().offset, log_size);
     assert_eq!(gz_cursor.unwrap().offset, gz_size);
     Ok(())
@@ -417,26 +514,38 @@ fn run_disable_without_restart_stops_ingest_v1() -> Result<(), Box<dyn std::erro
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let log_path = Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log");
+    let log_path = Path::new(&cfg.sparx.tenant_root)
+        .join("smoke")
+        .join("edge01")
+        .join("edge01.log");
     let initial_size = fs::metadata(&log_path)?.len();
 
     let _hook = RunHookGuardV1::install_v1(move |cycle_completed, runtime, hook_cfg| {
         if cycle_completed != 1 {
             return;
         }
-        let log_path = Path::new(&hook_cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log");
+        let log_path = Path::new(&hook_cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log");
         let mut f = fs::OpenOptions::new().append(true).open(&log_path).unwrap();
         writeln!(f, "<34>Jan  5 10:05:05 edge01 sshd[101]: Accepted publickey for root from 10.0.0.2 port 22 ssh2").unwrap();
         runtime.set_tenant_status_v1("smoke", 1).unwrap();
     });
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let file_key = file_key_v1("edge01.log");
-    let cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
+    let cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
     assert_eq!(cursor.unwrap().offset, initial_size);
     assert!(runtime.list_active_tenants_v1()?.is_empty());
     assert_eq!(runtime.read_tenant_record_v1("smoke")?.unwrap().status, 1);
@@ -444,33 +553,46 @@ fn run_disable_without_restart_stops_ingest_v1() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn run_terminating_tenant_no_longer_processes_once_marked_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_terminating_tenant_no_longer_processes_once_marked_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "2");
 
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
-    let log_path = Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log");
+    let log_path = Path::new(&cfg.sparx.tenant_root)
+        .join("smoke")
+        .join("edge01")
+        .join("edge01.log");
     let initial_size = fs::metadata(&log_path)?.len();
 
     let _hook = RunHookGuardV1::install_v1(move |cycle_completed, runtime, hook_cfg| {
         if cycle_completed != 1 {
             return;
         }
-        let log_path = Path::new(&hook_cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log");
+        let log_path = Path::new(&hook_cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log");
         let mut f = fs::OpenOptions::new().append(true).open(&log_path).unwrap();
         writeln!(f, "<34>Jan  5 10:06:06 edge01 sshd[102]: Accepted publickey for admin from 10.0.0.3 port 22 ssh2").unwrap();
         runtime.set_tenant_status_v1("smoke", 2).unwrap();
     });
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
+    let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let file_key = file_key_v1("edge01.log");
-    let cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
+    let cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
     assert_eq!(cursor.unwrap().offset, initial_size);
     assert!(runtime.list_active_tenants_v1()?.is_empty());
     assert_eq!(runtime.read_tenant_record_v1("smoke")?.unwrap().status, 2);
@@ -511,7 +633,12 @@ fn run_active_index_reconciles_deterministically_v1() -> Result<(), Box<dyn std:
     runtime.set_tenant_active_index_v1("tenant-disabled", true)?;
     drop(runtime);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
@@ -543,11 +670,22 @@ fn run_updates_tenant_last_seen_ts_v1() -> Result<(), Box<dyn std::error::Error>
     })?;
     drop(runtime);
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert!(runtime.read_tenant_record_v1("smoke")?.unwrap().last_seen_ts > 7);
+    assert!(
+        runtime
+            .read_tenant_record_v1("smoke")?
+            .unwrap()
+            .last_seen_ts
+            > 7
+    );
     Ok(())
 }
 
@@ -560,11 +698,23 @@ fn run_shutdown_best_effort_replays_spool_v1() {
     let alert = sample_spooled_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     let spool_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
     assert!(!spool_path.exists());
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert.window_start_ts,
+        0,
+    )
+    .unwrap();
     assert!(out_path.is_file());
 }
 
@@ -583,9 +733,7 @@ fn http_request_v1(
     let mut stream = TcpStream::connect(addr)?;
     let request = format!(
         "{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
-        method,
-        path,
-        addr
+        method, path, addr
     );
     stream.write_all(request.as_bytes())?;
     let mut buf = Vec::new();
@@ -598,7 +746,8 @@ fn http_get_v1(addr: &str, path: &str) -> Result<String, Box<dyn std::error::Err
 }
 
 #[test]
-fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_exposes_metrics_and_health_endpoints_when_enabled_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
 
@@ -609,14 +758,12 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     cfg.output.automated_replay_interval_s = 3600;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log", "edge01.gz"]);
 
-    let mut tenant_a_alert = sample_alert_v1();
-    tenant_a_alert.alert_id = "run-metrics-tenant-a".to_string();
-    tenant_a_alert.tenant_id = "tenant-a".to_string();
-    let mut tenant_b_alert = sample_alert_v1();
-    tenant_b_alert.alert_id = "run-metrics-tenant-b".to_string();
-    tenant_b_alert.tenant_id = "tenant-b".to_string();
-    write_spool_alert_v1(&cfg.sparx.data_root, &tenant_a_alert)?;
-    let tenant_b_path = write_spool_alert_v1(&cfg.sparx.data_root, &tenant_b_alert)?;
+    let tenant_a_alert = sample_spooled_alert_v1("tenant-a", "device-a", "run-metrics-tenant-a");
+    let tenant_b_alert = sample_spooled_alert_v1("tenant-b", "device-b", "run-metrics-tenant-b");
+    write_spool_alert_v1(&cfg.sparx.data_root, &tenant_a_alert)
+        .map_err(|e| format!("failed to write tenant-a spool alert: {:?}", e))?;
+    let tenant_b_path = write_spool_alert_v1(&cfg.sparx.data_root, &tenant_b_alert)
+        .map_err(|e| format!("failed to write tenant-b spool alert: {:?}", e))?;
     let tenant_b_bytes = std::fs::metadata(&tenant_b_path)?.len();
 
     let metrics_resp: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
@@ -630,15 +777,30 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
         if cycle_completed != 1 {
             return;
         }
-        *metrics_resp_hook.lock().unwrap() = Some(http_get_v1(&metrics_addr, "/metrics").expect("metrics response"));
-        *health_resp_hook.lock().unwrap() = Some(http_get_v1(&health_addr, "/healthz").expect("health response"));
+        *metrics_resp_hook.lock().unwrap() =
+            Some(http_get_v1(&metrics_addr, "/metrics").expect("metrics response"));
+        *health_resp_hook.lock().unwrap() =
+            Some(http_get_v1(&health_addr, "/healthz").expect("health response"));
     });
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let metrics_resp = metrics_resp.lock().unwrap().clone().expect("captured metrics response");
-    let health_resp = health_resp.lock().unwrap().clone().expect("captured health response");
+    let metrics_resp = metrics_resp
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured metrics response");
+    let health_resp = health_resp
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured health response");
     assert!(metrics_resp.starts_with("HTTP/1.1 200 OK"));
     assert!(metrics_resp.contains("sparx_run_cycles_completed_total 1"));
     assert!(metrics_resp.contains("sparx_run_devices_processed_total"));
@@ -651,25 +813,41 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     assert!(metrics_resp.contains("sparx_recovery_spool_oldest_age_seconds "));
     assert!(metrics_resp.contains("sparx_recovery_stale_backlog 0"));
     assert!(metrics_resp.contains("sparx_recovery_stale_backlog_tenants 0"));
-    assert!(metrics_resp.contains("sparx_recovery_spool_backlog_files_by_tenant{tenant_id=\"tenant-a\"} 1"));
-    assert!(metrics_resp.contains(&format!("sparx_recovery_spool_backlog_bytes_by_tenant{{tenant_id=\"tenant-b\"}} {}", tenant_b_bytes)));
-    assert!(metrics_resp.contains("sparx_recovery_spool_oldest_age_seconds_by_tenant{tenant_id=\"tenant-a\"} "));
-    assert!(metrics_resp.contains("sparx_recovery_stale_backlog_by_tenant{tenant_id=\"tenant-a\"} 0"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_spool_backlog_files_by_tenant{tenant_id=\"tenant-a\"} 1"));
+    assert!(metrics_resp.contains(&format!(
+        "sparx_recovery_spool_backlog_bytes_by_tenant{{tenant_id=\"tenant-b\"}} {}",
+        tenant_b_bytes
+    )));
+    assert!(metrics_resp
+        .contains("sparx_recovery_spool_oldest_age_seconds_by_tenant{tenant_id=\"tenant-a\"} "));
+    assert!(
+        metrics_resp.contains("sparx_recovery_stale_backlog_by_tenant{tenant_id=\"tenant-a\"} 0")
+    );
     assert!(metrics_resp.contains("sparx_recovery_spool_writes_total 0"));
     assert!(metrics_resp.contains("sparx_recovery_spool_replayed_total 0"));
     assert!(metrics_resp.contains("sparx_recovery_spool_replay_fail_total 0"));
     assert!(metrics_resp.contains("sparx_recovery_spool_drop_total 0"));
     assert!(metrics_resp.contains("sparx_recovery_automated_replay_attempts_total 0"));
     assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction 0"));
-    assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-a\"} 0"));
-    assert!(metrics_resp.contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-b\"} 0"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-a\"} 0"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-b\"} 0"));
     assert!(metrics_resp.contains("sparx_recovery_history_start_counter_snapshot_ts "));
-    assert!(metrics_resp.contains("sparx_recovery_history_start_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp.contains(
+        "sparx_recovery_history_start_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"
+    ));
     assert!(metrics_resp.contains("sparx_recovery_history_counter_snapshot_interval_seconds_by_tenant{tenant_id=\"tenant-b\"}"));
-    assert!(metrics_resp.contains("sparx_recovery_previous_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
-    assert!(metrics_resp.contains("sparx_recovery_last_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-b\"}"));
-    assert!(metrics_resp.contains("sparx_recovery_spool_write_rate_per_second_by_tenant{tenant_id=\"tenant-a\"}"));
-    assert!(metrics_resp.contains("sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant{tenant_id=\"tenant-b\"}"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_previous_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_last_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-b\"}"));
+    assert!(metrics_resp
+        .contains("sparx_recovery_spool_write_rate_per_second_by_tenant{tenant_id=\"tenant-a\"}"));
+    assert!(metrics_resp.contains(
+        "sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant{tenant_id=\"tenant-b\"}"
+    ));
     assert!(metrics_resp.contains("sparx_vdrop_enabled 1"));
     assert!(metrics_resp.contains("sparx_vdrop_device_enabled 1"));
     assert!(metrics_resp.contains("sparx_vdrop_tenant_enabled 1"));
@@ -698,7 +876,9 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     assert!(health_resp.contains("spool_backlog_tenant[0].history_spool_write_rate_per_s: "));
     assert!(health_resp.contains("spool_backlog_tenant[0].spool_replayed_rate_per_s: null"));
     assert!(health_resp.contains("spool_backlog_tenant[0].spool_write_rate_per_s: null"));
-    assert!(health_resp.contains("spool_backlog_tenant[0].automated_replay_attempt_rate_per_s: null"));
+    assert!(
+        health_resp.contains("spool_backlog_tenant[0].automated_replay_attempt_rate_per_s: null")
+    );
     assert!(health_resp.contains("spool_backlog_tenant[1].tenant_id: tenant-b"));
     assert!(health_resp.contains("spool_backlog_tenant[1].backlog_trend_direction: unknown"));
     assert!(health_resp.contains("spool_writes_total: 0"));
@@ -727,8 +907,16 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1() -> Result<(), Box<
     assert!(health_resp.contains("vdrop_source_stream_alerts_emitted_total: "));
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("run_cycles_completed_total")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("run_last_cycle_completed_ts")?.is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("run_cycles_completed_total")?,
+        Some(1)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("run_last_cycle_completed_ts")?
+        .is_some());
     Ok(())
 }
 
@@ -757,14 +945,19 @@ fn run_does_not_bind_endpoints_when_disabled_v1() {
         guard.push(TcpStream::connect(&health_addr).is_ok());
     });
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
     assert_eq!(*connect_results.lock().unwrap(), vec![false, false]);
 }
 
-
 #[test]
-fn run_observability_endpoints_reject_wrong_path_and_method_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_observability_endpoints_reject_wrong_path_and_method_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
 
@@ -783,19 +976,30 @@ fn run_observability_endpoints_reject_wrong_path_and_method_v1() -> Result<(), B
         if cycle_completed != 1 {
             return;
         }
-        *wrong_path_resp_hook.lock().unwrap() = Some(
-            http_get_v1(&metrics_addr, "/wrong").expect("wrong-path response")
-        );
-        *method_resp_hook.lock().unwrap() = Some(
-            http_request_v1(&metrics_addr, "POST", "/metrics").expect("method response")
-        );
+        *wrong_path_resp_hook.lock().unwrap() =
+            Some(http_get_v1(&metrics_addr, "/wrong").expect("wrong-path response"));
+        *method_resp_hook.lock().unwrap() =
+            Some(http_request_v1(&metrics_addr, "POST", "/metrics").expect("method response"));
     });
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
-    let wrong_path_resp = wrong_path_resp.lock().unwrap().clone().expect("captured wrong-path response");
-    let method_resp = method_resp.lock().unwrap().clone().expect("captured method response");
+    let wrong_path_resp = wrong_path_resp
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured wrong-path response");
+    let method_resp = method_resp
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("captured method response");
     assert!(wrong_path_resp.starts_with("HTTP/1.1 404 Not Found"));
     assert!(wrong_path_resp.contains("not found\n"));
     assert!(method_resp.starts_with("HTTP/1.1 405 Method Not Allowed"));
@@ -810,11 +1014,19 @@ fn run_partial_observability_startup_failure_releases_started_listener_v1() {
     let mut cfg = temp_cfg_v1();
     cfg.metrics.prometheus_bind = reserve_loopback_bind_v1();
     let blocker = TcpListener::bind("127.0.0.1:0").expect("health blocker");
-    cfg.metrics.health_bind = blocker.local_addr().expect("health blocker addr").to_string();
+    cfg.metrics.health_bind = blocker
+        .local_addr()
+        .expect("health blocker addr")
+        .to_string();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
     let prometheus_addr = cfg.metrics.prometheus_bind.clone();
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 1);
     let stderr = result.msg_stderr.expect("startup stderr");
     assert!(stderr.contains("run observability startup error"));
@@ -822,7 +1034,10 @@ fn run_partial_observability_startup_failure_releases_started_listener_v1() {
 
     drop(blocker);
     let rebound = TcpListener::bind(&prometheus_addr);
-    assert!(rebound.is_ok(), "prometheus listener should have been released after partial startup failure");
+    assert!(
+        rebound.is_ok(),
+        "prometheus listener should have been released after partial startup failure"
+    );
 }
 
 #[test]
@@ -834,14 +1049,29 @@ fn run_replays_spooled_alerts_automatically_v1() -> Result<(), Box<dyn std::erro
     let alert = sample_spooled_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     let spool_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
     assert!(!spool_path.exists());
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert.window_start_ts,
+        0,
+    )
+    .unwrap();
     let line = fs::read_to_string(out_path).unwrap();
     let value: serde_json::Value = serde_json::from_str(line.trim_end()).unwrap();
-    assert_eq!(value["alert_id"].as_str(), Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    assert_eq!(
+        value["alert_id"].as_str(),
+        Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    );
     Ok(())
 }
 
@@ -858,7 +1088,12 @@ fn run_automated_replay_is_bounded_per_cycle_v1() -> Result<(), Box<dyn std::err
         write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
     }
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let spool_root = Path::new(&cfg.sparx.data_root).join("spool").join("alerts");
@@ -872,54 +1107,239 @@ fn run_automated_replay_is_bounded_per_cycle_v1() -> Result<(), Box<dyn std::err
     assert!(remaining.exists());
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_automated_replay_attempts_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replayed_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replay_fail_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_writes_total")?, Some(0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_automated_replay_attempt_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_replayed")?, Some(1.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_failed")?, Some(0.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_snapshot_ts")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?, Some(2.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?, Some(1.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_automated_replay_attempts_total")?, Some(2));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_writes_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replay_fail_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a")?, Some(0));
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_automated_replay_attempts_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_replayed_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_replay_fail_total")?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_writes_total")?,
+        Some(0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_automated_replay_attempt_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_automated_replay_replayed")?,
+        Some(1.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_automated_replay_failed")?,
+        Some(0.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_previous_snapshot_ts")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?,
+        Some(2.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?,
+        Some(1.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_previous_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_last_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(2)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_writes_total")?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_spool_replayed_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_spool_replay_fail_total"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a"
+        )?,
+        Some(0)
+    );
     assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_snapshot_ts__tenant-a")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_snapshot_ts__tenant-a")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?, Some(2.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?, Some(1.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(2));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(2));
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_previous_snapshot_ts__tenant-a")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_last_snapshot_ts__tenant-a")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?,
+        Some(2.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?,
+        Some(1.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a"
+        )?,
+        Some(2)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__tenant-a"
+        )?,
+        Some(2)
+    );
     Ok(())
 }
 
 #[test]
-fn run_automated_replay_interval_limits_cycle_attempts_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn run_automated_replay_interval_limits_cycle_attempts_v1() -> Result<(), Box<dyn std::error::Error>>
+{
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "2");
 
@@ -932,33 +1352,130 @@ fn run_automated_replay_interval_limits_cycle_attempts_v1() -> Result<(), Box<dy
         write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
     }
 
-    let result = route_command_v1(&CommandV1::Run { migrate: MigrateModeV1::Auto }, &cfg);
+    let result = route_command_v1(
+        &CommandV1::Run {
+            migrate: MigrateModeV1::Auto,
+        },
+        &cfg,
+    );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
 
     let spool_root = Path::new(&cfg.sparx.data_root).join("spool").join("alerts");
     assert_eq!(count_spool_files_v1(&spool_root), 1);
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_automated_replay_attempts_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replayed_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_replayed")?, Some(1.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?, Some(2.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?, Some(1.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_automated_replay_attempts_total")?, Some(2));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a")?, Some(0));
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_automated_replay_attempts_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_replayed_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_automated_replay_replayed")?,
+        Some(1.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?,
+        Some(2.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?,
+        Some(1.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_previous_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_last_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(2)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_spool_replayed_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__tenant-a")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_writes_total__tenant-a"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replayed_total__tenant-a"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__tenant-a"
+        )?,
+        Some(0)
+    );
     assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__tenant-a")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?, Some(2.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?, Some(1.0));
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_tenant_previous_snapshot_backlog_files__tenant-a")?,
+        Some(2.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_tenant_last_snapshot_backlog_files__tenant-a")?,
+        Some(1.0)
+    );
     Ok(())
 }

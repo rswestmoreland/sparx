@@ -59,7 +59,7 @@ pub struct IngestSectionV1 {
 pub struct FeaturesSectionV1 {
     pub dict_enabled: bool,
     pub dict_max_entries: u32,
-    pub hash_space_bits: u8, // reserved continuity field in v0.1
+    pub hash_space_bits: u8,     // reserved continuity field in v0.1
     pub dict_gc_interval_s: u32, // reserved continuity field in v0.1
 }
 
@@ -95,13 +95,13 @@ pub struct CapsSectionV1 {
 
 #[derive(Clone, Debug)]
 pub struct StorageSectionV1 {
-    pub global_db_open_files: i32, // reserved continuity field in v0.1
+    pub global_db_open_files: i32,      // reserved continuity field in v0.1
     pub global_db_write_buffer_mb: u32, // reserved continuity field in v0.1
-    pub tenant_db_open_files: i32, // reserved continuity field in v0.1
+    pub tenant_db_open_files: i32,      // reserved continuity field in v0.1
     pub tenant_db_write_buffer_mb: u32, // reserved continuity field in v0.1
     pub tenant_db_max_background_jobs: i32, // reserved continuity field in v0.1
-    pub tenant_db_max_open: u32, // active tenant-handle lifecycle control
-    pub tenant_db_idle_close_s: u32, // active tenant-handle lifecycle control
+    pub tenant_db_max_open: u32,        // active tenant-handle lifecycle control
+    pub tenant_db_idle_close_s: u32,    // active tenant-handle lifecycle control
 }
 
 #[derive(Clone, Debug)]
@@ -118,9 +118,9 @@ pub struct OutputSectionV1 {
 #[derive(Clone, Debug)]
 pub struct MetricsSectionV1 {
     pub prometheus_enabled: bool, // serves /metrics during run when enabled
-    pub prometheus_bind: String, // bind address for the Prometheus text endpoint
-    pub health_enabled: bool, // serves /healthz during run when enabled
-    pub health_bind: String, // bind address for the health endpoint
+    pub prometheus_bind: String,  // bind address for the Prometheus text endpoint
+    pub health_enabled: bool,     // serves /healthz during run when enabled
+    pub health_bind: String,      // bind address for the health endpoint
 }
 
 #[derive(Clone, Debug)]

@@ -24,14 +24,21 @@ fn parses_rfc5424_with_pri_and_structured_data() {
     );
     assert_eq!(
         parsed.envelope.ts_guess,
-        Some(Utc.with_ymd_and_hms(2026, 3, 20, 12, 34, 56).unwrap().timestamp())
+        Some(
+            Utc.with_ymd_and_hms(2026, 3, 20, 12, 34, 56)
+                .unwrap()
+                .timestamp()
+        )
     );
     assert_eq!(parsed.msg, "hello world");
 }
 
 #[test]
 fn parses_bsd_with_tag_pid_and_infers_year() {
-    let ingest_ts = Utc.with_ymd_and_hms(2026, 3, 20, 15, 0, 0).unwrap().timestamp();
+    let ingest_ts = Utc
+        .with_ymd_and_hms(2026, 3, 20, 15, 0, 0)
+        .unwrap()
+        .timestamp();
     let parsed = peel_syslog_envelope_v1(
         "Mar 20 12:34:56 web01 sshd[1234]: Accepted password for user",
         ingest_ts,
@@ -42,19 +49,33 @@ fn parses_bsd_with_tag_pid_and_infers_year() {
     assert_eq!(parsed.envelope.procid.as_deref(), Some("1234"));
     assert_eq!(
         parsed.envelope.ts_guess,
-        Some(Utc.with_ymd_and_hms(2026, 3, 20, 12, 34, 56).unwrap().timestamp())
+        Some(
+            Utc.with_ymd_and_hms(2026, 3, 20, 12, 34, 56)
+                .unwrap()
+                .timestamp()
+        )
     );
     assert_eq!(parsed.msg, "Accepted password for user");
 }
 
 #[test]
 fn bsd_more_than_24h_future_uses_previous_year() {
-    let ingest_ts = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap().timestamp();
-    let parsed = peel_syslog_envelope_v1("Dec 31 23:00:00 fw01 kernel: previous year event", ingest_ts);
+    let ingest_ts = Utc
+        .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+        .unwrap()
+        .timestamp();
+    let parsed = peel_syslog_envelope_v1(
+        "Dec 31 23:00:00 fw01 kernel: previous year event",
+        ingest_ts,
+    );
 
     assert_eq!(
         parsed.envelope.ts_guess,
-        Some(Utc.with_ymd_and_hms(2025, 12, 31, 23, 0, 0).unwrap().timestamp())
+        Some(
+            Utc.with_ymd_and_hms(2025, 12, 31, 23, 0, 0)
+                .unwrap()
+                .timestamp()
+        )
     );
     assert_eq!(parsed.envelope.app.as_deref(), Some("kernel"));
 }
@@ -74,20 +95,34 @@ fn parses_iso_timestamp_with_host_and_app_heuristics() {
 
 #[test]
 fn peels_cisco_style_embedded_prefix_and_prefers_embedded_timestamp() {
-    let ingest_ts = Utc.with_ymd_and_hms(2026, 3, 20, 12, 0, 0).unwrap().timestamp();
+    let ingest_ts = Utc
+        .with_ymd_and_hms(2026, 3, 20, 12, 0, 0)
+        .unwrap()
+        .timestamp();
     let parsed = peel_syslog_envelope_v1(
         "Mar 20 11:59:00 edge01 syslogd: 2026-03-20T11:58:59Z: %ASA-6-302013: Built outbound TCP connection",
         ingest_ts,
     );
 
-    assert_eq!(parsed.envelope.peeled_prefixes, vec!["2026-03-20T11:58:59Z"]);
+    assert_eq!(
+        parsed.envelope.peeled_prefixes,
+        vec!["2026-03-20T11:58:59Z"]
+    );
     assert_eq!(
         parsed.envelope.embedded_ts_guess,
-        Some(Utc.with_ymd_and_hms(2026, 3, 20, 11, 58, 59).unwrap().timestamp())
+        Some(
+            Utc.with_ymd_and_hms(2026, 3, 20, 11, 58, 59)
+                .unwrap()
+                .timestamp()
+        )
     );
     assert_eq!(
         parsed.envelope.ts_guess,
-        Some(Utc.with_ymd_and_hms(2026, 3, 20, 11, 58, 59).unwrap().timestamp())
+        Some(
+            Utc.with_ymd_and_hms(2026, 3, 20, 11, 58, 59)
+                .unwrap()
+                .timestamp()
+        )
     );
     assert_eq!(parsed.msg, "%ASA-6-302013: Built outbound TCP connection");
 }

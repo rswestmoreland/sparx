@@ -14,8 +14,8 @@ use sparx::alert::{
 };
 use sparx::cli::route::route_command_v1;
 use sparx::cli::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1};
-use sparx::db::keys::key_tenant_alert_v1;
 use sparx::config::load::default_config_v1;
+use sparx::db::keys::key_tenant_alert_v1;
 use sparx::runtime::SparxRuntimeV1;
 use sparx::types::{ConfidenceV1, FeatureFamilyV1, LabelV1};
 
@@ -101,7 +101,10 @@ fn sample_alert_v1(alert_id: &str, window_start_ts: i64, summary_analyst: &str) 
     }
 }
 
-fn seed_alerts_v1(cfg: &sparx::config::ConfigV1, alerts: &[AlertV1]) -> Result<(), Box<dyn std::error::Error>> {
+fn seed_alerts_v1(
+    cfg: &sparx::config::ConfigV1,
+    alerts: &[AlertV1],
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = SparxRuntimeV1::open_from_config_v1(cfg)?;
     runtime.with_tenant_db_v1("tenant-a", 1_700_200_000, |db| {
         for alert in alerts {
@@ -113,7 +116,8 @@ fn seed_alerts_v1(cfg: &sparx::config::ConfigV1, alerts: &[AlertV1]) -> Result<(
 }
 
 #[test]
-fn alerts_list_json_is_sorted_by_window_desc_then_alert_id_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alerts_list_json_is_sorted_by_window_desc_then_alert_id_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     seed_alerts_v1(
         &cfg,
@@ -162,7 +166,10 @@ fn alerts_show_json_and_missing_alert_v1() -> Result<(), Box<dyn std::error::Err
     assert_eq!(0, ok.exit_code);
     let value: Value = serde_json::from_str(&ok.msg_stdout.unwrap())?;
     assert_eq!("alert-a", value["alert"]["alert_id"].as_str().unwrap());
-    assert_eq!("show me", value["alert"]["summary_analyst"].as_str().unwrap());
+    assert_eq!(
+        "show me",
+        value["alert"]["summary_analyst"].as_str().unwrap()
+    );
 
     let missing = route_command_v1(
         &CommandV1::AlertsShow {
@@ -173,7 +180,10 @@ fn alerts_show_json_and_missing_alert_v1() -> Result<(), Box<dyn std::error::Err
         &cfg,
     );
     assert_eq!(1, missing.exit_code);
-    assert!(missing.msg_stderr.unwrap().contains("alert not found: missing"));
+    assert!(missing
+        .msg_stderr
+        .unwrap()
+        .contains("alert not found: missing"));
     Ok(())
 }
 
@@ -211,7 +221,8 @@ fn alerts_search_honors_time_filter_and_contains_v1() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn alerts_list_falls_back_when_time_index_is_incomplete_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alerts_list_falls_back_when_time_index_is_incomplete_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     runtime.with_tenant_db_v1("tenant-a", 1_700_200_000, |db| {
@@ -219,8 +230,9 @@ fn alerts_list_falls_back_when_time_index_is_incomplete_v1() -> Result<(), Box<d
         db.write_primary_alert_v1(&indexed)?;
 
         let legacy = sample_alert_v1("alert-legacy", 200, "legacy primary only");
-        let encoded = encode_alert_v1(&legacy)
-            .map_err(|e| sparx::db::DbErrorV1::new_v1(format!("legacy alert encode failed: {:?}", e)))?;
+        let encoded = encode_alert_v1(&legacy).map_err(|e| {
+            sparx::db::DbErrorV1::new_v1(format!("legacy alert encode failed: {:?}", e))
+        })?;
         db.put_raw_v1(key_tenant_alert_v1(&legacy.alert_id).as_bytes(), &encoded)?;
         db.persist_sync_all_v1()
     })?;
@@ -271,7 +283,10 @@ fn alerts_list_structured_category_filter_v1() -> Result<(), Box<dyn std::error:
     assert_eq!(0, r.exit_code);
     let value: Value = serde_json::from_str(&r.msg_stdout.unwrap())?;
     let filters = value["filters"].as_object().unwrap();
-    assert_eq!(Some("noise_suspect"), filters.get("category").and_then(|v| v.as_str()));
+    assert_eq!(
+        Some("noise_suspect"),
+        filters.get("category").and_then(|v| v.as_str())
+    );
     let alerts = value["alerts"].as_array().unwrap();
     assert_eq!(1, alerts.len());
     assert_eq!("alert-b", alerts[0]["alert_id"].as_str().unwrap());
@@ -317,7 +332,8 @@ fn alerts_search_structured_entity_filter_v1() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn alerts_list_falls_back_when_entity_index_is_incomplete_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alerts_list_falls_back_when_entity_index_is_incomplete_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     runtime.with_tenant_db_v1("tenant-a", 1_700_200_000, |db| {
@@ -325,8 +341,9 @@ fn alerts_list_falls_back_when_entity_index_is_incomplete_v1() -> Result<(), Box
         db.write_primary_alert_v1(&indexed)?;
 
         let legacy = sample_alert_v1("alert-legacy", 200, "legacy alice");
-        let encoded = encode_alert_v1(&legacy)
-            .map_err(|e| sparx::db::DbErrorV1::new_v1(format!("legacy alert encode failed: {:?}", e)))?;
+        let encoded = encode_alert_v1(&legacy).map_err(|e| {
+            sparx::db::DbErrorV1::new_v1(format!("legacy alert encode failed: {:?}", e))
+        })?;
         db.put_raw_v1(key_tenant_alert_v1(&legacy.alert_id).as_bytes(), &encoded)?;
         db.persist_sync_all_v1()
     })?;

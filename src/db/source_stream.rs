@@ -25,21 +25,52 @@ use crate::stable_hash::{stable_hash_hex128_v1, STABLE_HASH_HEX128_LEN_V1};
 pub enum SourceStreamErrorV1 {
     EmptyPath,
     AbsolutePath,
-    InvalidPathComponent { component: String },
+    InvalidPathComponent {
+        component: String,
+    },
     InvalidPathByte(u8),
-    InvalidStoragePart { field: &'static str },
-    InvalidLength { expected: usize, actual: usize },
-    MinimumLength { minimum: usize, actual: usize },
+    InvalidStoragePart {
+        field: &'static str,
+    },
+    InvalidLength {
+        expected: usize,
+        actual: usize,
+    },
+    MinimumLength {
+        minimum: usize,
+        actual: usize,
+    },
     UnknownSchemaVersion(u16),
-    InvalidReservedField { field: &'static str, value: u64 },
+    InvalidReservedField {
+        field: &'static str,
+        value: u64,
+    },
     InvalidSourceStreamId,
-    InvalidTimestampBounds { first_seen_ts: i64, last_seen_ts: i64 },
-    InvalidBucket { value: u8 },
-    InvalidStringLength { field: &'static str, declared: usize, remaining: usize },
-    InvalidStringByte { field: &'static str, byte: u8 },
-    TrailingBytes { remaining: usize },
-    InvalidStatsField { field: &'static str },
-    StatsCounterOverflow { field: &'static str },
+    InvalidTimestampBounds {
+        first_seen_ts: i64,
+        last_seen_ts: i64,
+    },
+    InvalidBucket {
+        value: u8,
+    },
+    InvalidStringLength {
+        field: &'static str,
+        declared: usize,
+        remaining: usize,
+    },
+    InvalidStringByte {
+        field: &'static str,
+        byte: u8,
+    },
+    TrailingBytes {
+        remaining: usize,
+    },
+    InvalidStatsField {
+        field: &'static str,
+    },
+    StatsCounterOverflow {
+        field: &'static str,
+    },
 }
 
 impl fmt::Display for SourceStreamErrorV1 {
@@ -186,8 +217,16 @@ fn validate_schema_version_v1(version: u16) -> Result<(), SourceStreamErrorV1> {
     Ok(())
 }
 
-fn validate_ascii_storage_part_v1(field: &'static str, value: &str) -> Result<(), SourceStreamErrorV1> {
-    if value.is_empty() || value.as_bytes().iter().any(|b| *b == b'/' || *b < 0x20 || *b == 0x7f) {
+fn validate_ascii_storage_part_v1(
+    field: &'static str,
+    value: &str,
+) -> Result<(), SourceStreamErrorV1> {
+    if value.is_empty()
+        || value
+            .as_bytes()
+            .iter()
+            .any(|b| *b == b'/' || *b < 0x20 || *b == 0x7f)
+    {
         return Err(SourceStreamErrorV1::InvalidStoragePart { field });
     }
     Ok(())
@@ -197,7 +236,10 @@ fn validate_source_stream_id_v1(value: &str) -> Result<(), SourceStreamErrorV1> 
     if value.len() != SOURCE_STREAM_ID_HEX_LEN_V1 {
         return Err(SourceStreamErrorV1::InvalidSourceStreamId);
     }
-    if !value.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+    if !value
+        .bytes()
+        .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    {
         return Err(SourceStreamErrorV1::InvalidSourceStreamId);
     }
     Ok(())
@@ -234,7 +276,10 @@ fn validate_catalog_v1(value: &SourceStreamCatalogV1) -> Result<(), SourceStream
     Ok(())
 }
 
-fn validate_welford_v1(field: &'static str, value: &WelfordF64V1) -> Result<(), SourceStreamErrorV1> {
+fn validate_welford_v1(
+    field: &'static str,
+    value: &WelfordF64V1,
+) -> Result<(), SourceStreamErrorV1> {
     if !value.mean.is_finite() || !value.m2.is_finite() || value.m2 < 0.0 {
         return Err(SourceStreamErrorV1::InvalidStatsField { field });
     }
@@ -278,7 +323,8 @@ fn read_variable_string_v1(
         }
     }
     *offset += len;
-    String::from_utf8(raw.to_vec()).map_err(|_| SourceStreamErrorV1::InvalidStringByte { field, byte: 0xff })
+    String::from_utf8(raw.to_vec())
+        .map_err(|_| SourceStreamErrorV1::InvalidStringByte { field, byte: 0xff })
 }
 
 pub fn canonicalize_source_stream_path_v1(path: &str) -> Result<String, SourceStreamErrorV1> {
@@ -307,7 +353,11 @@ pub fn canonicalize_source_stream_path_v1(path: &str) -> Result<String, SourceSt
     Ok(parts.join("/"))
 }
 
-pub fn source_stream_contract_input_v1(tenant_id: &str, device_key: &str, canonical_source_path: &str) -> String {
+pub fn source_stream_contract_input_v1(
+    tenant_id: &str,
+    device_key: &str,
+    canonical_source_path: &str,
+) -> String {
     let mut out = String::new();
     out.push_str("source_stream/v1\n");
     out.push_str("tenant_id=");
@@ -329,9 +379,7 @@ pub fn source_stream_id_v1(
 ) -> Result<String, SourceStreamErrorV1> {
     let canonical = canonicalize_source_stream_path_v1(canonical_source_path)?;
     Ok(stable_hash_hex128_v1(&source_stream_contract_input_v1(
-        tenant_id,
-        device_key,
-        &canonical,
+        tenant_id, device_key, &canonical,
     )))
 }
 
@@ -381,7 +429,8 @@ pub fn update_source_stream_catalog_observed_v1(
         None => source_stream_catalog_from_identity_v1(identity, observed_ts_i64, observed_ts_i64)?,
     };
     validate_catalog_v1(&next)?;
-    if next.source_stream_id != identity.source_stream_id || next.device_key != identity.device_key {
+    if next.source_stream_id != identity.source_stream_id || next.device_key != identity.device_key
+    {
         return Err(SourceStreamErrorV1::InvalidSourceStreamId);
     }
     if next.canonical_source_path != identity.canonical_source_path {
@@ -395,7 +444,9 @@ pub fn update_source_stream_catalog_observed_v1(
     Ok(next)
 }
 
-pub fn encode_source_stream_catalog_v1(value: &SourceStreamCatalogV1) -> Result<Vec<u8>, SourceStreamErrorV1> {
+pub fn encode_source_stream_catalog_v1(
+    value: &SourceStreamCatalogV1,
+) -> Result<Vec<u8>, SourceStreamErrorV1> {
     validate_catalog_v1(value)?;
     let id = value.source_stream_id.as_bytes();
     let device = value.device_key.as_bytes();
@@ -405,18 +456,22 @@ pub fn encode_source_stream_catalog_v1(value: &SourceStreamCatalogV1) -> Result<
         declared: id.len(),
         remaining: usize::from(u16::MAX),
     })?;
-    let device_len = u16::try_from(device.len()).map_err(|_| SourceStreamErrorV1::InvalidStringLength {
-        field: "device_key",
-        declared: device.len(),
-        remaining: usize::from(u16::MAX),
-    })?;
-    let path_len = u16::try_from(path.len()).map_err(|_| SourceStreamErrorV1::InvalidStringLength {
-        field: "canonical_source_path",
-        declared: path.len(),
-        remaining: usize::from(u16::MAX),
-    })?;
+    let device_len =
+        u16::try_from(device.len()).map_err(|_| SourceStreamErrorV1::InvalidStringLength {
+            field: "device_key",
+            declared: device.len(),
+            remaining: usize::from(u16::MAX),
+        })?;
+    let path_len =
+        u16::try_from(path.len()).map_err(|_| SourceStreamErrorV1::InvalidStringLength {
+            field: "canonical_source_path",
+            declared: path.len(),
+            remaining: usize::from(u16::MAX),
+        })?;
 
-    let mut out = Vec::with_capacity(SOURCE_STREAM_CATALOG_V1_FIXED_LEN + id.len() + device.len() + path.len());
+    let mut out = Vec::with_capacity(
+        SOURCE_STREAM_CATALOG_V1_FIXED_LEN + id.len() + device.len() + path.len(),
+    );
     encode_u16_le(value.schema_version_u16, &mut out);
     out.push(value.state_flags_u8);
     out.push(value.reserved_u8_0);
@@ -432,7 +487,9 @@ pub fn encode_source_stream_catalog_v1(value: &SourceStreamCatalogV1) -> Result<
     Ok(out)
 }
 
-pub fn decode_source_stream_catalog_v1(bytes: &[u8]) -> Result<SourceStreamCatalogV1, SourceStreamErrorV1> {
+pub fn decode_source_stream_catalog_v1(
+    bytes: &[u8],
+) -> Result<SourceStreamCatalogV1, SourceStreamErrorV1> {
     require_min_len(bytes, SOURCE_STREAM_CATALOG_V1_FIXED_LEN)?;
     let schema_version_u16 = decode_u16_le(&bytes[0..2]);
     let state_flags_u8 = bytes[2];
@@ -446,7 +503,8 @@ pub fn decode_source_stream_catalog_v1(bytes: &[u8]) -> Result<SourceStreamCatal
     let mut offset = SOURCE_STREAM_CATALOG_V1_FIXED_LEN;
     let source_stream_id = read_variable_string_v1("source_stream_id", bytes, &mut offset, id_len)?;
     let device_key = read_variable_string_v1("device_key", bytes, &mut offset, device_len)?;
-    let canonical_source_path = read_variable_string_v1("canonical_source_path", bytes, &mut offset, path_len)?;
+    let canonical_source_path =
+        read_variable_string_v1("canonical_source_path", bytes, &mut offset, path_len)?;
     if offset != bytes.len() {
         return Err(SourceStreamErrorV1::TrailingBytes {
             remaining: bytes.len() - offset,
@@ -467,7 +525,9 @@ pub fn decode_source_stream_catalog_v1(bytes: &[u8]) -> Result<SourceStreamCatal
     Ok(value)
 }
 
-pub fn encode_source_stream_stats_v1(value: &SourceStreamStatsV1) -> Result<Vec<u8>, SourceStreamErrorV1> {
+pub fn encode_source_stream_stats_v1(
+    value: &SourceStreamStatsV1,
+) -> Result<Vec<u8>, SourceStreamErrorV1> {
     validate_source_stream_stats_v1(value)?;
     let mut out = Vec::with_capacity(SOURCE_STREAM_STATS_V1_LEN);
     encode_welford_f64_v1(&value.line_count, &mut out);
@@ -477,7 +537,9 @@ pub fn encode_source_stream_stats_v1(value: &SourceStreamStatsV1) -> Result<Vec<
     Ok(out)
 }
 
-pub fn decode_source_stream_stats_v1(bytes: &[u8]) -> Result<SourceStreamStatsV1, SourceStreamErrorV1> {
+pub fn decode_source_stream_stats_v1(
+    bytes: &[u8],
+) -> Result<SourceStreamStatsV1, SourceStreamErrorV1> {
     require_exact_len(bytes, SOURCE_STREAM_STATS_V1_LEN)?;
     let value = SourceStreamStatsV1 {
         line_count: decode_welford_f64_v1(&bytes[0..20]),
@@ -489,8 +551,9 @@ pub fn decode_source_stream_stats_v1(bytes: &[u8]) -> Result<SourceStreamStatsV1
     Ok(value)
 }
 
-
-pub fn source_stream_subject_from_identity_v1(identity: &SourceStreamIdentityV1) -> SourceStreamSubjectV1 {
+pub fn source_stream_subject_from_identity_v1(
+    identity: &SourceStreamIdentityV1,
+) -> SourceStreamSubjectV1 {
     SourceStreamSubjectV1 {
         tenant_id: identity.tenant_id.clone(),
         device_key: identity.device_key.clone(),
@@ -499,7 +562,9 @@ pub fn source_stream_subject_from_identity_v1(identity: &SourceStreamIdentityV1)
     }
 }
 
-pub fn validate_source_stream_subject_v1(subject: &SourceStreamSubjectV1) -> Result<(), SourceStreamErrorV1> {
+pub fn validate_source_stream_subject_v1(
+    subject: &SourceStreamSubjectV1,
+) -> Result<(), SourceStreamErrorV1> {
     validate_ascii_storage_part_v1("tenant_id", &subject.tenant_id)?;
     validate_ascii_storage_part_v1("device_key", &subject.device_key)?;
     validate_source_stream_id_v1(&subject.source_stream_id)?;
@@ -534,7 +599,9 @@ pub fn evaluate_source_stream_hard_silence_candidate_v1(
     if let Some(state) = state {
         if state.subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
             return Ok(VDropEvaluationV1::Suppressed(
-                crate::db::silence::VDropSuppressionReasonV1::InvalidSubjectKind(state.subject_kind_u8),
+                crate::db::silence::VDropSuppressionReasonV1::InvalidSubjectKind(
+                    state.subject_kind_u8,
+                ),
             ));
         }
     }
@@ -586,10 +653,18 @@ fn decorate_source_stream_vdrop_details_v1(
         .unwrap_or(candidate.reason_details.len());
     let details = vec![
         ("device_key".to_string(), subject.device_key.clone()),
-        ("source_stream_id".to_string(), subject.source_stream_id.clone()),
-        ("source_path".to_string(), subject.canonical_source_path.clone()),
+        (
+            "source_stream_id".to_string(),
+            subject.source_stream_id.clone(),
+        ),
+        (
+            "source_path".to_string(),
+            subject.canonical_source_path.clone(),
+        ),
     ];
-    candidate.reason_details.splice(insert_at..insert_at, details);
+    candidate
+        .reason_details
+        .splice(insert_at..insert_at, details);
 }
 
 fn decorate_source_stream_sharp_drop_details_v1(
@@ -603,19 +678,31 @@ fn decorate_source_stream_sharp_drop_details_v1(
         .unwrap_or(candidate.reason_details.len());
     let details = vec![
         ("device_key".to_string(), subject.device_key.clone()),
-        ("source_stream_id".to_string(), subject.source_stream_id.clone()),
-        ("source_path".to_string(), subject.canonical_source_path.clone()),
+        (
+            "source_stream_id".to_string(),
+            subject.source_stream_id.clone(),
+        ),
+        (
+            "source_path".to_string(),
+            subject.canonical_source_path.clone(),
+        ),
     ];
-    candidate.reason_details.splice(insert_at..insert_at, details);
+    candidate
+        .reason_details
+        .splice(insert_at..insert_at, details);
 }
-
 
 pub fn source_stream_open_silence_state_from_candidate_v1(
     subject: &SourceStreamSubjectV1,
     candidate: &VDropCandidateV1,
     alert_id: &str,
 ) -> Result<OpenSilenceStateV1, SourceStreamErrorV1> {
-    validate_source_stream_candidate_match_v1(subject, candidate.subject_kind_u8, &candidate.tenant_id, &candidate.subject_key)?;
+    validate_source_stream_candidate_match_v1(
+        subject,
+        candidate.subject_kind_u8,
+        &candidate.tenant_id,
+        &candidate.subject_key,
+    )?;
     Ok(OpenSilenceStateV1 {
         schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
         subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
@@ -632,7 +719,12 @@ pub fn source_stream_open_drop_state_from_candidate_v1(
     candidate: &SharpDropCandidateV1,
     alert_id: &str,
 ) -> Result<OpenDropStateV1, SourceStreamErrorV1> {
-    validate_source_stream_candidate_match_v1(subject, candidate.subject_kind_u8, &candidate.tenant_id, &candidate.subject_key)?;
+    validate_source_stream_candidate_match_v1(
+        subject,
+        candidate.subject_kind_u8,
+        &candidate.tenant_id,
+        &candidate.subject_key,
+    )?;
     Ok(OpenDropStateV1 {
         schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
         subject_kind_u8: SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
@@ -649,7 +741,12 @@ pub fn source_stream_open_silence_state_suppresses_candidate_v1(
     candidate: &VDropCandidateV1,
     open_silence: Option<&OpenSilenceStateV1>,
 ) -> Result<bool, SourceStreamErrorV1> {
-    validate_source_stream_candidate_match_v1(subject, candidate.subject_kind_u8, &candidate.tenant_id, &candidate.subject_key)?;
+    validate_source_stream_candidate_match_v1(
+        subject,
+        candidate.subject_kind_u8,
+        &candidate.tenant_id,
+        &candidate.subject_key,
+    )?;
     Ok(open_silence
         .map(|state| {
             state.subject_kind_u8 == SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
@@ -663,7 +760,12 @@ pub fn source_stream_open_drop_state_suppresses_candidate_v1(
     candidate: &SharpDropCandidateV1,
     open_drop: Option<&OpenDropStateV1>,
 ) -> Result<bool, SourceStreamErrorV1> {
-    validate_source_stream_candidate_match_v1(subject, candidate.subject_kind_u8, &candidate.tenant_id, &candidate.subject_key)?;
+    validate_source_stream_candidate_match_v1(
+        subject,
+        candidate.subject_kind_u8,
+        &candidate.tenant_id,
+        &candidate.subject_key,
+    )?;
     Ok(open_drop
         .map(|state| {
             state.subject_kind_u8 == SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
@@ -680,7 +782,9 @@ fn validate_source_stream_candidate_match_v1(
 ) -> Result<(), SourceStreamErrorV1> {
     validate_source_stream_subject_v1(subject)?;
     if subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
-        return Err(SourceStreamErrorV1::InvalidStatsField { field: "subject_kind_u8" });
+        return Err(SourceStreamErrorV1::InvalidStatsField {
+            field: "subject_kind_u8",
+        });
     }
     if tenant_id != subject.tenant_id.as_str() {
         return Err(SourceStreamErrorV1::InvalidStoragePart { field: "tenant_id" });
@@ -717,7 +821,9 @@ pub fn update_source_stream_stats_from_observation_v1(
     observed_bytes_u64: u64,
     update_ts_i64: i64,
 ) -> Result<SourceStreamStatsV1, SourceStreamErrorV1> {
-    let mut next = previous.cloned().unwrap_or_else(|| empty_source_stream_stats_v1(update_ts_i64));
+    let mut next = previous
+        .cloned()
+        .unwrap_or_else(|| empty_source_stream_stats_v1(update_ts_i64));
     validate_source_stream_stats_v1(&next)?;
     next.line_count = update_welford_v1("line_count", &next.line_count, observed_lines_u64 as f64)?;
     next.byte_count = update_welford_v1("byte_count", &next.byte_count, observed_bytes_u64 as f64)?;

@@ -155,7 +155,10 @@ fn known_tenant_ids_are_deterministic_v1() -> Result<(), Box<dyn std::error::Err
         alert_out_root: None,
     })?;
 
-    assert_eq!(vec!["tenant-a".to_string(), "tenant-b".to_string()], db.list_known_tenant_ids_v1()?);
+    assert_eq!(
+        vec!["tenant-a".to_string(), "tenant-b".to_string()],
+        db.list_known_tenant_ids_v1()?
+    );
     Ok(())
 }
 
@@ -195,13 +198,25 @@ fn global_metrics_roundtrip_v1() -> Result<(), Box<dyn std::error::Error>> {
     db.write_metric_counter_v1("run_cycles_completed_total", 9)?;
     db.write_metric_gauge_v1("run_last_cycle_devices_failed", 2.0)?;
 
-    assert_eq!(Some(9), db.read_metric_counter_v1("run_cycles_completed_total")?);
-    assert_eq!(Some(2.0), db.read_metric_gauge_v1("run_last_cycle_devices_failed")?);
+    assert_eq!(
+        Some(9),
+        db.read_metric_counter_v1("run_cycles_completed_total")?
+    );
+    assert_eq!(
+        Some(2.0),
+        db.read_metric_gauge_v1("run_last_cycle_devices_failed")?
+    );
 
     db.delete_metric_counter_v1("run_cycles_completed_total")?;
     db.delete_metric_gauge_v1("run_last_cycle_devices_failed")?;
 
-    assert_eq!(None, db.read_metric_counter_v1("run_cycles_completed_total")?);
-    assert_eq!(None, db.read_metric_gauge_v1("run_last_cycle_devices_failed")?);
+    assert_eq!(
+        None,
+        db.read_metric_counter_v1("run_cycles_completed_total")?
+    );
+    assert_eq!(
+        None,
+        db.read_metric_gauge_v1("run_last_cycle_devices_failed")?
+    );
     Ok(())
 }

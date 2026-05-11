@@ -26,7 +26,9 @@ fn build_key(parts: &[&str]) -> KeyBytes {
         }
         s.push_str(part);
     }
-    KeyBytes { bytes: s.into_bytes() }
+    KeyBytes {
+        bytes: s.into_bytes(),
+    }
 }
 
 fn u8_part(v: u8) -> String {
@@ -247,8 +249,17 @@ pub fn key_prefix_tenant_source_stats_v1(device_key: &str, source_stream_id: &st
     build_key(&["source_stats", "v1", device_key, source_stream_id])
 }
 
-pub fn key_prefix_tenant_silence_subject_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["silence_subject", "v1", "source_stream", device_key, source_stream_id])
+pub fn key_prefix_tenant_silence_subject_source_stream_v1(
+    device_key: &str,
+    source_stream_id: &str,
+) -> KeyBytes {
+    build_key(&[
+        "silence_subject",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+    ])
 }
 
 pub fn key_prefix_tenant_alert_v1() -> KeyBytes {
@@ -287,8 +298,17 @@ pub fn key_prefix_tenant_silence_open_v1() -> KeyBytes {
     build_key(&["silence_open", "v1"])
 }
 
-pub fn key_prefix_tenant_silence_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["silence_open", "v1", "source_stream", device_key, source_stream_id])
+pub fn key_prefix_tenant_silence_open_source_stream_v1(
+    device_key: &str,
+    source_stream_id: &str,
+) -> KeyBytes {
+    build_key(&[
+        "silence_open",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+    ])
 }
 
 pub fn key_prefix_tenant_drop_open_v1() -> KeyBytes {
@@ -299,8 +319,17 @@ pub fn key_prefix_tenant_drop_open_device_v1(device_key: &str) -> KeyBytes {
     build_key(&["drop_open", "v1", "device", device_key])
 }
 
-pub fn key_prefix_tenant_drop_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["drop_open", "v1", "source_stream", device_key, source_stream_id])
+pub fn key_prefix_tenant_drop_open_source_stream_v1(
+    device_key: &str,
+    source_stream_id: &str,
+) -> KeyBytes {
+    build_key(&[
+        "drop_open",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+    ])
 }
 
 pub fn key_prefix_tenant_migrate_journal_v1() -> KeyBytes {
@@ -459,10 +488,20 @@ pub fn key_tenant_stats_v1(device_key: &str, bucket: u8) -> KeyBytes {
 }
 
 pub fn key_tenant_source_stream_catalog_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["source_stream", "v1", device_key, source_stream_id, "catalog"])
+    build_key(&[
+        "source_stream",
+        "v1",
+        device_key,
+        source_stream_id,
+        "catalog",
+    ])
 }
 
-pub fn key_tenant_source_stats_v1(device_key: &str, source_stream_id: &str, bucket: u8) -> KeyBytes {
+pub fn key_tenant_source_stats_v1(
+    device_key: &str,
+    source_stream_id: &str,
+    bucket: u8,
+) -> KeyBytes {
     let bucket = u8_part(bucket);
     build_key(&["source_stats", "v1", device_key, source_stream_id, &bucket])
 }
@@ -471,12 +510,26 @@ pub fn key_tenant_alert_v1(alert_id: &str) -> KeyBytes {
     build_key(&["alert", "v1", alert_id])
 }
 
-pub fn key_tenant_alert_idx_time_v1(device_key: &str, window_start_ts: i64, alert_id: &str) -> KeyBytes {
+pub fn key_tenant_alert_idx_time_v1(
+    device_key: &str,
+    window_start_ts: i64,
+    alert_id: &str,
+) -> KeyBytes {
     let window_start_ts = i64_part(window_start_ts);
-    build_key(&["alert_idx_time", "v1", device_key, &window_start_ts, alert_id])
+    build_key(&[
+        "alert_idx_time",
+        "v1",
+        device_key,
+        &window_start_ts,
+        alert_id,
+    ])
 }
 
-pub fn key_tenant_alert_idx_cat_v1(category: &str, window_start_ts: i64, alert_id: &str) -> KeyBytes {
+pub fn key_tenant_alert_idx_cat_v1(
+    category: &str,
+    window_start_ts: i64,
+    alert_id: &str,
+) -> KeyBytes {
     let window_start_ts = i64_part(window_start_ts);
     build_key(&["alert_idx_cat", "v1", category, &window_start_ts, alert_id])
 }
@@ -488,7 +541,14 @@ pub fn key_tenant_alert_idx_ent_v1(
     alert_id: &str,
 ) -> KeyBytes {
     let window_start_ts = i64_part(window_start_ts);
-    build_key(&["alert_idx_ent", "v1", entity_kind, entity_value, &window_start_ts, alert_id])
+    build_key(&[
+        "alert_idx_ent",
+        "v1",
+        entity_kind,
+        entity_value,
+        &window_start_ts,
+        alert_id,
+    ])
 }
 
 pub fn key_tenant_metrics_counter_v1(name: &str) -> KeyBytes {
@@ -511,7 +571,14 @@ pub fn key_tenant_silence_subject_source_stream_state_v1(
     device_key: &str,
     source_stream_id: &str,
 ) -> KeyBytes {
-    build_key(&["silence_subject", "v1", "source_stream", device_key, source_stream_id, "state"])
+    build_key(&[
+        "silence_subject",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+        "state",
+    ])
 }
 
 pub fn key_tenant_silence_open_device_v1(device_key: &str) -> KeyBytes {
@@ -522,8 +589,17 @@ pub fn key_tenant_silence_open_tenant_v1() -> KeyBytes {
     build_key(&["silence_open", "v1", "tenant"])
 }
 
-pub fn key_tenant_silence_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["silence_open", "v1", "source_stream", device_key, source_stream_id])
+pub fn key_tenant_silence_open_source_stream_v1(
+    device_key: &str,
+    source_stream_id: &str,
+) -> KeyBytes {
+    build_key(&[
+        "silence_open",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+    ])
 }
 
 pub fn key_tenant_drop_open_device_v1(device_key: &str) -> KeyBytes {
@@ -535,7 +611,13 @@ pub fn key_tenant_drop_open_tenant_v1() -> KeyBytes {
 }
 
 pub fn key_tenant_drop_open_source_stream_v1(device_key: &str, source_stream_id: &str) -> KeyBytes {
-    build_key(&["drop_open", "v1", "source_stream", device_key, source_stream_id])
+    build_key(&[
+        "drop_open",
+        "v1",
+        "source_stream",
+        device_key,
+        source_stream_id,
+    ])
 }
 
 pub fn key_tenant_migrate_journal_v1(ts: i64, name: &str) -> KeyBytes {

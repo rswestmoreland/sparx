@@ -10,10 +10,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::BaselineSectionV1;
-use crate::db::baseline_sketch::{encode_dfm_v1, encode_dfn_v1, BaselineSketchErrorV1, DfCountPairV1};
+use crate::db::baseline_sketch::{
+    encode_dfm_v1, encode_dfn_v1, BaselineSketchErrorV1, DfCountPairV1,
+};
 use crate::db::keys::{
-    key_prefix_tenant_dfm_slot_v1, key_prefix_tenant_dfn_slot_v1, key_tenant_df_ring_current_day_epoch_v1,
-    key_tenant_df_ring_day_slot_epoch_v1, key_tenant_dfm_v1, key_tenant_dfn_v1, KeyBytes,
+    key_prefix_tenant_dfm_slot_v1, key_prefix_tenant_dfn_slot_v1,
+    key_tenant_df_ring_current_day_epoch_v1, key_tenant_df_ring_day_slot_epoch_v1,
+    key_tenant_dfm_v1, key_tenant_dfn_v1, KeyBytes,
 };
 use crate::db::tenant_values::{
     encode_meta_df_ring_current_day_epoch_v1, encode_meta_df_ring_day_slot_epoch_v1,
@@ -90,11 +93,24 @@ pub struct DfRingUpdatePlanV1 {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DfRingErrorV1 {
-    InvalidDfRingSlots { df_ring_slots: u32 },
-    InvalidDfBucketCount { df_bucket_count: u32 },
-    DaySlotEpochLenMismatch { expected: usize, actual: usize },
-    InvalidBucket { bucket: BaselineBucket, df_bucket_count: u32 },
-    StaleSlotKeyOutsidePrefixes { key: String, slot: u8 },
+    InvalidDfRingSlots {
+        df_ring_slots: u32,
+    },
+    InvalidDfBucketCount {
+        df_bucket_count: u32,
+    },
+    DaySlotEpochLenMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidBucket {
+        bucket: BaselineBucket,
+        df_bucket_count: u32,
+    },
+    StaleSlotKeyOutsidePrefixes {
+        key: String,
+        slot: u8,
+    },
     BaselineSketch(BaselineSketchErrorV1),
 }
 
@@ -173,7 +189,11 @@ pub fn plan_df_ring_update_v1(
         df_pairs_to_map_v1(&current_slot_bucket.df_pairs)
     };
 
-    let present_feature_ids: BTreeSet<u32> = row.sparse_counts.iter().map(|pair| pair.feature_id).collect();
+    let present_feature_ids: BTreeSet<u32> = row
+        .sparse_counts
+        .iter()
+        .map(|pair| pair.feature_id)
+        .collect();
     for feature_id in present_feature_ids {
         let entry = df_counts.entry(feature_id).or_insert(0);
         *entry = (*entry).saturating_add(1);
@@ -220,7 +240,10 @@ fn validate_df_bucket_count_v1(df_bucket_count: u32) -> Result<(), DfRingErrorV1
     Ok(())
 }
 
-fn normalize_stale_slot_keys_v1(slot: u8, stale_slot_keys: &[KeyBytes]) -> Result<Vec<KeyBytes>, DfRingErrorV1> {
+fn normalize_stale_slot_keys_v1(
+    slot: u8,
+    stale_slot_keys: &[KeyBytes],
+) -> Result<Vec<KeyBytes>, DfRingErrorV1> {
     let dfn_prefix = key_prefix_tenant_dfn_slot_v1(slot);
     let dfm_prefix = key_prefix_tenant_dfm_slot_v1(slot);
     let dfn_prefix_bytes = dfn_prefix.as_bytes();
@@ -247,7 +270,11 @@ fn normalize_stale_slot_keys_v1(slot: u8, stale_slot_keys: &[KeyBytes]) -> Resul
     Ok(keys)
 }
 
-fn stale_slot_key_sort_parts_v1(bytes: &[u8], dfm_prefix: &[u8], dfn_prefix: &[u8]) -> (u8, Option<u32>) {
+fn stale_slot_key_sort_parts_v1(
+    bytes: &[u8],
+    dfm_prefix: &[u8],
+    dfn_prefix: &[u8],
+) -> (u8, Option<u32>) {
     if let Some(bucket) = stale_slot_bucket_suffix_v1(bytes, dfm_prefix) {
         return (0, Some(bucket));
     }
@@ -293,7 +320,11 @@ fn cap_df_pairs_v1(mut pairs: Vec<DfCountPairV1>, df_map_cap: usize) -> Vec<DfCo
         return pairs;
     }
 
-    pairs.sort_by(|a, b| b.df_count.cmp(&a.df_count).then(a.feature_id.cmp(&b.feature_id)));
+    pairs.sort_by(|a, b| {
+        b.df_count
+            .cmp(&a.df_count)
+            .then(a.feature_id.cmp(&b.feature_id))
+    });
     pairs.truncate(df_map_cap);
     pairs.sort_by_key(|pair| pair.feature_id);
     pairs

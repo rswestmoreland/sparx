@@ -74,11 +74,11 @@ pub fn weighted_row_vector_v1(
 ) -> Result<Vec<CentroidValuePairV1>, CentroidStatsErrorV1> {
     let mut pairs = Vec::with_capacity(row.sparse_counts.len());
     for pair in &row.sparse_counts {
-        let feature_string = dict
-            .lookup_feature_string_v1(pair.feature_id)
-            .ok_or(CentroidStatsErrorV1::MissingFeatureString {
+        let feature_string = dict.lookup_feature_string_v1(pair.feature_id).ok_or(
+            CentroidStatsErrorV1::MissingFeatureString {
                 feature_id: pair.feature_id,
-            })?;
+            },
+        )?;
         let weight = feature_weight_v1(feature_string);
         let tf = f64::from(pair.count).ln_1p();
         let value = (weight * tf) as f32;
@@ -106,7 +106,8 @@ pub fn plan_centroid_stats_update_v1(
     validate_bucket_v1(row.key.bucket)?;
 
     let weighted_row_pairs = weighted_row_vector_v1(row, dict)?;
-    let next_centroid_pairs = apply_centroid_ema_v1(current_centroid_pairs, &weighted_row_pairs, cfg);
+    let next_centroid_pairs =
+        apply_centroid_ema_v1(current_centroid_pairs, &weighted_row_pairs, cfg);
     let next_stats = apply_stats_updates_v1(current_stats, row, score_total, last_update_ts)?;
 
     let mutations = vec![
@@ -129,7 +130,9 @@ pub fn plan_centroid_stats_update_v1(
     })
 }
 
-fn validate_centroid_stats_config_v1(cfg: &CentroidStatsConfigV1) -> Result<(), CentroidStatsErrorV1> {
+fn validate_centroid_stats_config_v1(
+    cfg: &CentroidStatsConfigV1,
+) -> Result<(), CentroidStatsErrorV1> {
     if !cfg.centroid_alpha.is_finite() || cfg.centroid_alpha <= 0.0 || cfg.centroid_alpha > 1.0 {
         return Err(CentroidStatsErrorV1::InvalidCentroidAlpha {
             centroid_alpha: cfg.centroid_alpha,
@@ -167,7 +170,6 @@ fn feature_weight_v1(feature: &str) -> f64 {
         FEATURE_WEIGHT_SHAPE_V1
     }
 }
-
 
 fn is_exact_identity_feature_v1(feature: &str) -> bool {
     feature.starts_with("SourceIp@")
@@ -253,7 +255,8 @@ fn apply_stats_updates_v1(
     next.line_count = welford_update_v1(&next.line_count, f64::from(row.meta.lines), "line_count")?;
     next.byte_count = welford_update_v1(&next.byte_count, row.meta.bytes as f64, "byte_count")?;
     if let Some(score_total) = score_total {
-        next.score_total = welford_update_v1(&next.score_total, f64::from(score_total), "score_total")?;
+        next.score_total =
+            welford_update_v1(&next.score_total, f64::from(score_total), "score_total")?;
     }
     next.last_update_ts = last_update_ts;
     Ok(next)

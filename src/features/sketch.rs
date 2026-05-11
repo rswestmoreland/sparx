@@ -208,7 +208,11 @@ fn build_topk_v1(counts: &BTreeMap<String, u32>, cap: u32) -> Vec<TopKStringEntr
         })
         .collect();
 
-    entries.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.as_bytes().cmp(b.value.as_bytes())));
+    entries.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.value.as_bytes().cmp(b.value.as_bytes()))
+    });
 
     let cap = usize::try_from(cap).unwrap_or(usize::MAX);
     if entries.len() > cap {

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use sparx::ingest::{
-    apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorResetReasonV1, FileCursorV1, ObservedFileStateV1,
+    apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorResetReasonV1, FileCursorV1,
+    ObservedFileStateV1,
 };
 
 fn observed_plain(inode: u64, mtime: i64, size: u64) -> ObservedFileStateV1 {
@@ -63,7 +64,10 @@ fn plain_file_resumes_from_existing_offset() {
     assert!(plan.should_read);
     assert_eq!(plan.reset_reason, None);
     assert_eq!(plan.cursor_resets_total_delta, 0);
-    assert_eq!(plan.cursor, cursor_plain(11, 1700001010, 240, 80, 1700001005));
+    assert_eq!(
+        plan.cursor,
+        cursor_plain(11, 1700001010, 240, 80, 1700001005)
+    );
 }
 
 #[test]
@@ -121,7 +125,10 @@ fn gzip_file_size_change_reprocesses_from_zero() {
     let plan = reconcile_cursor_v1(Some(&prev), &observed_gzip(21, 1700001010, 120));
     assert_eq!(plan.start_offset, 0);
     assert!(plan.should_read);
-    assert_eq!(plan.reset_reason, Some(CursorResetReasonV1::GzipIdentityChanged));
+    assert_eq!(
+        plan.reset_reason,
+        Some(CursorResetReasonV1::GzipIdentityChanged)
+    );
     assert_eq!(plan.cursor_resets_total_delta, 0);
 }
 

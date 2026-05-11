@@ -157,7 +157,9 @@ pub fn encode_string_v1(value: &str) -> Vec<u8> {
 pub fn decode_string_v1(bytes: &[u8]) -> Result<String, TenantValueErrorV1> {
     let (len_u32, used) = decode_varint_u32_prefix(bytes)?;
     let len = usize::try_from(len_u32).map_err(|_| TenantValueErrorV1::VarintOverflow)?;
-    let end = used.checked_add(len).ok_or(TenantValueErrorV1::VarintOverflow)?;
+    let end = used
+        .checked_add(len)
+        .ok_or(TenantValueErrorV1::VarintOverflow)?;
 
     if end > bytes.len() {
         return Err(TenantValueErrorV1::UnexpectedEof);

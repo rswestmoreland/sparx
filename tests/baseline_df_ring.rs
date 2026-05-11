@@ -10,8 +10,8 @@ use sparx::baseline::{
 };
 use sparx::db::baseline_sketch::{decode_dfm_v1, decode_dfn_v1, DfCountPairV1};
 use sparx::db::keys::{
-    key_tenant_df_ring_current_day_epoch_v1, key_tenant_df_ring_day_slot_epoch_v1, key_tenant_dfm_v1,
-    key_tenant_dfn_v1, KeyBytes,
+    key_tenant_df_ring_current_day_epoch_v1, key_tenant_df_ring_day_slot_epoch_v1,
+    key_tenant_dfm_v1, key_tenant_dfn_v1, KeyBytes,
 };
 use sparx::db::open_window::{SparseCountPairV1, WinMetaV1};
 use sparx::db::tenant_values::{
@@ -69,7 +69,10 @@ fn day_epoch_and_slot_follow_utc_floor_rules() {
 
     let negative_ts = -1;
     assert_eq!(day_epoch_for_ts_v1(negative_ts), -1);
-    assert_eq!(slot_for_day_epoch_v1(-1, DF_RING_SLOTS_DEFAULT_V1).unwrap(), 6);
+    assert_eq!(
+        slot_for_day_epoch_v1(-1, DF_RING_SLOTS_DEFAULT_V1).unwrap(),
+        6
+    );
 }
 
 #[test]
@@ -97,23 +100,38 @@ fn fresh_slot_update_writes_meta_dfn_and_dfm_with_presence_counts() {
     assert_eq!(plan.day_epoch, day_epoch);
     assert_eq!(plan.slot, slot);
     assert_eq!(plan.next_window_count, 1);
-    assert_eq!(plan.next_df_pairs, vec![
-        DfCountPairV1 { feature_id: 5, df_count: 1 },
-        DfCountPairV1 { feature_id: 7, df_count: 1 },
-    ]);
+    assert_eq!(
+        plan.next_df_pairs,
+        vec![
+            DfCountPairV1 {
+                feature_id: 5,
+                df_count: 1
+            },
+            DfCountPairV1 {
+                feature_id: 7,
+                df_count: 1
+            },
+        ]
+    );
     assert_eq!(plan.mutations.len(), 4);
 
     match &plan.mutations[0] {
         DfRingMutationV1::Put(kv) => {
             assert_eq!(kv.key, key_tenant_df_ring_day_slot_epoch_v1(slot));
-            assert_eq!(decode_meta_df_ring_day_slot_epoch_v1(&kv.value).unwrap(), day_epoch);
+            assert_eq!(
+                decode_meta_df_ring_day_slot_epoch_v1(&kv.value).unwrap(),
+                day_epoch
+            );
         }
         other => panic!("unexpected first mutation: {:?}", other),
     }
     match &plan.mutations[1] {
         DfRingMutationV1::Put(kv) => {
             assert_eq!(kv.key, key_tenant_df_ring_current_day_epoch_v1());
-            assert_eq!(decode_meta_df_ring_current_day_epoch_v1(&kv.value).unwrap(), day_epoch);
+            assert_eq!(
+                decode_meta_df_ring_current_day_epoch_v1(&kv.value).unwrap(),
+                day_epoch
+            );
         }
         other => panic!("unexpected second mutation: {:?}", other),
     }
@@ -152,19 +170,38 @@ fn same_day_update_accumulates_existing_slot_state_without_rollover() {
     let state = DfRingSlotBucketStateV1 {
         window_count: 4,
         df_pairs: vec![
-            DfCountPairV1 { feature_id: 5, df_count: 2 },
-            DfCountPairV1 { feature_id: 7, df_count: 9 },
+            DfCountPairV1 {
+                feature_id: 5,
+                df_count: 2,
+            },
+            DfCountPairV1 {
+                feature_id: 7,
+                df_count: 9,
+            },
         ],
     };
 
-    let plan = plan_df_ring_update_v1(&row, &DfRingConfigV1::default(), &meta, &state, &[]).unwrap();
+    let plan =
+        plan_df_ring_update_v1(&row, &DfRingConfigV1::default(), &meta, &state, &[]).unwrap();
     assert!(!plan.cleared_stale_slot);
     assert_eq!(plan.next_window_count, 5);
-    assert_eq!(plan.next_df_pairs, vec![
-        DfCountPairV1 { feature_id: 5, df_count: 2 },
-        DfCountPairV1 { feature_id: 7, df_count: 10 },
-        DfCountPairV1 { feature_id: 9, df_count: 1 },
-    ]);
+    assert_eq!(
+        plan.next_df_pairs,
+        vec![
+            DfCountPairV1 {
+                feature_id: 5,
+                df_count: 2
+            },
+            DfCountPairV1 {
+                feature_id: 7,
+                df_count: 10
+            },
+            DfCountPairV1 {
+                feature_id: 9,
+                df_count: 1
+            },
+        ]
+    );
     assert_eq!(plan.mutations.len(), 2);
 }
 
@@ -186,7 +223,10 @@ fn rollover_deletes_stale_slot_keys_sorted_and_resets_slot_bucket_state() {
     };
     let state = DfRingSlotBucketStateV1 {
         window_count: 99,
-        df_pairs: vec![DfCountPairV1 { feature_id: 2, df_count: 99 }],
+        df_pairs: vec![DfCountPairV1 {
+            feature_id: 2,
+            df_count: 99,
+        }],
     };
     let stale_keys = vec![
         key_tenant_dfm_v1(slot, 17),
@@ -196,10 +236,17 @@ fn rollover_deletes_stale_slot_keys_sorted_and_resets_slot_bucket_state() {
         key_tenant_dfn_v1(slot, 4),
     ];
 
-    let plan = plan_df_ring_update_v1(&row, &DfRingConfigV1::default(), &meta, &state, &stale_keys).unwrap();
+    let plan = plan_df_ring_update_v1(&row, &DfRingConfigV1::default(), &meta, &state, &stale_keys)
+        .unwrap();
     assert!(plan.cleared_stale_slot);
     assert_eq!(plan.next_window_count, 1);
-    assert_eq!(plan.next_df_pairs, vec![DfCountPairV1 { feature_id: 44, df_count: 1 }]);
+    assert_eq!(
+        plan.next_df_pairs,
+        vec![DfCountPairV1 {
+            feature_id: 44,
+            df_count: 1
+        }]
+    );
 
     let deleted: Vec<String> = plan
         .mutations
@@ -209,12 +256,15 @@ fn rollover_deletes_stale_slot_keys_sorted_and_resets_slot_bucket_state() {
             DfRingMutationV1::Put(_) => None,
         })
         .collect();
-    assert_eq!(deleted, vec![
-        s(&key_tenant_dfm_v1(slot, 4)),
-        s(&key_tenant_dfm_v1(slot, 17)),
-        s(&key_tenant_dfn_v1(slot, 4)),
-        s(&key_tenant_dfn_v1(slot, 17)),
-    ]);
+    assert_eq!(
+        deleted,
+        vec![
+            s(&key_tenant_dfm_v1(slot, 4)),
+            s(&key_tenant_dfm_v1(slot, 17)),
+            s(&key_tenant_dfn_v1(slot, 4)),
+            s(&key_tenant_dfn_v1(slot, 17)),
+        ]
+    );
 }
 
 #[test]
@@ -236,9 +286,18 @@ fn df_cap_keeps_top_counts_with_feature_id_tiebreak() {
     let state = DfRingSlotBucketStateV1 {
         window_count: 2,
         df_pairs: vec![
-            DfCountPairV1 { feature_id: 9, df_count: 2 },
-            DfCountPairV1 { feature_id: 5, df_count: 2 },
-            DfCountPairV1 { feature_id: 7, df_count: 2 },
+            DfCountPairV1 {
+                feature_id: 9,
+                df_count: 2,
+            },
+            DfCountPairV1 {
+                feature_id: 5,
+                df_count: 2,
+            },
+            DfCountPairV1 {
+                feature_id: 7,
+                df_count: 2,
+            },
         ],
     };
     let cfg = DfRingConfigV1 {
@@ -248,10 +307,19 @@ fn df_cap_keeps_top_counts_with_feature_id_tiebreak() {
     };
 
     let plan = plan_df_ring_update_v1(&row, &cfg, &meta, &state, &[]).unwrap();
-    assert_eq!(plan.next_df_pairs, vec![
-        DfCountPairV1 { feature_id: 5, df_count: 2 },
-        DfCountPairV1 { feature_id: 7, df_count: 2 },
-    ]);
+    assert_eq!(
+        plan.next_df_pairs,
+        vec![
+            DfCountPairV1 {
+                feature_id: 5,
+                df_count: 2
+            },
+            DfCountPairV1 {
+                feature_id: 7,
+                df_count: 2
+            },
+        ]
+    );
 }
 
 #[test]
@@ -272,7 +340,14 @@ fn rejects_invalid_bucket_and_stale_keys_outside_slot_prefixes() {
         df_pairs: Vec::new(),
     };
     assert_eq!(
-        plan_df_ring_update_v1(&bad_bucket_row, &DfRingConfigV1::default(), &meta, &state, &[]).unwrap_err(),
+        plan_df_ring_update_v1(
+            &bad_bucket_row,
+            &DfRingConfigV1::default(),
+            &meta,
+            &state,
+            &[]
+        )
+        .unwrap_err(),
         DfRingErrorV1::InvalidBucket {
             bucket: 48,
             df_bucket_count: 48,
@@ -284,7 +359,14 @@ fn rejects_invalid_bucket_and_stale_keys_outside_slot_prefixes() {
     let row = row(start, 11, &[(1, 1)]);
     let bad_key = key_tenant_df_ring_current_day_epoch_v1();
     assert_eq!(
-        plan_df_ring_update_v1(&row, &DfRingConfigV1::default(), &meta, &state, &[bad_key.clone()]).unwrap_err(),
+        plan_df_ring_update_v1(
+            &row,
+            &DfRingConfigV1::default(),
+            &meta,
+            &state,
+            &[bad_key.clone()]
+        )
+        .unwrap_err(),
         DfRingErrorV1::StaleSlotKeyOutsidePrefixes {
             key: s(&bad_key),
             slot,

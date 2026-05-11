@@ -67,7 +67,10 @@ pub fn load_tenant_policy_v1(
         if e.kind() == std::io::ErrorKind::NotFound {
             TenantPolicyLoadErrorV1 {
                 kind: TenantPolicyLoadErrorKindV1::MissingTenant,
-                details: vec![format!("tenant directory not found: {}", tenant_dir.display())],
+                details: vec![format!(
+                    "tenant directory not found: {}",
+                    tenant_dir.display()
+                )],
             }
         } else {
             TenantPolicyLoadErrorV1 {
@@ -83,7 +86,10 @@ pub fn load_tenant_policy_v1(
     if !tenant_md.is_dir() {
         return Err(TenantPolicyLoadErrorV1 {
             kind: TenantPolicyLoadErrorKindV1::MissingTenant,
-            details: vec![format!("tenant directory is not a directory: {}", tenant_dir.display())],
+            details: vec![format!(
+                "tenant directory is not a directory: {}",
+                tenant_dir.display()
+            )],
         });
     }
 
@@ -91,7 +97,10 @@ pub fn load_tenant_policy_v1(
         if e.kind() == std::io::ErrorKind::NotFound {
             TenantPolicyLoadErrorV1 {
                 kind: TenantPolicyLoadErrorKindV1::MissingPolicy,
-                details: vec![format!("tenant policy not found: {}", policy_path.display())],
+                details: vec![format!(
+                    "tenant policy not found: {}",
+                    policy_path.display()
+                )],
             }
         } else {
             TenantPolicyLoadErrorV1 {
@@ -209,7 +218,6 @@ pub fn tenant_policy_path_parts_v1(tenant_root: &Path, tenant_id: &str) -> (Path
     let policy_path = tenant_dir.join(".sparx").join("policy.toml");
     (tenant_dir, policy_path)
 }
-
 
 pub fn resolve_vdrop_source_stream_enabled_v1(
     config_vdrop_enabled: bool,

@@ -94,7 +94,10 @@ fn sample_alert_v1(alert_id: &str, provenance: Vec<FileSpanV1>) -> AlertV1 {
     }
 }
 
-fn seed_alert_v1(cfg: &sparx::config::ConfigV1, alert: &AlertV1) -> Result<(), Box<dyn std::error::Error>> {
+fn seed_alert_v1(
+    cfg: &sparx::config::ConfigV1,
+    alert: &AlertV1,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = SparxRuntimeV1::open_from_config_v1(cfg)?;
     runtime.with_tenant_db_v1("tenant-a", 1_700_200_000, |db| {
         db.write_primary_alert_v1(alert)?;
@@ -103,7 +106,11 @@ fn seed_alert_v1(cfg: &sparx::config::ConfigV1, alert: &AlertV1) -> Result<(), B
     Ok(())
 }
 
-fn write_plain_log_v1(cfg: &sparx::config::ConfigV1, rel_name: &str, body: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+fn write_plain_log_v1(
+    cfg: &sparx::config::ConfigV1,
+    rel_name: &str,
+    body: &str,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     let path = std::path::Path::new(&cfg.sparx.tenant_root)
         .join("tenant-a")
         .join("device-a")
@@ -113,7 +120,11 @@ fn write_plain_log_v1(cfg: &sparx::config::ConfigV1, rel_name: &str, body: &str)
     Ok(path)
 }
 
-fn write_gzip_log_v1(cfg: &sparx::config::ConfigV1, rel_name: &str, body: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+fn write_gzip_log_v1(
+    cfg: &sparx::config::ConfigV1,
+    rel_name: &str,
+    body: &str,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     let path = std::path::Path::new(&cfg.sparx.tenant_root)
         .join("tenant-a")
         .join("device-a")
@@ -127,7 +138,8 @@ fn write_gzip_log_v1(cfg: &sparx::config::ConfigV1, rel_name: &str, body: &str) 
 }
 
 #[test]
-fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>>
+{
     let cfg = temp_cfg_v1();
     let body = "alpha\nbravo\ncharlie\n";
     let bravo_start = body.find("bravo").unwrap() as u64;
@@ -274,12 +286,16 @@ fn alert_extract_missing_file_returns_exit_three_v1() -> Result<(), Box<dyn std:
         &cfg,
     );
     assert_eq!(3, result.exit_code);
-    assert!(result.msg_stderr.unwrap().contains("alert extract io error"));
+    assert!(result
+        .msg_stderr
+        .unwrap()
+        .contains("alert extract io error"));
     Ok(())
 }
 
 #[test]
-fn alert_drill_resolves_runtime_device_path_with_tenant_prefix_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alert_drill_resolves_runtime_device_path_with_tenant_prefix_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     let body = "alpha\nbravo\n";
     let plain_path = write_plain_log_v1(&cfg, "runtime.log", body)?;
@@ -346,7 +362,8 @@ fn alert_drill_rejects_provenance_path_traversal_v1() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn alert_drill_resolves_source_stream_display_path_by_device_key_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alert_drill_resolves_source_stream_display_path_by_device_key_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     let body = "source-one\nsource-two\n";
     let plain_path = write_plain_log_v1(&cfg, "source.log", body)?;

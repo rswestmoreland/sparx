@@ -50,7 +50,6 @@ fn primitive_bool_roundtrip_and_validation_match_contract() {
     );
 }
 
-
 #[test]
 fn cursor_is_gzip_rejects_values_other_than_zero_or_one() {
     assert_eq!(
@@ -70,11 +69,13 @@ fn simple_value_helpers_roundtrip_by_contract_type() {
         1700000000
     );
     assert_eq!(
-        decode_meta_schema_last_migrate_ts_v1(&encode_meta_schema_last_migrate_ts_v1(1700000100)).unwrap(),
+        decode_meta_schema_last_migrate_ts_v1(&encode_meta_schema_last_migrate_ts_v1(1700000100))
+            .unwrap(),
         1700000100
     );
     assert_eq!(
-        decode_meta_ingest_last_flush_ts_v1(&encode_meta_ingest_last_flush_ts_v1(1700000200)).unwrap(),
+        decode_meta_ingest_last_flush_ts_v1(&encode_meta_ingest_last_flush_ts_v1(1700000200))
+            .unwrap(),
         1700000200
     );
     assert_eq!(
@@ -82,15 +83,20 @@ fn simple_value_helpers_roundtrip_by_contract_type() {
         77
     );
     assert_eq!(
-        decode_meta_df_ring_current_day_epoch_v1(&encode_meta_df_ring_current_day_epoch_v1(1700000300)).unwrap(),
+        decode_meta_df_ring_current_day_epoch_v1(&encode_meta_df_ring_current_day_epoch_v1(
+            1700000300
+        ))
+        .unwrap(),
         1700000300
     );
     assert_eq!(
-        decode_meta_df_ring_day_slot_epoch_v1(&encode_meta_df_ring_day_slot_epoch_v1(1700000400)).unwrap(),
+        decode_meta_df_ring_day_slot_epoch_v1(&encode_meta_df_ring_day_slot_epoch_v1(1700000400))
+            .unwrap(),
         1700000400
     );
     assert_eq!(
-        decode_meta_df_ring_last_roll_epoch_v1(&encode_meta_df_ring_last_roll_epoch_v1(1700000500)).unwrap(),
+        decode_meta_df_ring_last_roll_epoch_v1(&encode_meta_df_ring_last_roll_epoch_v1(1700000500))
+            .unwrap(),
         1700000500
     );
     assert_eq!(
@@ -102,7 +108,8 @@ fn simple_value_helpers_roundtrip_by_contract_type() {
         100
     );
     assert_eq!(
-        decode_feat_dict_meta_last_gc_ts_v1(&encode_feat_dict_meta_last_gc_ts_v1(1700000600)).unwrap(),
+        decode_feat_dict_meta_last_gc_ts_v1(&encode_feat_dict_meta_last_gc_ts_v1(1700000600))
+            .unwrap(),
         1700000600
     );
     assert_eq!(
@@ -168,7 +175,10 @@ fn string_length_varint_supports_long_feature_strings() {
     let feature = format!("feature:{}", "x".repeat(300));
     let encoded = encode_feat_dict_id_to_str_v1(&feature);
     let expected_prefix = encode_varint_u32(feature.len() as u32);
-    assert_eq!(&encoded[..expected_prefix.len()], expected_prefix.as_slice());
+    assert_eq!(
+        &encoded[..expected_prefix.len()],
+        expected_prefix.as_slice()
+    );
     assert_eq!(decode_feat_dict_id_to_str_v1(&encoded).unwrap(), feature);
 }
 

@@ -19,13 +19,14 @@ use sparx::db::baseline_sketch::{
 use sparx::db::keys::{
     key_tenant_active_window_v1, key_tenant_centroid_v1, key_tenant_cursor_inode_v1,
     key_tenant_cursor_is_gzip_v1, key_tenant_cursor_last_read_ts_v1, key_tenant_cursor_mtime_v1,
-    key_tenant_cursor_offset_v1, key_tenant_cursor_size_v1, key_tenant_df_ring_current_day_epoch_v1,
-    key_tenant_df_ring_day_slot_epoch_v1, key_tenant_dfm_v1, key_tenant_dfn_v1,
-    key_tenant_feature_dict_entries_v1, key_tenant_feature_dict_last_gc_ts_v1,
-    key_tenant_feature_dict_next_id_v1, key_tenant_stats_v1, key_tenant_window_row_ent_domain_v1,
-    key_tenant_window_row_ent_dstip_v1, key_tenant_window_row_ent_host_v1,
-    key_tenant_window_row_ent_srcip_v1, key_tenant_window_row_ent_userid_v1,
-    key_tenant_window_row_feat_v1, key_tenant_window_row_meta_v1,
+    key_tenant_cursor_offset_v1, key_tenant_cursor_size_v1,
+    key_tenant_df_ring_current_day_epoch_v1, key_tenant_df_ring_day_slot_epoch_v1,
+    key_tenant_dfm_v1, key_tenant_dfn_v1, key_tenant_feature_dict_entries_v1,
+    key_tenant_feature_dict_last_gc_ts_v1, key_tenant_feature_dict_next_id_v1, key_tenant_stats_v1,
+    key_tenant_window_row_ent_domain_v1, key_tenant_window_row_ent_dstip_v1,
+    key_tenant_window_row_ent_host_v1, key_tenant_window_row_ent_srcip_v1,
+    key_tenant_window_row_ent_userid_v1, key_tenant_window_row_feat_v1,
+    key_tenant_window_row_meta_v1,
 };
 use sparx::db::open_window::{
     decode_win_active_v1, decode_win_row_ent_domain_v1, decode_win_row_ent_dstip_v1,
@@ -54,7 +55,9 @@ use sparx::ingest::{
 };
 use sparx::sink::{JsonlAlertSinkV1, JsonlSinkConfigV1};
 use sparx::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
-use sparx::window::{align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1};
+use sparx::window::{
+    align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1,
+};
 
 static NEXT_TMP_ID_V1: AtomicU64 = AtomicU64::new(1);
 const FIXTURE_TENANT_V1: &str = "smoke";
@@ -89,16 +92,26 @@ struct RunResultV1 {
 fn repo_fixture_corpus_validates_and_smoke_pipeline_emits_alert_with_provenance() {
     let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
     let report = validate_fixture_root_v1(&fixture_root).unwrap();
-    assert!(report.is_ok(), "fixture validation errors: {:?}", report.errors);
+    assert!(
+        report.is_ok(),
+        "fixture validation errors: {:?}",
+        report.errors
+    );
     assert!(report.device_file_count >= 2);
 
     let run = run_full_fixture_v1();
     assert_eq!(run.final_cursor.offset, run.final_cursor.size);
-    assert!(!run.emitted_alerts.is_empty(), "expected at least one alert");
+    assert!(
+        !run.emitted_alerts.is_empty(),
+        "expected at least one alert"
+    );
 
     let alert = &run.emitted_alerts[0];
     assert_eq!(alert.tenant_id, FIXTURE_TENANT_V1);
-    assert_eq!(alert.device_path, format!("{}/{}", FIXTURE_TENANT_V1, DEVICE_DIR_V1));
+    assert_eq!(
+        alert.device_path,
+        format!("{}/{}", FIXTURE_TENANT_V1, DEVICE_DIR_V1)
+    );
     assert!(!alert.provenance.is_empty());
     assert_eq!(alert.provenance[0].file_rel, "auth.log");
     assert!(alert.provenance[0].offset_end > alert.provenance[0].offset_start);
@@ -109,7 +122,10 @@ fn restart_recovery_matches_single_pass_alerts_and_cursor() {
     let expected = run_full_fixture_v1();
 
     let partial = run_fixture_v1(None, Some(3));
-    assert!(partial.snapshot.active_span.is_some(), "expected active window state after partial run");
+    assert!(
+        partial.snapshot.active_span.is_some(),
+        "expected active window state after partial run"
+    );
     assert!(partial.final_cursor.offset < partial.final_cursor.size);
 
     let resumed = run_fixture_v1(Some(partial.snapshot.clone()), None);
@@ -126,7 +142,10 @@ fn run_full_fixture_v1() -> RunResultV1 {
     run_fixture_v1(None, None)
 }
 
-fn run_fixture_v1(snapshot: Option<PipelineSnapshotV1>, stop_after_lines: Option<usize>) -> RunResultV1 {
+fn run_fixture_v1(
+    snapshot: Option<PipelineSnapshotV1>,
+    stop_after_lines: Option<usize>,
+) -> RunResultV1 {
     let temp_root = make_temp_root_v1("e2e_smoke");
     let watch_root = temp_root.join("watch_root");
     let alerts_root = temp_root.join("alerts_out");
@@ -140,7 +159,10 @@ fn run_fixture_v1(snapshot: Option<PipelineSnapshotV1>, stop_after_lines: Option
 
     let device = &device_inventory.device;
     let file = &device_inventory.files[0];
-    let file_path = watch_root.join(&device.tenant_id).join(&device.device_dir_rel).join(&file.file_rel);
+    let file_path = watch_root
+        .join(&device.tenant_id)
+        .join(&device.device_dir_rel)
+        .join(&file.file_rel);
     let observed = observed_file_state_v1(&file_path, file.is_gzip);
 
     let mut tenant_db = snapshot
@@ -169,14 +191,18 @@ fn run_fixture_v1(snapshot: Option<PipelineSnapshotV1>, stop_after_lines: Option
     );
     sink.shutdown_v1().unwrap();
 
-    let final_cursor = load_cursor_from_db_v1(&tenant_db, &device.device_key, &file.file_key).unwrap();
+    let final_cursor =
+        load_cursor_from_db_v1(&tenant_db, &device.device_key, &file.file_key).unwrap();
     let alerts_from_sink = read_alerts_from_jsonl_root_v1(&alerts_root);
     assert_eq!(alerts_from_sink, emitted_alerts);
 
     let _ = fs::create_dir_all(&state_root);
 
     RunResultV1 {
-        snapshot: PipelineSnapshotV1 { tenant_db, active_span },
+        snapshot: PipelineSnapshotV1 {
+            tenant_db,
+            active_span,
+        },
         emitted_alerts: alerts_from_sink,
         final_cursor,
     }
@@ -213,11 +239,18 @@ fn process_file_v1(
     alert_cfg.include_debug_fields = true;
 
     let mut dict = load_dict_from_db_v1(tenant_db, dict_cfg.clone());
-    let mut acc = restore_active_window_from_db_v1(tenant_db, &device.device_key, caps.clone(), &dict);
+    let mut acc =
+        restore_active_window_from_db_v1(tenant_db, &device.device_key, caps.clone(), &dict);
     let mut cursor = cursor_plan.cursor.clone();
     write_cursor_to_db_v1(tenant_db, &device.device_key, &file.file_key, &cursor);
 
-    let mut reader = open_file_reader_v1(file_path, file.is_gzip, cursor_plan.start_offset, READ_CHUNK_BYTES_V1).unwrap();
+    let mut reader = open_file_reader_v1(
+        file_path,
+        file.is_gzip,
+        cursor_plan.start_offset,
+        READ_CHUNK_BYTES_V1,
+    )
+    .unwrap();
     let mut emitted_alerts = Vec::new();
     let mut line_buf = Vec::new();
     let mut line_start_offset = cursor_plan.start_offset;
@@ -306,7 +339,11 @@ fn process_file_v1(
                 &centroid_cfg,
                 &alert_cfg,
             );
-            apply_finalize_idle_deletes_v1(tenant_db, &device.device_key, acc.active_v1().active_window_id);
+            apply_finalize_idle_deletes_v1(
+                tenant_db,
+                &device.device_key,
+                acc.active_v1().active_window_id,
+            );
         }
     }
 
@@ -339,20 +376,29 @@ fn process_line_v1(
     let window_start_ts = align_window_start_ts_v1(line_ts, 60).unwrap();
 
     if acc_opt.is_none() {
-        *acc_opt = Some(WindowAccumulatorV1::new_v1(
-            &device.device_key,
-            window_start_ts,
-            next_window_id_v1(tenant_db, &device.device_key),
-            60,
-            line_ts,
-            base_window_caps_v1(),
-        ).unwrap());
+        *acc_opt = Some(
+            WindowAccumulatorV1::new_v1(
+                &device.device_key,
+                window_start_ts,
+                next_window_id_v1(tenant_db, &device.device_key),
+                60,
+                line_ts,
+                base_window_caps_v1(),
+            )
+            .unwrap(),
+        );
     }
 
     loop {
         let acc = acc_opt.as_mut().unwrap();
         let result = acc
-            .apply_line_v1(line_ts, line_ts, usize::try_from(byte_len).unwrap(), &emitted, dict)
+            .apply_line_v1(
+                line_ts,
+                line_ts,
+                usize::try_from(byte_len).unwrap(),
+                &emitted,
+                dict,
+            )
             .unwrap();
         match result {
             WindowApplyLineResultV1::Applied(applied) => {
@@ -367,12 +413,18 @@ fn process_line_v1(
                 write_cursor_to_db_v1(tenant_db, &device.device_key, &file.file_key, cursor);
                 break;
             }
-            WindowApplyLineResultV1::DifferentWindow { line_window_start_ts } => {
-                let (plan, next) = acc.finalize_and_advance_v1(line_window_start_ts, line_ts).unwrap();
+            WindowApplyLineResultV1::DifferentWindow {
+                line_window_start_ts,
+            } => {
+                let (plan, next) = acc
+                    .finalize_and_advance_v1(line_window_start_ts, line_ts)
+                    .unwrap();
                 let finalized_row = plan.finalized_row.clone();
                 for mutation in plan.mutations {
                     match mutation {
-                        sparx::window::WindowFinalizeMutationV1::Put(kv) => insert_kv_v1(tenant_db, kv.key.bytes, kv.value),
+                        sparx::window::WindowFinalizeMutationV1::Put(kv) => {
+                            insert_kv_v1(tenant_db, kv.key.bytes, kv.value)
+                        }
                         sparx::window::WindowFinalizeMutationV1::Delete(key) => {
                             tenant_db.remove(&String::from_utf8(key.bytes).unwrap());
                         }
@@ -408,7 +460,8 @@ fn finalize_window_v1(
     centroid_cfg: &CentroidStatsConfigV1,
     alert_cfg: &AlertScoringConfigV1,
 ) {
-    let baseline_before = build_bucket_baseline_from_db_v1(tenant_db, &device.device_key, row.key.bucket, df_cfg);
+    let baseline_before =
+        build_bucket_baseline_from_db_v1(tenant_db, &device.device_key, row.key.bucket, df_cfg);
     let current_stats = load_device_stats_v1(tenant_db, &device.device_key, row.key.bucket);
 
     let df_meta = load_df_meta_v1(tenant_db, df_cfg);
@@ -416,7 +469,14 @@ fn finalize_window_v1(
     let slot = sparx::baseline::slot_for_day_epoch_v1(day_epoch, df_cfg.df_ring_slots).unwrap();
     let current_slot_bucket = load_df_slot_bucket_state_v1(tenant_db, slot, row.key.bucket);
     let stale_slot_keys = collect_stale_slot_keys_v1(tenant_db, slot);
-    let df_plan = plan_df_ring_update_v1(&row, df_cfg, &df_meta, &current_slot_bucket, &stale_slot_keys).unwrap();
+    let df_plan = plan_df_ring_update_v1(
+        &row,
+        df_cfg,
+        &df_meta,
+        &current_slot_bucket,
+        &stale_slot_keys,
+    )
+    .unwrap();
     let preview = build_alert_v1(
         &device.tenant_id,
         &format!("{}/{}", device.tenant_id, device.device_dir_rel),
@@ -425,12 +485,18 @@ fn finalize_window_v1(
         &baseline_before,
         current_stats.as_ref(),
         alert_cfg,
-        &span.clone().into_iter().map(file_span_from_active_v1).collect::<Vec<FileSpanV1>>(),
-    ).unwrap();
+        &span
+            .clone()
+            .into_iter()
+            .map(file_span_from_active_v1)
+            .collect::<Vec<FileSpanV1>>(),
+    )
+    .unwrap();
 
     apply_df_mutations_v1(tenant_db, &df_plan.mutations);
 
-    let centroid_pairs_before = load_centroid_pairs_v1(tenant_db, &device.device_key, row.key.bucket);
+    let centroid_pairs_before =
+        load_centroid_pairs_v1(tenant_db, &device.device_key, row.key.bucket);
     let centroid_plan = plan_centroid_stats_update_v1(
         &row,
         dict,
@@ -439,7 +505,8 @@ fn finalize_window_v1(
         current_stats.as_ref(),
         Some(preview.score_total),
         row.key.window_end_ts,
-    ).unwrap();
+    )
+    .unwrap();
     apply_centroid_mutations_v1(tenant_db, &centroid_plan.mutations);
 
     if let Some(alert) = preview.alert {
@@ -448,7 +515,11 @@ fn finalize_window_v1(
     }
 }
 
-fn apply_finalize_idle_deletes_v1(db: &mut BTreeMap<String, Vec<u8>>, device_key: &str, window_id: u64) {
+fn apply_finalize_idle_deletes_v1(
+    db: &mut BTreeMap<String, Vec<u8>>,
+    device_key: &str,
+    window_id: u64,
+) {
     let keys = vec![
         key_tenant_window_row_feat_v1(device_key, window_id),
         key_tenant_window_row_meta_v1(device_key, window_id),
@@ -479,22 +550,92 @@ fn load_cursor_from_db_v1(
     device_key: &str,
     file_key: &str,
 ) -> Option<FileCursorV1> {
-    let inode = db.get(&key_string_v1(key_tenant_cursor_inode_v1(device_key, file_key))).map(|v| decode_cursor_inode_v1(v).unwrap())?;
-    let mtime = decode_cursor_mtime_v1(db.get(&key_string_v1(key_tenant_cursor_mtime_v1(device_key, file_key))).unwrap()).unwrap();
-    let size = decode_cursor_size_v1(db.get(&key_string_v1(key_tenant_cursor_size_v1(device_key, file_key))).unwrap()).unwrap();
-    let offset = decode_cursor_offset_v1(db.get(&key_string_v1(key_tenant_cursor_offset_v1(device_key, file_key))).unwrap()).unwrap();
-    let is_gzip = decode_cursor_is_gzip_v1(db.get(&key_string_v1(key_tenant_cursor_is_gzip_v1(device_key, file_key))).unwrap()).unwrap();
-    let last_read_ts = decode_cursor_last_read_ts_v1(db.get(&key_string_v1(key_tenant_cursor_last_read_ts_v1(device_key, file_key))).unwrap()).unwrap();
-    Some(FileCursorV1 { inode, mtime, size, offset, is_gzip, last_read_ts })
+    let inode = db
+        .get(&key_string_v1(key_tenant_cursor_inode_v1(
+            device_key, file_key,
+        )))
+        .map(|v| decode_cursor_inode_v1(v).unwrap())?;
+    let mtime = decode_cursor_mtime_v1(
+        db.get(&key_string_v1(key_tenant_cursor_mtime_v1(
+            device_key, file_key,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    let size = decode_cursor_size_v1(
+        db.get(&key_string_v1(key_tenant_cursor_size_v1(
+            device_key, file_key,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    let offset = decode_cursor_offset_v1(
+        db.get(&key_string_v1(key_tenant_cursor_offset_v1(
+            device_key, file_key,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    let is_gzip = decode_cursor_is_gzip_v1(
+        db.get(&key_string_v1(key_tenant_cursor_is_gzip_v1(
+            device_key, file_key,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    let last_read_ts = decode_cursor_last_read_ts_v1(
+        db.get(&key_string_v1(key_tenant_cursor_last_read_ts_v1(
+            device_key, file_key,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    Some(FileCursorV1 {
+        inode,
+        mtime,
+        size,
+        offset,
+        is_gzip,
+        last_read_ts,
+    })
 }
 
-fn write_cursor_to_db_v1(db: &mut BTreeMap<String, Vec<u8>>, device_key: &str, file_key: &str, cursor: &FileCursorV1) {
-    insert_kv_v1(db, key_tenant_cursor_inode_v1(device_key, file_key).bytes, encode_cursor_inode_v1(cursor.inode));
-    insert_kv_v1(db, key_tenant_cursor_mtime_v1(device_key, file_key).bytes, encode_cursor_mtime_v1(cursor.mtime));
-    insert_kv_v1(db, key_tenant_cursor_size_v1(device_key, file_key).bytes, encode_cursor_size_v1(cursor.size));
-    insert_kv_v1(db, key_tenant_cursor_offset_v1(device_key, file_key).bytes, encode_cursor_offset_v1(cursor.offset));
-    insert_kv_v1(db, key_tenant_cursor_is_gzip_v1(device_key, file_key).bytes, encode_cursor_is_gzip_v1(cursor.is_gzip));
-    insert_kv_v1(db, key_tenant_cursor_last_read_ts_v1(device_key, file_key).bytes, encode_cursor_last_read_ts_v1(cursor.last_read_ts));
+fn write_cursor_to_db_v1(
+    db: &mut BTreeMap<String, Vec<u8>>,
+    device_key: &str,
+    file_key: &str,
+    cursor: &FileCursorV1,
+) {
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_inode_v1(device_key, file_key).bytes,
+        encode_cursor_inode_v1(cursor.inode),
+    );
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_mtime_v1(device_key, file_key).bytes,
+        encode_cursor_mtime_v1(cursor.mtime),
+    );
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_size_v1(device_key, file_key).bytes,
+        encode_cursor_size_v1(cursor.size),
+    );
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_offset_v1(device_key, file_key).bytes,
+        encode_cursor_offset_v1(cursor.offset),
+    );
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_is_gzip_v1(device_key, file_key).bytes,
+        encode_cursor_is_gzip_v1(cursor.is_gzip),
+    );
+    insert_kv_v1(
+        db,
+        key_tenant_cursor_last_read_ts_v1(device_key, file_key).bytes,
+        encode_cursor_last_read_ts_v1(cursor.last_read_ts),
+    );
 }
 
 fn load_dict_from_db_v1(
@@ -508,7 +649,11 @@ fn load_dict_from_db_v1(
 
     let meta = FeatureDictionaryMetaV1 {
         next_id: decode_feat_dict_meta_next_id_v1(db.get(&next_id_key).unwrap()).unwrap(),
-        entries: decode_feat_dict_meta_entries_v1(db.get(&key_string_v1(key_tenant_feature_dict_entries_v1())).unwrap()).unwrap(),
+        entries: decode_feat_dict_meta_entries_v1(
+            db.get(&key_string_v1(key_tenant_feature_dict_entries_v1()))
+                .unwrap(),
+        )
+        .unwrap(),
         last_gc_ts: db
             .get(&key_string_v1(key_tenant_feature_dict_last_gc_ts_v1()))
             .map(|v| decode_feat_dict_meta_last_gc_ts_v1(v).unwrap())
@@ -519,7 +664,10 @@ fn load_dict_from_db_v1(
     let mut reverse_entries = Vec::new();
     for (key, value) in db {
         if let Some(feature_string) = key.strip_prefix("feat_dict/v1/str/") {
-            forward_entries.push((feature_string.to_string(), decode_feat_dict_str_to_id_v1(value).unwrap()));
+            forward_entries.push((
+                feature_string.to_string(),
+                decode_feat_dict_str_to_id_v1(value).unwrap(),
+            ));
         } else if key.starts_with("feat_dict/v1/id/") {
             let feature_id: u32 = key.rsplit('/').next().unwrap().parse().unwrap();
             reverse_entries.push((feature_id, decode_feat_dict_id_to_str_v1(value).unwrap()));
@@ -540,29 +688,69 @@ fn restore_active_window_from_db_v1(
     let active = db.get(&key_string_v1(key_tenant_active_window_v1(device_key)))?;
     let active = decode_win_active_v1(active).unwrap();
     let feat = decode_win_row_feat_v1(
-        db.get(&key_string_v1(key_tenant_window_row_feat_v1(device_key, active.active_window_id))).unwrap(),
-    ).unwrap();
+        db.get(&key_string_v1(key_tenant_window_row_feat_v1(
+            device_key,
+            active.active_window_id,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
     let meta = decode_win_row_meta_v1(
-        db.get(&key_string_v1(key_tenant_window_row_meta_v1(device_key, active.active_window_id))).unwrap(),
-    ).unwrap();
+        db.get(&key_string_v1(key_tenant_window_row_meta_v1(
+            device_key,
+            active.active_window_id,
+        )))
+        .unwrap(),
+    )
+    .unwrap();
     let snapshot = EntitySketchSnapshotV1 {
         srcips: decode_win_row_ent_srcip_v1(
-            db.get(&key_string_v1(key_tenant_window_row_ent_srcip_v1(device_key, active.active_window_id))).unwrap(),
-        ).unwrap(),
+            db.get(&key_string_v1(key_tenant_window_row_ent_srcip_v1(
+                device_key,
+                active.active_window_id,
+            )))
+            .unwrap(),
+        )
+        .unwrap(),
         dstips: decode_win_row_ent_dstip_v1(
-            db.get(&key_string_v1(key_tenant_window_row_ent_dstip_v1(device_key, active.active_window_id))).unwrap(),
-        ).unwrap(),
+            db.get(&key_string_v1(key_tenant_window_row_ent_dstip_v1(
+                device_key,
+                active.active_window_id,
+            )))
+            .unwrap(),
+        )
+        .unwrap(),
         userids: decode_win_row_ent_userid_v1(
-            db.get(&key_string_v1(key_tenant_window_row_ent_userid_v1(device_key, active.active_window_id))).unwrap(),
-        ).unwrap(),
+            db.get(&key_string_v1(key_tenant_window_row_ent_userid_v1(
+                device_key,
+                active.active_window_id,
+            )))
+            .unwrap(),
+        )
+        .unwrap(),
         domains: decode_win_row_ent_domain_v1(
-            db.get(&key_string_v1(key_tenant_window_row_ent_domain_v1(device_key, active.active_window_id))).unwrap(),
-        ).unwrap(),
+            db.get(&key_string_v1(key_tenant_window_row_ent_domain_v1(
+                device_key,
+                active.active_window_id,
+            )))
+            .unwrap(),
+        )
+        .unwrap(),
         hosts: decode_win_row_ent_host_v1(
-            db.get(&key_string_v1(key_tenant_window_row_ent_host_v1(device_key, active.active_window_id))).unwrap(),
-        ).unwrap(),
+            db.get(&key_string_v1(key_tenant_window_row_ent_host_v1(
+                device_key,
+                active.active_window_id,
+            )))
+            .unwrap(),
+        )
+        .unwrap(),
     };
-    Some(WindowAccumulatorV1::from_checkpoint_v1(device_key, caps, active, meta, &feat, &snapshot, dict).unwrap())
+    Some(
+        WindowAccumulatorV1::from_checkpoint_v1(
+            device_key, caps, active, meta, &feat, &snapshot, dict,
+        )
+        .unwrap(),
+    )
 }
 
 fn load_df_meta_v1(db: &BTreeMap<String, Vec<u8>>, cfg: &DfRingConfigV1) -> DfRingMetaStateV1 {
@@ -570,7 +758,8 @@ fn load_df_meta_v1(db: &BTreeMap<String, Vec<u8>>, cfg: &DfRingConfigV1) -> DfRi
     for slot in 0..cfg.df_ring_slots {
         let key = key_string_v1(key_tenant_df_ring_day_slot_epoch_v1(slot as u8));
         if let Some(value) = db.get(&key) {
-            day_slot_epochs[slot as usize] = Some(decode_meta_df_ring_day_slot_epoch_v1(value).unwrap());
+            day_slot_epochs[slot as usize] =
+                Some(decode_meta_df_ring_day_slot_epoch_v1(value).unwrap());
         }
     }
     DfRingMetaStateV1 {
@@ -594,16 +783,24 @@ fn load_df_slot_bucket_state_v1(
         .get(&key_string_v1(key_tenant_dfm_v1(slot, bucket)))
         .map(|value| decode_dfm_v1(value).unwrap())
         .unwrap_or_default();
-    DfRingSlotBucketStateV1 { window_count, df_pairs }
+    DfRingSlotBucketStateV1 {
+        window_count,
+        df_pairs,
+    }
 }
 
-fn collect_stale_slot_keys_v1(db: &BTreeMap<String, Vec<u8>>, slot: u8) -> Vec<sparx::db::keys::KeyBytes> {
+fn collect_stale_slot_keys_v1(
+    db: &BTreeMap<String, Vec<u8>>,
+    slot: u8,
+) -> Vec<sparx::db::keys::KeyBytes> {
     let dfm_prefix = format!("dfM/v1/{}/", slot);
     let dfn_prefix = format!("dfN/v1/{}/", slot);
     let mut keys = Vec::new();
     for key in db.keys() {
         if key.starts_with(&dfm_prefix) || key.starts_with(&dfn_prefix) {
-            keys.push(sparx::db::keys::KeyBytes { bytes: key.as_bytes().to_vec() });
+            keys.push(sparx::db::keys::KeyBytes {
+                bytes: key.as_bytes().to_vec(),
+            });
         }
     }
     keys
@@ -642,7 +839,10 @@ fn build_bucket_baseline_from_db_v1(
     }
     let df = df_totals
         .into_iter()
-        .map(|(feature_id, df_count)| DfPairV1 { feature_id, df_count })
+        .map(|(feature_id, df_count)| DfPairV1 {
+            feature_id,
+            df_count,
+        })
         .collect();
     let centroid = load_centroid_pairs_v1(db, device_key, bucket)
         .into_iter()
@@ -728,7 +928,12 @@ fn file_span_from_active_v1(span: ActiveSpanStateV1) -> FileSpanV1 {
 
 fn next_window_id_v1(db: &BTreeMap<String, Vec<u8>>, device_key: &str) -> u64 {
     db.get(&key_string_v1(key_tenant_active_window_v1(device_key)))
-        .map(|value| decode_win_active_v1(value).unwrap().active_window_id.saturating_add(1))
+        .map(|value| {
+            decode_win_active_v1(value)
+                .unwrap()
+                .active_window_id
+                .saturating_add(1)
+        })
         .unwrap_or(1)
 }
 

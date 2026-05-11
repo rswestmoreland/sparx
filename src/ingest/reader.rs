@@ -179,7 +179,12 @@ impl GzipFileReaderV1 {
     }
 }
 
-pub fn open_file_reader_v1(path: &Path, is_gzip: bool, start_offset: u64, chunk_bytes: usize) -> io::Result<FileReaderV1> {
+pub fn open_file_reader_v1(
+    path: &Path,
+    is_gzip: bool,
+    start_offset: u64,
+    chunk_bytes: usize,
+) -> io::Result<FileReaderV1> {
     if is_gzip {
         Ok(FileReaderV1::Gzip(GzipFileReaderV1::open_v1(
             path,
@@ -224,7 +229,6 @@ impl<R: Read> Read for CountingReaderV1<R> {
         Ok(n)
     }
 }
-
 
 impl GzipFileReaderV1 {
     fn read_decoder_v1(&mut self, buf: &mut [u8]) -> io::Result<usize> {

@@ -50,7 +50,10 @@ fn open_under_cap_and_reuse_handle_v1() -> Result<(), Box<dyn std::error::Error>
         })
     })?;
     assert_eq!(2, cache.open_count_v1());
-    assert_eq!(vec!["tenant-a".to_string(), "tenant-b".to_string()], cache.list_open_tenant_ids_v1());
+    assert_eq!(
+        vec!["tenant-a".to_string(), "tenant-b".to_string()],
+        cache.list_open_tenant_ids_v1()
+    );
 
     let seq_before = cache
         .snapshot_v1()
@@ -93,7 +96,10 @@ fn lru_eviction_is_deterministic_v1() -> Result<(), Box<dyn std::error::Error>> 
     cache.with_tenant_db_v1("tenant-c", 103, |_db| Ok(()))?;
 
     assert_eq!(2, cache.open_count_v1());
-    assert_eq!(vec!["tenant-a".to_string(), "tenant-c".to_string()], cache.list_open_tenant_ids_v1());
+    assert_eq!(
+        vec!["tenant-a".to_string(), "tenant-c".to_string()],
+        cache.list_open_tenant_ids_v1()
+    );
     assert!(!cache.contains_v1("tenant-b"));
     Ok(())
 }
@@ -127,9 +133,11 @@ fn idle_close_and_safe_reopen_v1() -> Result<(), Box<dyn std::error::Error>> {
 
     let reopened_version = cache.with_tenant_db_v1("tenant-a", 111, |db| {
         let state = db.read_schema_state_v1()?;
-        state
-            .map(|s| Ok(s.version))
-            .unwrap_or_else(|| Err(sparx::db::DbErrorV1::new_v1("missing schema state after reopen")))
+        state.map(|s| Ok(s.version)).unwrap_or_else(|| {
+            Err(sparx::db::DbErrorV1::new_v1(
+                "missing schema state after reopen",
+            ))
+        })
     })?;
     assert_eq!(9, reopened_version);
     Ok(())

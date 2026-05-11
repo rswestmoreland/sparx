@@ -21,8 +21,8 @@ pub use emit::{
     SemanticCategoryV1, SemanticMatchV1, UserIdentityV1, UserKindV1,
 };
 pub use sketch::{
-    EntitySketchCapsV1, EntitySketchKindV1, EntitySketchKvV1,
-    EntitySketchSnapshotV1, EntitySketchesV1,
+    EntitySketchCapsV1, EntitySketchKindV1, EntitySketchKvV1, EntitySketchSnapshotV1,
+    EntitySketchesV1,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

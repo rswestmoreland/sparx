@@ -103,7 +103,12 @@ fn ingest_line_counts_only_supported_metadata_kinds() {
         .map(|m| m.value.clone())
         .collect();
     assert_eq!(user_raws, vec!["Alice@Example.com".to_string()]);
-    assert_eq!(sketches.counts_for_kind_v1(EntitySketchKindV1::UserId).len(), 1);
+    assert_eq!(
+        sketches
+            .counts_for_kind_v1(EntitySketchKindV1::UserId)
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -124,10 +129,7 @@ fn topk_snapshot_is_count_desc_then_lex_asc_and_capped() {
         .collect();
     assert_eq!(
         got,
-        vec![
-            ("10.0.0.7".to_string(), 2),
-            ("10.0.0.8".to_string(), 2),
-        ]
+        vec![("10.0.0.7".to_string(), 2), ("10.0.0.8".to_string(), 2),]
     );
 }
 
@@ -142,11 +144,26 @@ fn checkpoint_writes_use_expected_keys_and_encodings() {
 
     let writes = sketches.checkpoint_writes_v1("dev123", 42).unwrap();
     assert_eq!(writes.len(), 5);
-    assert_eq!(writes[0].key, key_tenant_window_row_ent_srcip_v1("dev123", 42));
-    assert_eq!(writes[1].key, key_tenant_window_row_ent_dstip_v1("dev123", 42));
-    assert_eq!(writes[2].key, key_tenant_window_row_ent_userid_v1("dev123", 42));
-    assert_eq!(writes[3].key, key_tenant_window_row_ent_domain_v1("dev123", 42));
-    assert_eq!(writes[4].key, key_tenant_window_row_ent_host_v1("dev123", 42));
+    assert_eq!(
+        writes[0].key,
+        key_tenant_window_row_ent_srcip_v1("dev123", 42)
+    );
+    assert_eq!(
+        writes[1].key,
+        key_tenant_window_row_ent_dstip_v1("dev123", 42)
+    );
+    assert_eq!(
+        writes[2].key,
+        key_tenant_window_row_ent_userid_v1("dev123", 42)
+    );
+    assert_eq!(
+        writes[3].key,
+        key_tenant_window_row_ent_domain_v1("dev123", 42)
+    );
+    assert_eq!(
+        writes[4].key,
+        key_tenant_window_row_ent_host_v1("dev123", 42)
+    );
 
     assert_eq!(
         decode_win_row_ent_srcip_v1(&writes[0].value).unwrap()[0].value,
@@ -175,9 +192,19 @@ fn empty_checkpoint_still_writes_all_entity_lists() {
     let sketches = EntitySketchesV1::new_v1(sample_caps());
     let writes = sketches.checkpoint_writes_v1("dev123", 7).unwrap();
     assert_eq!(writes.len(), 5);
-    assert!(decode_win_row_ent_srcip_v1(&writes[0].value).unwrap().is_empty());
-    assert!(decode_win_row_ent_dstip_v1(&writes[1].value).unwrap().is_empty());
-    assert!(decode_win_row_ent_userid_v1(&writes[2].value).unwrap().is_empty());
-    assert!(decode_win_row_ent_domain_v1(&writes[3].value).unwrap().is_empty());
-    assert!(decode_win_row_ent_host_v1(&writes[4].value).unwrap().is_empty());
+    assert!(decode_win_row_ent_srcip_v1(&writes[0].value)
+        .unwrap()
+        .is_empty());
+    assert!(decode_win_row_ent_dstip_v1(&writes[1].value)
+        .unwrap()
+        .is_empty());
+    assert!(decode_win_row_ent_userid_v1(&writes[2].value)
+        .unwrap()
+        .is_empty());
+    assert!(decode_win_row_ent_domain_v1(&writes[3].value)
+        .unwrap()
+        .is_empty());
+    assert!(decode_win_row_ent_host_v1(&writes[4].value)
+        .unwrap()
+        .is_empty());
 }

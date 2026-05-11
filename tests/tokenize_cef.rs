@@ -6,7 +6,11 @@ use sparx::tokenize::{tokenize_message_v1, TokenEventV1};
 fn kv_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for event in events {
-        if let TokenEventV1::Kv { key_norm, value_raw } = event {
+        if let TokenEventV1::Kv {
+            key_norm,
+            value_raw,
+        } = event
+        {
             out.push((key_norm.clone(), value_raw.clone()));
         }
     }
@@ -100,5 +104,12 @@ fn cef_residual_text_is_tokenized_as_words() {
             ("msg".to_string(), "done".to_string()),
         ]
     );
-    assert_eq!(words(&result.events), vec!["leading".to_string(), "free".to_string(), "text".to_string()]);
+    assert_eq!(
+        words(&result.events),
+        vec![
+            "leading".to_string(),
+            "free".to_string(),
+            "text".to_string()
+        ]
+    );
 }
