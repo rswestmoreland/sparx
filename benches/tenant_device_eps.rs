@@ -179,7 +179,10 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     let durable_timing = if bench_cfg.durable_oneshot_enabled {
         let durable_start = Instant::now();
         run_durable_oneshot_probe_v1(&cfg, &bench_cfg)?;
-        Some(timing_v1(total_events, durable_start.elapsed().as_secs_f64()))
+        Some(timing_v1(
+            total_events,
+            durable_start.elapsed().as_secs_f64(),
+        ))
     } else {
         None
     };
@@ -211,7 +214,10 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     println!("detection_events={}", detect_result.events_represented);
     println!("detection_sparse_rows={}", detect_result.rows_evaluated);
     println!("detection_alerts_emitted={}", detect_result.alerts_emitted);
-    println!("detection_encoded_alert_bytes={}", detect_result.encoded_alert_bytes);
+    println!(
+        "detection_encoded_alert_bytes={}",
+        detect_result.encoded_alert_bytes
+    );
     println!("detection_elapsed_s={:.6}", detect_elapsed_s);
     println!("detection_event_eps={:.2}", detection_event_eps);
     println!("detection_row_eps={:.2}", detection_row_eps);
@@ -233,11 +239,8 @@ fn run_ingestion_probe_v1(
     cfg: &sparx::config::ConfigV1,
     bench_cfg: &TenantDeviceEpsBenchConfigV1,
 ) -> Result<IngestionProbeResultV1, String> {
-    let mut dict = FeatureDictionaryV1::new_empty_v1(
-        FeatureDictionaryConfigV1::from(&cfg.features),
-        1,
-        0,
-    );
+    let mut dict =
+        FeatureDictionaryV1::new_empty_v1(FeatureDictionaryConfigV1::from(&cfg.features), 1, 0);
     let caps = WindowCapsV1::from(&cfg.caps);
     let mut sparse_rows = Vec::new();
     let mut events = 0usize;
@@ -352,8 +355,15 @@ fn apply_ingest_probe_line_v1(
 
     if acc.is_none() {
         *acc = Some(
-            WindowAccumulatorV1::new_v1(device_key, window_start_ts, 1, window_size_s, line_ts, caps)
-                .map_err(|e| format!("create window accumulator failed: {:?}", e))?,
+            WindowAccumulatorV1::new_v1(
+                device_key,
+                window_start_ts,
+                1,
+                window_size_s,
+                line_ts,
+                caps,
+            )
+            .map_err(|e| format!("create window accumulator failed: {:?}", e))?,
         );
     }
 
@@ -390,7 +400,8 @@ fn run_detection_probe_v1(
     cfg: &sparx::config::ConfigV1,
     ingest: &IngestionProbeResultV1,
 ) -> Result<DetectionProbeResultV1, String> {
-    let mut alert_cfg = AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
+    let mut alert_cfg =
+        AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
     alert_cfg.cold_start_days = 0;
     alert_cfg.cold_start_min_windows = 0;
     alert_cfg.min_lines_per_window = 1;
