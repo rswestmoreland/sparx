@@ -87,4 +87,5 @@ validation logs are green, and release packaging is complete.
 ## Benchmarking
 
 - [x] Tenant/device EPS benchmark target added.
+- [x] EPS benchmark default workload adjusted for dense high-EPS logging.
 - [ ] User-run benchmark output remains required before publishing performance claims.

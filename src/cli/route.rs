@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use super::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1};
 use crate::alert::{
     build_alert_v1, build_sharp_drop_alert_v1, build_source_stream_sharp_drop_alert_v1,
-    build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, AlertScoringConfigV1, AlertV1,
+    build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, decode_alert_v1, AlertScoringConfigV1, AlertV1,
     FileSpanV1,
 };
 use crate::baseline::{
@@ -975,20 +975,29 @@ fn load_filtered_alerts_v1(
     let mut alerts = runtime.with_tenant_db_v1(tenant_id, current_unix_ts_v1(), |db| {
         let mut out = Vec::new();
         let indexed_ids = if let Some(entity) = &filters.entity {
-            db.select_alert_ids_via_entity_index_if_complete_v1(
+            match db.select_alert_ids_via_entity_index_if_complete_v1(
                 alert_entity_kind_filter_name_v1(entity.kind),
                 &entity.value,
                 filters.since,
                 filters.until,
-            )?
+            ) {
+                Ok(ids) => ids,
+                Err(_) => None,
+            }
         } else if let Some(category) = filters.category {
-            db.select_alert_ids_via_category_index_if_complete_v1(
+            match db.select_alert_ids_via_category_index_if_complete_v1(
                 alert_category_filter_name_v1(category),
                 filters.since,
                 filters.until,
-            )?
+            ) {
+                Ok(ids) => ids,
+                Err(_) => None,
+            }
         } else {
-            db.select_alert_ids_via_time_index_if_complete_v1(filters.since, filters.until)?
+            match db.select_alert_ids_via_time_index_if_complete_v1(filters.since, filters.until) {
+                Ok(ids) => ids,
+                Err(_) => None,
+            }
         };
 
         if let Some(alert_ids) = indexed_ids {
@@ -1002,12 +1011,12 @@ fn load_filtered_alerts_v1(
             return Ok(out);
         }
 
-        for alert_id in db.list_primary_alert_ids_v1()? {
-            match db.read_primary_alert_v1(&alert_id) {
-                Ok(Some(alert)) if alert_matches_query_filters_v1(&alert, filters) => {
-                    out.push(alert);
-                }
-                Ok(Some(_)) | Ok(None) | Err(_) => {}
+        for (_, payload) in db.list_alert_record_keys_v1()? {
+            let Ok(alert) = decode_alert_v1(&payload) else {
+                continue;
+            };
+            if alert_matches_query_filters_v1(&alert, filters) {
+                out.push(alert);
             }
         }
         Ok(out)
@@ -5201,7 +5210,7 @@ fn process_line_oneshot_v1(
                     db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
                 })
                 .map_err(|e| e.to_string())?;
-            return Ok(0);
+            Ok(0)
         }
         WindowApplyLineResultV1::DifferentWindow {
             line_window_start_ts,
@@ -5240,7 +5249,7 @@ fn process_line_oneshot_v1(
             sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
             source_stream_windows.extend(finalize_result.source_stream_windows);
             *acc_opt = Some(next);
-            return Ok(
+            Ok(
                 finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
                     runtime,
                     cfg,
@@ -5267,7 +5276,7 @@ fn process_line_oneshot_v1(
                     alert_cfg,
                     now_ts,
                 )?),
-            );
+            )
         }
     }
 }

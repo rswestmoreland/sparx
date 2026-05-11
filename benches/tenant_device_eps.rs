@@ -23,6 +23,7 @@ const DEFAULT_DEVICES_PER_TENANT: usize = 8;
 const DEFAULT_FILES_PER_DEVICE: usize = 2;
 const DEFAULT_EVENTS_PER_FILE: usize = 2_000;
 const DEFAULT_READ_CHUNK_BYTES: u32 = 262_144;
+const DEFAULT_EVENTS_PER_TIMESTAMP: usize = 100;
 const MAX_TOTAL_EVENTS: usize = 5_000_000;
 
 #[derive(Clone, Debug)]
@@ -32,6 +33,7 @@ struct TenantDeviceEpsBenchConfigV1 {
     files_per_device: usize,
     events_per_file: usize,
     read_chunk_bytes: u32,
+    events_per_timestamp: usize,
     source_stream_enabled: bool,
     keep_root: bool,
 }
@@ -50,6 +52,10 @@ impl TenantDeviceEpsBenchConfigV1 {
             )?,
             events_per_file: env_usize_v1("SPARX_BENCH_EVENTS_PER_FILE", DEFAULT_EVENTS_PER_FILE)?,
             read_chunk_bytes: env_u32_v1("SPARX_BENCH_READ_CHUNK_BYTES", DEFAULT_READ_CHUNK_BYTES)?,
+            events_per_timestamp: env_usize_v1(
+                "SPARX_BENCH_EVENTS_PER_TIMESTAMP",
+                DEFAULT_EVENTS_PER_TIMESTAMP,
+            )?,
             source_stream_enabled: env_bool_v1("SPARX_BENCH_SOURCE_STREAM", false)?,
             keep_root: env_bool_v1("SPARX_BENCH_KEEP_ROOT", false)?,
         };
@@ -147,6 +153,11 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     println!("files_per_device={}", bench_cfg.files_per_device);
     println!("events_per_file={}", bench_cfg.events_per_file);
     println!("total_events={}", total_events);
+    println!("events_per_timestamp={}", bench_cfg.events_per_timestamp);
+    println!(
+        "approx_event_time_span_s_per_file={}",
+        bench_cfg.events_per_file.div_ceil(bench_cfg.events_per_timestamp)
+    );
     println!("elapsed_s={:.6}", elapsed_s);
     println!("total_eps={:.2}", total_eps);
     println!("read_chunk_bytes={}", bench_cfg.read_chunk_bytes);
@@ -179,6 +190,7 @@ fn write_bench_corpus_v1(
                     device_idx,
                     file_idx,
                     bench_cfg.events_per_file,
+                    bench_cfg.events_per_timestamp,
                 )?;
             }
         }
@@ -192,15 +204,16 @@ fn write_device_file_v1(
     device_idx: usize,
     file_idx: usize,
     events_per_file: usize,
+    events_per_timestamp: usize,
 ) -> Result<(), String> {
     let file = File::create(file_path).map_err(|e| format!("create log file failed: {}", e))?;
     let mut writer = BufWriter::new(file);
     for event_idx in 0..events_per_file {
-        let ts = event_timestamp_v1(
-            file_idx
-                .saturating_mul(events_per_file)
-                .saturating_add(event_idx),
-        );
+        let event_second = file_idx
+            .saturating_mul(events_per_file)
+            .saturating_add(event_idx)
+            / events_per_timestamp;
+        let ts = event_timestamp_v1(event_second);
         let action = match event_idx % 5 {
             0 => "login",
             1 => "query",

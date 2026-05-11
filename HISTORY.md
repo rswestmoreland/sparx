@@ -55,6 +55,15 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Added documentation for workload scaling controls and release-performance interpretation.
 - No Rust toolchain validation is claimed for this checkpoint.
 
+
+## EPS benchmark validation fix checkpoint
+
+- Adjusted the tenant/device EPS benchmark default workload to model dense high-EPS logging.
+- Added `SPARX_BENCH_EVENTS_PER_TIMESTAMP` so sparse event-time stress runs can still be measured explicitly.
+- Hardened alert query fallback behavior for incomplete or unreadable secondary indexes.
+- Removed clippy-reported needless returns from the oneshot processing path.
+- No Rust toolchain validation is claimed for this checkpoint; external revalidation remains required.
+
 ## Rust 1.90 validation fix checkpoint
 
 - Addressed externally reported run-mode test compile issues.

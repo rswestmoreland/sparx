@@ -26,6 +26,8 @@ devices_per_tenant=8
 files_per_device=2
 events_per_file=2000
 total_events=64000
+events_per_timestamp=100
+approx_event_time_span_s_per_file=20
 elapsed_s=1.234567
 total_eps=51840.03
 read_chunk_bytes=262144
@@ -44,11 +46,19 @@ machines:
 - 2 files per device
 - 2000 events per file
 - 64000 total events
+- 100 events per event timestamp
+- about 20 seconds of event time per file
 - source-stream V_DROP disabled, matching the default product gate
 
 Generated events use deterministic RFC5424-style syslog lines with common
 key/value fields such as source IP, destination IP, user, action, result, bytes,
 path, and status.
+
+The default workload is shaped as a high-EPS logging scenario. Many events share
+the same event timestamp so the benchmark measures dense ingestion through the
+runtime path instead of mostly measuring repeated window-finalization overhead.
+Set `SPARX_BENCH_EVENTS_PER_TIMESTAMP=1` to reproduce a sparse event-time shape
+where every event advances by one second.
 
 ## Environment controls
 
@@ -59,6 +69,7 @@ Use environment variables to scale or alter the workload:
 - `SPARX_BENCH_FILES_PER_DEVICE`
 - `SPARX_BENCH_EVENTS_PER_FILE`
 - `SPARX_BENCH_READ_CHUNK_BYTES`
+- `SPARX_BENCH_EVENTS_PER_TIMESTAMP`
 - `SPARX_BENCH_SOURCE_STREAM`
 - `SPARX_BENCH_KEEP_ROOT`
 
@@ -97,4 +108,9 @@ EPS depends on CPU, storage, filesystem, OS, build profile, and whether the
 source-stream gate is enabled.
 
 For release notes, retain the command, environment values, hardware summary,
-Rust version, and final `total_eps` value.
+Rust version, event timestamp density, approximate event-time span, and final
+`total_eps` value.
+
+If `total_eps` is unexpectedly low, first check `events_per_timestamp`. A value
+of 1 intentionally stresses durable cursor/checkpoint/finalization behavior and
+is not representative of dense high-EPS logging.

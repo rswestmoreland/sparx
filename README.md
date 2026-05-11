@@ -124,7 +124,9 @@ cargo bench --bench tenant_device_eps
 
 The benchmark generates a deterministic multi-tenant, multi-device corpus, runs
 the existing `oneshot` runtime path, and prints total events per second as
-`total_eps`. See `docs/BENCHMARKING.md` for workload controls and interpretation
+`total_eps`. The default workload models dense high-EPS logging by grouping many
+events under the same event timestamp; sparse event-time stress runs are also
+available. See `docs/BENCHMARKING.md` for workload controls and interpretation
 guidance.
 
 ## Repository guide
