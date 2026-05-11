@@ -81,3 +81,9 @@ validation logs are green, and release packaging is complete.
 - [x] Cargo package metadata declares MIT license and author contact.
 - [x] Rust source and test files include SPDX MIT headers.
 - [x] README, docs, contracts, and fixtures include author/contact/license notes.
+
+
+## Benchmarking
+
+- [x] Tenant/device EPS benchmark target added.
+- [ ] User-run benchmark output remains required before publishing performance claims.

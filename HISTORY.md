@@ -46,3 +46,11 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Added consistent SPDX and copyright headers to Rust source and test files.
 - Added license and author notes to README, docs, contracts, and fixture documentation.
 - No Rust toolchain validation is claimed for this checkpoint.
+
+
+## Tenant/device EPS benchmark checkpoint
+
+- Added a dependency-free custom Cargo bench target for end-to-end tenant/device throughput.
+- The benchmark generates deterministic multi-tenant log input and reports total EPS.
+- Added documentation for workload scaling controls and release-performance interpretation.
+- No Rust toolchain validation is claimed for this checkpoint.

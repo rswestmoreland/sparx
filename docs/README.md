@@ -20,6 +20,7 @@ traceability.
 - `METRICS_HEALTH_STATUS.md`: status, JSON status, Prometheus metrics, and
   health output
 - `VALIDATION_AND_RELEASE_READINESS.md`: external validation and release gates
+- `BENCHMARKING.md`: tenant/device EPS benchmark and workload controls
 - `OPEN_SOURCE_RELEASE_METADATA.md`: MIT license, author, copyright, and SPDX metadata
 - `SECURITY_PERFORMANCE_HARDENING_REVIEW.md`: filesystem, unsafe-data, and resource-use hardening review
 - `CODEBASE_CONSISTENCY_AND_BAD_DATA_REVIEW.md`: maintainability comments and malformed-data stability review

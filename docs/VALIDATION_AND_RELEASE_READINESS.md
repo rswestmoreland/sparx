@@ -12,6 +12,7 @@ Run and retain logs for:
 - `cargo test`
 - `cargo clippy -- -D warnings`
 - release build as appropriate for the target environment
+- `cargo bench --bench tenant_device_eps` for end-to-end EPS measurement
 
 ## Scenario validation
 
@@ -28,6 +29,7 @@ Representative validation should include:
 - malformed-readable-log runtime stability verification
 - source comment and maintainability consistency review
 - replay-spool success and fail-closed behavior
+- tenant/device EPS benchmark output retained for release-performance comparison
 
 ## Release readiness gates
 

@@ -114,6 +114,19 @@ The current CLI/runtime surface includes:
 - `alert drill/extract`
 - `replay-spool`
 
+## Benchmarking
+
+sparx includes a dependency-free tenant/device EPS benchmark:
+
+```bash
+cargo bench --bench tenant_device_eps
+```
+
+The benchmark generates a deterministic multi-tenant, multi-device corpus, runs
+the existing `oneshot` runtime path, and prints total events per second as
+`total_eps`. See `docs/BENCHMARKING.md` for workload controls and interpretation
+guidance.
+
 ## Repository guide
 
 - `contracts/`: locked v0.1 contracts and behavior boundaries
