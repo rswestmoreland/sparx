@@ -67,3 +67,14 @@ Before release, confirm that:
 - `Cargo.toml` declares `license = "MIT"` and the author contact.
 - Rust source and test files include SPDX MIT headers.
 - README, documentation, and contracts identify the MIT license and author contact.
+
+
+## EPS benchmark expectations
+
+The tenant/device EPS benchmark should report separate `ingest_eps` and `detection_event_eps` values. The default validation workload is 10000 events. The larger validation workload is 100000 events:
+
+```bash
+SPARX_BENCH_TENANTS=2 SPARX_BENCH_DEVICES_PER_TENANT=10 SPARX_BENCH_FILES_PER_DEVICE=5 SPARX_BENCH_EVENTS_PER_FILE=1000 cargo bench --bench tenant_device_eps
+```
+
+Optional durable oneshot timing can be enabled with `SPARX_BENCH_DURABLE_ONESHOT=1`, but that storage-inclusive timing is not the primary ingestion or detection EPS metric.

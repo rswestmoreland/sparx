@@ -100,7 +100,7 @@ that must remain covered before release.
 - fixture validation and end-to-end smoke behavior
 - malformed-readable-log stability behavior
 - source comment and maintainability consistency checks
-- tenant/device EPS benchmark for end-to-end throughput tracking
+- tenant/device EPS benchmark with separate ingestion and detection throughput metrics
 
 ## External release validation
 
@@ -112,7 +112,7 @@ user-provided logs for:
 - `cargo test`
 - `cargo clippy -- -D warnings`
 - release build for the target environment
-- tenant/device EPS benchmark output for release-performance comparison
+- tenant/device EPS benchmark output for ingestion and detection release-performance comparison
 
 Any reported failures must be fixed before new features are added.
 

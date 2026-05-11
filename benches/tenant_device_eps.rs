@@ -1,27 +1,44 @@
 // Copyright (c) 2026 Richard S. Westmoreland
 // SPDX-License-Identifier: MIT
 
-// End-to-end tenant/device EPS benchmark.
+// Tenant/device EPS benchmark.
 //
 // This custom bench target intentionally avoids external benchmark crates. It
-// creates a deterministic multi-tenant, multi-device corpus, runs the existing
-// oneshot runtime path, and reports total processed events per second.
+// creates a deterministic multi-tenant, multi-device corpus, then reports two
+// separate throughput metrics:
+//
+// - ingestion EPS: file scan, line read, syslog parse, tokenization, feature
+//   emission, dictionary resolution, and sparse row/window population
+// - detection EPS: alert scoring/build/encoding over the finalized sparse rows
+//
+// Optional durable oneshot timing can be enabled for storage-inclusive checks,
+// but it is not part of the default benchmark because it measures a different
+// end-to-end runtime cost profile.
 
 use std::env;
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use sparx::alert::{build_alert_v1, AlertScoringConfigV1};
+use sparx::baseline::{BucketBaselineV1, CentroidPairV1, DfPairV1};
 use sparx::cli::route::route_command_v1;
 use sparx::cli::{CommandV1, MigrateModeV1};
 use sparx::config::load::default_config_v1;
 use sparx::config::validate::validate_config_v1;
+use sparx::features::{emit_line_features_v1, FeatureDictionaryConfigV1, FeatureDictionaryV1};
+use sparx::ingest::device_key_v1;
+use sparx::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
+use sparx::window::{
+    align_window_start_ts_v1, FinalizedWindowRowV1, WindowAccumulatorV1, WindowApplyLineResultV1,
+    WindowCapsV1,
+};
 
 const DEFAULT_TENANTS: usize = 2;
-const DEFAULT_DEVICES_PER_TENANT: usize = 8;
+const DEFAULT_DEVICES_PER_TENANT: usize = 5;
 const DEFAULT_FILES_PER_DEVICE: usize = 2;
-const DEFAULT_EVENTS_PER_FILE: usize = 2_000;
+const DEFAULT_EVENTS_PER_FILE: usize = 500;
 const DEFAULT_READ_CHUNK_BYTES: u32 = 262_144;
 const DEFAULT_EVENTS_PER_TIMESTAMP: usize = 100;
 const MAX_TOTAL_EVENTS: usize = 5_000_000;
@@ -35,6 +52,7 @@ struct TenantDeviceEpsBenchConfigV1 {
     read_chunk_bytes: u32,
     events_per_timestamp: usize,
     source_stream_enabled: bool,
+    durable_oneshot_enabled: bool,
     keep_root: bool,
 }
 
@@ -57,6 +75,7 @@ impl TenantDeviceEpsBenchConfigV1 {
                 DEFAULT_EVENTS_PER_TIMESTAMP,
             )?,
             source_stream_enabled: env_bool_v1("SPARX_BENCH_SOURCE_STREAM", false)?,
+            durable_oneshot_enabled: env_bool_v1("SPARX_BENCH_DURABLE_ONESHOT", false)?,
             keep_root: env_bool_v1("SPARX_BENCH_KEEP_ROOT", false)?,
         };
         cfg.validate_v1()?;
@@ -84,6 +103,35 @@ impl TenantDeviceEpsBenchConfigV1 {
             .and_then(|v| v.checked_mul(self.events_per_file))
             .ok_or_else(|| "benchmark corpus size overflow".to_string())
     }
+}
+
+#[derive(Clone, Debug)]
+struct BenchSparseRowV1 {
+    tenant_id: String,
+    device_path: String,
+    row: FinalizedWindowRowV1,
+}
+
+#[derive(Clone, Debug)]
+struct IngestionProbeResultV1 {
+    events: usize,
+    bytes: u64,
+    sparse_rows: Vec<BenchSparseRowV1>,
+    dictionary: FeatureDictionaryV1,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TimingV1 {
+    elapsed_s: f64,
+    eps: f64,
+}
+
+#[derive(Clone, Debug)]
+struct DetectionProbeResultV1 {
+    rows_evaluated: usize,
+    events_represented: usize,
+    alerts_emitted: usize,
+    encoded_alert_bytes: usize,
 }
 
 fn main() {
@@ -117,34 +165,23 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     validate_config_v1(&cfg).map_err(|e| format!("bench config invalid: {}", e.msg))?;
     write_bench_corpus_v1(&cfg.sparx.tenant_root, &bench_cfg)?;
 
-    let start = Instant::now();
-    for tenant_idx in 0..bench_cfg.tenants {
-        let tenant_id = tenant_id_v1(tenant_idx);
-        let result = route_command_v1(
-            &CommandV1::OneShot {
-                tenant_id: tenant_id.clone(),
-                since: None,
-                until: None,
-                device_path: None,
-                migrate: MigrateModeV1::Auto,
-            },
-            &cfg,
-        );
-        if result.exit_code != 0 {
-            return Err(format!(
-                "oneshot failed for tenant={} exit_code={} stderr={}",
-                tenant_id,
-                result.exit_code,
-                result.msg_stderr.unwrap_or_else(|| "<none>".to_string())
-            ));
-        }
-    }
-    let elapsed = start.elapsed();
-    let elapsed_s = elapsed.as_secs_f64();
-    let total_eps = if elapsed_s > 0.0 {
-        total_events as f64 / elapsed_s
+    let ingest_start = Instant::now();
+    let ingest_result = run_ingestion_probe_v1(&cfg, &bench_cfg)?;
+    let ingest_timing = timing_v1(ingest_result.events, ingest_start.elapsed().as_secs_f64());
+
+    let detect_start = Instant::now();
+    let detect_result = run_detection_probe_v1(&cfg, &ingest_result)?;
+    let detect_elapsed_s = detect_start.elapsed().as_secs_f64();
+    let detection_event_eps = eps_v1(detect_result.events_represented, detect_elapsed_s);
+    let detection_row_eps = eps_v1(detect_result.rows_evaluated, detect_elapsed_s);
+    let detection_alert_eps = eps_v1(detect_result.alerts_emitted, detect_elapsed_s);
+
+    let durable_timing = if bench_cfg.durable_oneshot_enabled {
+        let durable_start = Instant::now();
+        run_durable_oneshot_probe_v1(&cfg, &bench_cfg)?;
+        Some(timing_v1(total_events, durable_start.elapsed().as_secs_f64()))
     } else {
-        0.0
+        None
     };
 
     println!("sparx tenant/device EPS benchmark");
@@ -160,10 +197,29 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
             .events_per_file
             .div_ceil(bench_cfg.events_per_timestamp)
     );
-    println!("elapsed_s={:.6}", elapsed_s);
-    println!("total_eps={:.2}", total_eps);
     println!("read_chunk_bytes={}", bench_cfg.read_chunk_bytes);
     println!("source_stream_enabled={}", bench_cfg.source_stream_enabled);
+    println!(
+        "durable_oneshot_enabled={}",
+        bench_cfg.durable_oneshot_enabled
+    );
+    println!("ingest_events={}", ingest_result.events);
+    println!("ingest_bytes={}", ingest_result.bytes);
+    println!("ingest_sparse_rows={}", ingest_result.sparse_rows.len());
+    println!("ingest_elapsed_s={:.6}", ingest_timing.elapsed_s);
+    println!("ingest_eps={:.2}", ingest_timing.eps);
+    println!("detection_events={}", detect_result.events_represented);
+    println!("detection_sparse_rows={}", detect_result.rows_evaluated);
+    println!("detection_alerts_emitted={}", detect_result.alerts_emitted);
+    println!("detection_encoded_alert_bytes={}", detect_result.encoded_alert_bytes);
+    println!("detection_elapsed_s={:.6}", detect_elapsed_s);
+    println!("detection_event_eps={:.2}", detection_event_eps);
+    println!("detection_row_eps={:.2}", detection_row_eps);
+    println!("detection_alert_eps={:.2}", detection_alert_eps);
+    if let Some(timing) = durable_timing {
+        println!("durable_oneshot_elapsed_s={:.6}", timing.elapsed_s);
+        println!("durable_oneshot_total_eps={:.2}", timing.eps);
+    }
 
     if bench_cfg.keep_root {
         println!("bench_root={}", root.display());
@@ -171,6 +227,279 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
         fs::remove_dir_all(&root).map_err(|e| format!("remove bench root failed: {}", e))?;
     }
     Ok(())
+}
+
+fn run_ingestion_probe_v1(
+    cfg: &sparx::config::ConfigV1,
+    bench_cfg: &TenantDeviceEpsBenchConfigV1,
+) -> Result<IngestionProbeResultV1, String> {
+    let mut dict = FeatureDictionaryV1::new_empty_v1(
+        FeatureDictionaryConfigV1::from(&cfg.features),
+        1,
+        0,
+    );
+    let caps = WindowCapsV1::from(&cfg.caps);
+    let mut sparse_rows = Vec::new();
+    let mut events = 0usize;
+    let mut bytes = 0u64;
+
+    for tenant_idx in 0..bench_cfg.tenants {
+        let tenant_id = tenant_id_v1(tenant_idx);
+        for device_idx in 0..bench_cfg.devices_per_tenant {
+            let device_path = device_id_v1(device_idx);
+            let device_key = device_key_v1(&tenant_id, &device_path);
+            let mut acc: Option<WindowAccumulatorV1> = None;
+            for file_idx in 0..bench_cfg.files_per_device {
+                let file_path = Path::new(&cfg.sparx.tenant_root)
+                    .join(&tenant_id)
+                    .join(&device_path)
+                    .join(format!("app{:02}.log", file_idx));
+                read_ingest_probe_file_v1(
+                    &file_path,
+                    &tenant_id,
+                    &device_path,
+                    &device_key,
+                    cfg.ingest.window_size_s,
+                    caps.clone(),
+                    &mut dict,
+                    &mut acc,
+                    &mut sparse_rows,
+                    &mut events,
+                    &mut bytes,
+                )?;
+            }
+            if let Some(acc) = acc.take() {
+                sparse_rows.push(BenchSparseRowV1 {
+                    tenant_id: tenant_id.clone(),
+                    device_path: device_path.clone(),
+                    row: acc.finalize_idle_v1().finalized_row,
+                });
+            }
+        }
+    }
+
+    Ok(IngestionProbeResultV1 {
+        events,
+        bytes,
+        sparse_rows,
+        dictionary: dict,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn read_ingest_probe_file_v1(
+    file_path: &Path,
+    tenant_id: &str,
+    device_path: &str,
+    device_key: &str,
+    window_size_s: u32,
+    caps: WindowCapsV1,
+    dict: &mut FeatureDictionaryV1,
+    acc: &mut Option<WindowAccumulatorV1>,
+    sparse_rows: &mut Vec<BenchSparseRowV1>,
+    events: &mut usize,
+    bytes: &mut u64,
+) -> Result<(), String> {
+    let file = File::open(file_path).map_err(|e| format!("open log file failed: {}", e))?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|e| format!("read log line failed: {}", e))?;
+        if read == 0 {
+            break;
+        }
+        let trimmed = line.trim_end_matches('\n').trim_end_matches('\r');
+        *bytes = bytes.saturating_add(read as u64);
+        *events = events.saturating_add(1);
+        apply_ingest_probe_line_v1(
+            tenant_id,
+            device_path,
+            device_key,
+            window_size_s,
+            caps.clone(),
+            dict,
+            acc,
+            sparse_rows,
+            trimmed,
+            read,
+        )?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_ingest_probe_line_v1(
+    tenant_id: &str,
+    device_path: &str,
+    device_key: &str,
+    window_size_s: u32,
+    caps: WindowCapsV1,
+    dict: &mut FeatureDictionaryV1,
+    acc: &mut Option<WindowAccumulatorV1>,
+    sparse_rows: &mut Vec<BenchSparseRowV1>,
+    line: &str,
+    line_bytes: usize,
+) -> Result<(), String> {
+    let parsed = parse_syslog_envelope_v1(line, 0);
+    let line_ts = parsed.envelope.ts_guess.unwrap_or(0);
+    let tokenized = tokenize_message_v1(&parsed.msg, None);
+    let emitted = emit_line_features_v1(&parsed.envelope, &tokenized.events);
+    let window_start_ts = align_window_start_ts_v1(line_ts, window_size_s)
+        .map_err(|e| format!("align window failed: {:?}", e))?;
+
+    if acc.is_none() {
+        *acc = Some(
+            WindowAccumulatorV1::new_v1(device_key, window_start_ts, 1, window_size_s, line_ts, caps)
+                .map_err(|e| format!("create window accumulator failed: {:?}", e))?,
+        );
+    }
+
+    loop {
+        let active = acc
+            .as_mut()
+            .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
+        match active
+            .apply_line_v1(line_ts, line_ts, line_bytes, &emitted, dict)
+            .map_err(|e| format!("apply line failed: {:?}", e))?
+        {
+            WindowApplyLineResultV1::Applied(_) => return Ok(()),
+            WindowApplyLineResultV1::DifferentWindow {
+                line_window_start_ts,
+            } => {
+                let active = acc
+                    .take()
+                    .ok_or_else(|| "window accumulator missing before finalize".to_string())?;
+                let (plan, next) = active
+                    .finalize_and_advance_v1(line_window_start_ts, line_ts)
+                    .map_err(|e| format!("finalize and advance failed: {:?}", e))?;
+                sparse_rows.push(BenchSparseRowV1 {
+                    tenant_id: tenant_id.to_string(),
+                    device_path: device_path.to_string(),
+                    row: plan.finalized_row,
+                });
+                *acc = Some(next);
+            }
+        }
+    }
+}
+
+fn run_detection_probe_v1(
+    cfg: &sparx::config::ConfigV1,
+    ingest: &IngestionProbeResultV1,
+) -> Result<DetectionProbeResultV1, String> {
+    let mut alert_cfg = AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
+    alert_cfg.cold_start_days = 0;
+    alert_cfg.cold_start_min_windows = 0;
+    alert_cfg.min_lines_per_window = 1;
+    alert_cfg.outlier_threshold = 0.0;
+    alert_cfg.noise_threshold = 0.0;
+    alert_cfg.info_threshold = 0.0;
+
+    let mut result = DetectionProbeResultV1 {
+        rows_evaluated: 0,
+        events_represented: 0,
+        alerts_emitted: 0,
+        encoded_alert_bytes: 0,
+    };
+
+    for sparse_row in &ingest.sparse_rows {
+        let baseline = baseline_from_row_v1(&sparse_row.row);
+        let alert_result = build_alert_v1(
+            &sparse_row.tenant_id,
+            &format!("{}/{}", sparse_row.tenant_id, sparse_row.device_path),
+            &sparse_row.row,
+            &ingest.dictionary,
+            &baseline,
+            None,
+            &alert_cfg,
+            &[],
+        )
+        .map_err(|e| format!("alert build failed: {:?}", e))?;
+
+        result.rows_evaluated = result.rows_evaluated.saturating_add(1);
+        result.events_represented = result
+            .events_represented
+            .saturating_add(sparse_row.row.meta.lines as usize);
+        if alert_result.alert.is_some() {
+            result.alerts_emitted = result.alerts_emitted.saturating_add(1);
+        }
+        if let Some(kv) = alert_result.primary_put {
+            result.encoded_alert_bytes = result.encoded_alert_bytes.saturating_add(kv.value.len());
+        }
+    }
+
+    Ok(result)
+}
+
+fn baseline_from_row_v1(row: &FinalizedWindowRowV1) -> BucketBaselineV1 {
+    let df = row
+        .sparse_counts
+        .iter()
+        .map(|pair| DfPairV1 {
+            feature_id: pair.feature_id,
+            df_count: 1,
+        })
+        .collect();
+    let centroid = row
+        .sparse_counts
+        .iter()
+        .map(|pair| CentroidPairV1 {
+            feature_id: pair.feature_id,
+            value: 0.1,
+        })
+        .collect();
+    BucketBaselineV1 {
+        bucket: row.key.bucket,
+        n_bucket: 100,
+        df,
+        centroid,
+    }
+}
+
+fn run_durable_oneshot_probe_v1(
+    cfg: &sparx::config::ConfigV1,
+    bench_cfg: &TenantDeviceEpsBenchConfigV1,
+) -> Result<(), String> {
+    for tenant_idx in 0..bench_cfg.tenants {
+        let tenant_id = tenant_id_v1(tenant_idx);
+        let result = route_command_v1(
+            &CommandV1::OneShot {
+                tenant_id: tenant_id.clone(),
+                since: None,
+                until: None,
+                device_path: None,
+                migrate: MigrateModeV1::Auto,
+            },
+            cfg,
+        );
+        if result.exit_code != 0 {
+            return Err(format!(
+                "oneshot failed for tenant={} exit_code={} stderr={}",
+                tenant_id,
+                result.exit_code,
+                result.msg_stderr.unwrap_or_else(|| "<none>".to_string())
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn timing_v1(events: usize, elapsed_s: f64) -> TimingV1 {
+    TimingV1 {
+        elapsed_s,
+        eps: eps_v1(events, elapsed_s),
+    }
+}
+
+fn eps_v1(events: usize, elapsed_s: f64) -> f64 {
+    if elapsed_s > 0.0 {
+        events as f64 / elapsed_s
+    } else {
+        0.0
+    }
 }
 
 fn write_bench_corpus_v1(

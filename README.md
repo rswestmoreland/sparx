@@ -122,12 +122,13 @@ sparx includes a dependency-free tenant/device EPS benchmark:
 cargo bench --bench tenant_device_eps
 ```
 
-The benchmark generates a deterministic multi-tenant, multi-device corpus, runs
-the existing `oneshot` runtime path, and prints total events per second as
-`total_eps`. The default workload models dense high-EPS logging by grouping many
-events under the same event timestamp; sparse event-time stress runs are also
-available. See `docs/BENCHMARKING.md` for workload controls and interpretation
-guidance.
+The benchmark generates a deterministic multi-tenant, multi-device corpus and
+reports separate throughput metrics for ingestion and detection. `ingest_eps`
+measures file scanning, parsing, tokenization, feature emission, and sparse-row
+population. `detection_event_eps` measures alert scoring/build/encoding over the
+finalized sparse rows. The default workload is 10000 events; a documented
+100000-event run is available for larger validation. See `docs/BENCHMARKING.md`
+for workload controls and interpretation guidance.
 
 ## Repository guide
 

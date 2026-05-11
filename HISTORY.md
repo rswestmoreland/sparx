@@ -71,3 +71,10 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Fixed the tenant/device EPS benchmark timestamp generator so multi-file device workloads stay monotonic.
 - No Rust toolchain validation is claimed for this checkpoint; external revalidation remains required.
 
+
+## Benchmark metric split
+
+- Reduced the default tenant/device EPS benchmark workload to 10000 events.
+- Updated the documented larger validation workload to 100000 events.
+- Split benchmark output into ingestion EPS and detection EPS metrics.
+- Kept optional durable oneshot timing available through `SPARX_BENCH_DURABLE_ONESHOT=1`.

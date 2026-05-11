@@ -89,3 +89,11 @@ validation logs are green, and release packaging is complete.
 - [x] Tenant/device EPS benchmark target added.
 - [x] EPS benchmark default workload adjusted for dense high-EPS logging.
 - [ ] User-run benchmark output remains required before publishing performance claims.
+
+
+## Benchmark follow-up
+
+- Tenant/device EPS benchmark now reports separate ingestion and detection metrics.
+- Default workload target: 10000 events.
+- Larger validation workload target: 100000 events.
+- Optional durable oneshot timing remains available through `SPARX_BENCH_DURABLE_ONESHOT=1`.
