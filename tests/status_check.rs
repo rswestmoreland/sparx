@@ -78,6 +78,8 @@ fn expected_status_text_v1(cfg: &sparx::config::ConfigV1) -> String {
         .join("alerts")
         .display()
         .to_string();
+    let prometheus_url = format!("http://{}/metrics", cfg.metrics.prometheus_bind);
+    let health_url = format!("http://{}/healthz", cfg.metrics.health_bind);
     format!(
         "sparx status
 version: sparx 0.0.0
@@ -192,10 +194,10 @@ recovery.automated_replay_attempt_rate_per_s: null
         spool_root,
         cfg.metrics.prometheus_enabled,
         cfg.metrics.prometheus_bind,
-        format!("http://{}{}", cfg.metrics.prometheus_bind, "/metrics"),
+        prometheus_url,
         cfg.metrics.health_enabled,
         cfg.metrics.health_bind,
-        format!("http://{}{}", cfg.metrics.health_bind, "/healthz"),
+        health_url,
         cfg.output.automated_replay_max_files_per_pass,
         cfg.output.automated_replay_interval_s,
         cfg.output.spool_max_mb,

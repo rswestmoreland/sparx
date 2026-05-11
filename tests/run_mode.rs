@@ -414,6 +414,7 @@ fn run_tenant_policy_can_disable_all_vdrop_subjects_v1() -> Result<(), Box<dyn s
     Ok(())
 }
 
+#[test]
 fn run_disabled_tenant_is_skipped_v1() -> Result<(), Box<dyn std::error::Error>> {
     let _lock = run_test_lock_v1();
     let _guard = EnvVarGuardV1::set_v1("SPARX_TEST_RUN_MAX_CYCLES", "1");
@@ -1103,7 +1104,7 @@ fn run_automated_replay_is_bounded_per_cycle_v1() -> Result<(), Box<dyn std::err
         .join("spool")
         .join("alerts")
         .join("tenant=tenant-a")
-        .join(format!("spool_{}.json", format!("{:032x}", 2u32)));
+        .join(format!("spool_{:032x}.json", 2u32));
     assert!(remaining.exists());
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
