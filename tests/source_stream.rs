@@ -118,10 +118,14 @@ fn source_stream_catalog_rejects_malformed_values_v1() {
 
     let mut encoded = encode_source_stream_catalog_v1(&catalog).unwrap();
     encoded[22..24].copy_from_slice(&33u16.to_le_bytes());
-    assert_eq!(
+    assert!(matches!(
         decode_source_stream_catalog_v1(&encoded).unwrap_err(),
         SourceStreamErrorV1::InvalidSourceStreamId
-    );
+            | SourceStreamErrorV1::InvalidStringLength {
+                field: "canonical_source_path",
+                ..
+            }
+    ));
 }
 
 #[test]

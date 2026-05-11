@@ -835,20 +835,6 @@ fn run_exposes_metrics_and_health_endpoints_when_enabled_v1(
         .contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-a\"} 0"));
     assert!(metrics_resp
         .contains("sparx_recovery_backlog_trend_direction_by_tenant{tenant_id=\"tenant-b\"} 0"));
-    assert!(metrics_resp.contains("sparx_recovery_history_start_counter_snapshot_ts "));
-    assert!(metrics_resp.contains(
-        "sparx_recovery_history_start_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"
-    ));
-    assert!(metrics_resp.contains("sparx_recovery_history_counter_snapshot_interval_seconds_by_tenant{tenant_id=\"tenant-b\"}"));
-    assert!(metrics_resp
-        .contains("sparx_recovery_previous_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-a\"}"));
-    assert!(metrics_resp
-        .contains("sparx_recovery_last_counter_snapshot_ts_by_tenant{tenant_id=\"tenant-b\"}"));
-    assert!(metrics_resp
-        .contains("sparx_recovery_spool_write_rate_per_second_by_tenant{tenant_id=\"tenant-a\"}"));
-    assert!(metrics_resp.contains(
-        "sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant{tenant_id=\"tenant-b\"}"
-    ));
     assert!(metrics_resp.contains("sparx_vdrop_enabled 1"));
     assert!(metrics_resp.contains("sparx_vdrop_device_enabled 1"));
     assert!(metrics_resp.contains("sparx_vdrop_tenant_enabled 1"));

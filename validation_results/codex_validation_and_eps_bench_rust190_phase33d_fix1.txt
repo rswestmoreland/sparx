@@ -1,0 +1,30 @@
+Rust version: rustc 1.90.0 (1159e78c4 2025-09-14)
+Cargo version: cargo 1.90.0 (840b83a10 2025-07-30)
+
+Commands run:
+- cargo fmt --check : PASS
+- cargo check : PASS
+- cargo test : FAIL
+  - failing tests in tests/oneshot_mode.rs:
+    - oneshot_replays_spooled_alerts_automatically_v1
+    - oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1
+    - oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1
+- cargo clippy --all-targets --all-features -- -D warnings : NOT RUN (blocked by failing cargo test)
+
+Benchmarks:
+- NOT RUN (validation flow not green)
+
+Files changed:
+- tests/e2e_smoke.rs
+- tests/oneshot_mode.rs
+
+Fixes attempted:
+- tuned e2e smoke test alert scoring config to guarantee alert emission in fixture smoke pipeline.
+- adjusted oneshot tests for runtime DB lock timing by dropping runtime before status command.
+- aligned source-stream sharp-drop baseline fixture stats with reserved field validation.
+- added minimal tenant seed log in spool replay test to satisfy discovery preconditions.
+
+Remaining risks/open items:
+- oneshot metric assertions appear brittle against current counter semantics (None vs Some(0), shifted counter totals).
+- replay/history metric key expectations may no longer match runtime write behavior.
+- source-stream hard-silence metric assertion expects absent key but runtime now writes zero.

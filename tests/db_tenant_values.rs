@@ -42,8 +42,8 @@ fn primitive_varint_roundtrips_cover_single_and_multi_byte_values() {
 fn primitive_bool_roundtrip_and_validation_match_contract() {
     assert_eq!(encode_u8_bool(false), vec![0]);
     assert_eq!(encode_u8_bool(true), vec![1]);
-    assert_eq!(decode_u8_bool(&[0]).unwrap(), false);
-    assert_eq!(decode_u8_bool(&[1]).unwrap(), true);
+    assert!(!decode_u8_bool(&[0]).unwrap());
+    assert!(decode_u8_bool(&[1]).unwrap());
     assert_eq!(
         decode_u8_bool(&[2]).unwrap_err(),
         TenantValueErrorV1::InvalidBoolByte(2)
@@ -140,10 +140,7 @@ fn simple_value_helpers_roundtrip_by_contract_type() {
         decode_cursor_offset_v1(&encode_cursor_offset_v1(4096)).unwrap(),
         4096
     );
-    assert_eq!(
-        decode_cursor_is_gzip_v1(&encode_cursor_is_gzip_v1(true)).unwrap(),
-        true
-    );
+    assert!(decode_cursor_is_gzip_v1(&encode_cursor_is_gzip_v1(true)).unwrap());
     assert_eq!(
         decode_cursor_last_read_ts_v1(&encode_cursor_last_read_ts_v1(1700001000)).unwrap(),
         1700001000
