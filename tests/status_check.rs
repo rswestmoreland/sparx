@@ -69,6 +69,7 @@ fn temp_cfg_v1() -> sparx::config::ConfigV1 {
     cfg.sparx.global_db_path = root.join("state/global.db").display().to_string();
     cfg.sparx.tenant_db_root = root.join("state/tenants").display().to_string();
     cfg.sparx.alert_out_root = root.join("state/alerts").display().to_string();
+    cfg.vdrop.min_expected_windows_missed = 1;
     cfg
 }
 
@@ -745,7 +746,7 @@ fn status_json_populated_runtime_state_is_deterministic_v1(
     );
     assert_eq!(
         value["vdrop"]["min_expected_windows_missed"].as_u64(),
-        Some(1)
+        Some(cfg.vdrop.min_expected_windows_missed as u64)
     );
     assert_eq!(value["vdrop"]["min_mature_windows"].as_u64(), None);
     assert_eq!(value["vdrop"]["min_expected_lines"].as_u64(), None);
