@@ -48,14 +48,8 @@ impl TenantDeviceEpsBenchConfigV1 {
                 "SPARX_BENCH_FILES_PER_DEVICE",
                 DEFAULT_FILES_PER_DEVICE,
             )?,
-            events_per_file: env_usize_v1(
-                "SPARX_BENCH_EVENTS_PER_FILE",
-                DEFAULT_EVENTS_PER_FILE,
-            )?,
-            read_chunk_bytes: env_u32_v1(
-                "SPARX_BENCH_READ_CHUNK_BYTES",
-                DEFAULT_READ_CHUNK_BYTES,
-            )?,
+            events_per_file: env_usize_v1("SPARX_BENCH_EVENTS_PER_FILE", DEFAULT_EVENTS_PER_FILE)?,
+            read_chunk_bytes: env_u32_v1("SPARX_BENCH_READ_CHUNK_BYTES", DEFAULT_READ_CHUNK_BYTES)?,
             source_stream_enabled: env_bool_v1("SPARX_BENCH_SOURCE_STREAM", false)?,
             keep_root: env_bool_v1("SPARX_BENCH_KEEP_ROOT", false)?,
         };
@@ -210,7 +204,11 @@ fn write_device_file_v1(
             3 => "download",
             _ => "logout",
         };
-        let result = if event_idx % 97 == 0 { "failure" } else { "success" };
+        let result = if event_idx % 97 == 0 {
+            "failure"
+        } else {
+            "success"
+        };
         let src_a = 10 + (tenant_idx % 100);
         let src_b = device_idx % 250;
         let src_c = event_idx % 250;
