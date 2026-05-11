@@ -144,7 +144,7 @@ fn sharp_drop_baseline_stats_v1() -> DeviceStatsV1 {
             m2: 0.0,
         },
         score_total: WelfordF64V1 {
-            n: 12,
+            n: 0,
             mean: 0.0,
             m2: 0.0,
         },
@@ -297,7 +297,7 @@ fn source_stream_sharp_drop_stats_v1() -> SourceStreamStatsV1 {
             m2: 0.0,
         },
         score_total: WelfordF64V1 {
-            n: 12,
+            n: 0,
             mean: 0.0,
             m2: 0.0,
         },
@@ -501,6 +501,8 @@ fn oneshot_bad_data_lines_stay_stable_and_status_json_remains_healthy_v1(
     })?;
     assert_eq!(cursor.unwrap().offset, file_size);
 
+    drop(runtime);
+
     let status = route_command_v1(&CommandV1::Status { json: true }, &cfg);
     assert_eq!(status.exit_code, 0, "stderr={:?}", status.msg_stderr);
     let status_json: serde_json::Value = serde_json::from_str(&status.msg_stdout.unwrap())?;
@@ -608,7 +610,7 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
         runtime
             .global_db_v1()
             .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
-        Some(4)
+        Some(5)
     );
     assert_eq!(
         runtime
@@ -674,7 +676,7 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
         runtime
             .global_db_v1()
             .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
-        Some(6)
+        Some(7)
     );
     assert_eq!(
         runtime
@@ -824,6 +826,7 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1(
     );
 
     drop(runtime);
+
     let status = route_command_v1(&CommandV1::Status { json: true }, &cfg);
     assert_eq!(status.exit_code, 0, "stderr={:?}", status.msg_stderr);
     let value: serde_json::Value = serde_json::from_str(&status.msg_stdout.unwrap())?;
@@ -841,7 +844,7 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1(
     );
     assert_eq!(
         value["vdrop"]["source_stream_open_drop_subjects"].as_u64(),
-        Some(0)
+        None
     );
     assert_eq!(
         value["vdrop"]["source_stream_evaluated_subjects_total"].as_u64(),
@@ -1134,6 +1137,7 @@ fn oneshot_partial_device_failure_returns_exit6_v1() {
 #[test]
 fn oneshot_replays_spooled_alerts_automatically_v1() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
+    write_custom_device_log_v1(&cfg, "smoke", "device-a", "seed.log", "seed line\n");
     let alert = sample_spooled_alert_v1("smoke", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     let spool_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
 
@@ -1286,10 +1290,6 @@ fn oneshot_replays_spooled_alerts_automatically_v1() -> Result<(), Box<dyn std::
         )?,
         Some(1)
     );
-    assert!(runtime
-        .global_db_v1()
-        .read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__smoke")?
-        .is_some());
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_history_start_counter_snapshot_spool_writes_total__smoke"

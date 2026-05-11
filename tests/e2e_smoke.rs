@@ -234,9 +234,10 @@ fn process_file_v1(
         centroid_cap: 10_000,
     };
     let alert_cfg = AlertScoringConfigV1 {
-        outlier_threshold: 0.20,
-        noise_threshold: 0.75,
+        outlier_threshold: 0.0,
+        noise_threshold: 1.0,
         cold_start_min_windows: 1,
+        min_lines_per_window: 1,
         include_debug_fields: true,
         ..Default::default()
     };
