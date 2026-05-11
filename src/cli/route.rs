@@ -1012,12 +1012,11 @@ fn load_filtered_alerts_v1(
             }
         }
 
-        for alert_id in db.list_primary_alert_ids_v1()? {
-            match db.read_primary_alert_v1(&alert_id) {
-                Ok(Some(alert)) if alert_matches_query_filters_v1(&alert, filters) => {
-                    out.push(alert)
-                }
-                Ok(Some(_)) | Ok(None) | Err(_) => {}
+        let alert_prefix = crate::db::keys::key_prefix_tenant_alert_v1();
+        for (_, bytes) in db.scan_prefix_raw_v1(alert_prefix.as_bytes())? {
+            match decode_alert_v1(&bytes) {
+                Ok(alert) if alert_matches_query_filters_v1(&alert, filters) => out.push(alert),
+                Ok(_) | Err(_) => {}
             }
         }
         Ok(out)
