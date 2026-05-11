@@ -17,8 +17,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use super::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1};
 use crate::alert::{
     build_alert_v1, build_sharp_drop_alert_v1, build_source_stream_sharp_drop_alert_v1,
-    build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, decode_alert_v1, AlertScoringConfigV1, AlertV1,
-    FileSpanV1,
+    build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, decode_alert_v1,
+    AlertScoringConfigV1, AlertV1, FileSpanV1,
 };
 use crate::baseline::{
     plan_centroid_stats_update_v1, plan_df_ring_update_v1, BucketBaselineV1, CentroidPairV1,
@@ -975,48 +975,49 @@ fn load_filtered_alerts_v1(
     let mut alerts = runtime.with_tenant_db_v1(tenant_id, current_unix_ts_v1(), |db| {
         let mut out = Vec::new();
         let indexed_ids = if let Some(entity) = &filters.entity {
-            match db.select_alert_ids_via_entity_index_if_complete_v1(
+            db.select_alert_ids_via_entity_index_if_complete_v1(
                 alert_entity_kind_filter_name_v1(entity.kind),
                 &entity.value,
                 filters.since,
                 filters.until,
-            ) {
-                Ok(ids) => ids,
-                Err(_) => None,
-            }
+            )
+            .unwrap_or_default()
         } else if let Some(category) = filters.category {
-            match db.select_alert_ids_via_category_index_if_complete_v1(
+            db.select_alert_ids_via_category_index_if_complete_v1(
                 alert_category_filter_name_v1(category),
                 filters.since,
                 filters.until,
-            ) {
-                Ok(ids) => ids,
-                Err(_) => None,
-            }
+            )
+            .unwrap_or_default()
         } else {
-            match db.select_alert_ids_via_time_index_if_complete_v1(filters.since, filters.until) {
-                Ok(ids) => ids,
-                Err(_) => None,
-            }
+            db.select_alert_ids_via_time_index_if_complete_v1(filters.since, filters.until)
+                .unwrap_or_default()
         };
 
         if let Some(alert_ids) = indexed_ids {
-            for alert_id in alert_ids {
-                match db.read_primary_alert_v1(&alert_id) {
-                    Ok(Some(alert)) => out.push(alert),
-                    Ok(None) => {}
-                    Err(_) => {}
+            if !alert_ids.is_empty() {
+                let mut indexed_read_failed = false;
+                for alert_id in alert_ids {
+                    match db.read_primary_alert_v1(&alert_id) {
+                        Ok(Some(alert)) => out.push(alert),
+                        Ok(None) | Err(_) => {
+                            indexed_read_failed = true;
+                            break;
+                        }
+                    }
+                }
+                if !indexed_read_failed {
+                    return Ok(out);
                 }
             }
-            return Ok(out);
         }
 
-        for (_, payload) in db.list_alert_record_keys_v1()? {
-            let Ok(alert) = decode_alert_v1(&payload) else {
-                continue;
-            };
-            if alert_matches_query_filters_v1(&alert, filters) {
-                out.push(alert);
+        for alert_id in db.list_primary_alert_ids_v1()? {
+            match db.read_primary_alert_v1(&alert_id) {
+                Ok(Some(alert)) if alert_matches_query_filters_v1(&alert, filters) => {
+                    out.push(alert)
+                }
+                Ok(Some(_)) | Ok(None) | Err(_) => {}
             }
         }
         Ok(out)

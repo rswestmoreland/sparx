@@ -156,7 +156,9 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     println!("events_per_timestamp={}", bench_cfg.events_per_timestamp);
     println!(
         "approx_event_time_span_s_per_file={}",
-        bench_cfg.events_per_file.div_ceil(bench_cfg.events_per_timestamp)
+        bench_cfg
+            .events_per_file
+            .div_ceil(bench_cfg.events_per_timestamp)
     );
     println!("elapsed_s={:.6}", elapsed_s);
     println!("total_eps={:.2}", total_eps);
