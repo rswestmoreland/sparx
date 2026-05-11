@@ -11,17 +11,17 @@ use sparx::alert::{
     ALERT_SCHEMA_VERSION_V1,
 };
 use sparx::cli::route::route_command_v1;
-use sparx::db::baseline_sketch::{DeviceStatsV1, WelfordF64V1};
 use sparx::cli::{CommandV1, MigrateModeV1};
 use sparx::config::load::default_config_v1;
+use sparx::db::baseline_sketch::{DeviceStatsV1, WelfordF64V1};
 use sparx::db::silence::{
     OPEN_SILENCE_FLAG_CLOSED_V1, OPEN_SILENCE_FLAG_OPEN_V1, SILENCE_SUBJECT_KIND_DEVICE_V1,
     SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1, SILENCE_SUBJECT_KIND_TENANT_V1,
 };
-use sparx::ingest::{device_key_v1, file_key_v1};
-use sparx::runtime::SparxRuntimeV1;
 use sparx::db::source_stream::SourceStreamStatsV1;
 use sparx::db::tenant::TenantDeviceBaselineStateV1;
+use sparx::ingest::{device_key_v1, file_key_v1};
+use sparx::runtime::SparxRuntimeV1;
 use sparx::sink::{jsonl_alert_path_v1, write_spool_alert_v1};
 use sparx::types::{ConfidenceV1, FeatureFamilyV1, LabelV1};
 
@@ -50,8 +50,15 @@ fn fixture_source_v1(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn copy_fixture_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device: &str, files: &[&str]) {
-    let device_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device);
+fn copy_fixture_device_v1(
+    cfg: &sparx::config::ConfigV1,
+    tenant_id: &str,
+    device: &str,
+    files: &[&str],
+) {
+    let device_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device);
     fs::create_dir_all(&device_dir).unwrap();
     for file in files {
         fs::copy(fixture_source_v1(file), device_dir.join(file)).unwrap();
@@ -59,13 +66,23 @@ fn copy_fixture_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device
 }
 
 fn write_tenant_policy_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, body: &str) {
-    let policy_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(".sparx");
+    let policy_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(".sparx");
     fs::create_dir_all(&policy_dir).unwrap();
     fs::write(policy_dir.join("policy.toml"), body).unwrap();
 }
 
-fn append_future_observation_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device: &str, file: &str) {
-    let path = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device).join(file);
+fn append_future_observation_v1(
+    cfg: &sparx::config::ConfigV1,
+    tenant_id: &str,
+    device: &str,
+    file: &str,
+) {
+    let path = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device)
+        .join(file);
     let mut content = fs::read_to_string(&path).unwrap();
     content.push_str("<34>1 2099-01-05T13:05:05Z host1 sshd 111 ID48 - src_ip=10.2.3.4 user=alice action=login result=success\n");
     fs::write(path, content).unwrap();
@@ -78,7 +95,10 @@ fn append_custom_observation_v1(
     file: &str,
     line: &str,
 ) {
-    let path = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device).join(file);
+    let path = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device)
+        .join(file);
     let mut content = fs::read_to_string(&path).unwrap();
     content.push_str(line);
     if !line.ends_with('\n') {
@@ -104,7 +124,9 @@ fn write_custom_device_bytes_v1(
     file: &str,
     content: &[u8],
 ) {
-    let device_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device);
+    let device_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device);
     fs::create_dir_all(&device_dir).unwrap();
     fs::write(device_dir.join(file), content).unwrap();
 }
@@ -148,7 +170,10 @@ fn write_all_bucket_sharp_drop_baselines_v1(
     })
 }
 
-fn count_sharp_drop_alerts_v1(runtime: &mut SparxRuntimeV1, tenant_id: &str) -> Result<usize, sparx::db::DbErrorV1> {
+fn count_sharp_drop_alerts_v1(
+    runtime: &mut SparxRuntimeV1,
+    tenant_id: &str,
+) -> Result<usize, sparx::db::DbErrorV1> {
     runtime.with_tenant_db_v1(tenant_id, 0, |db| {
         let mut count = 0usize;
         for alert_id in db.list_primary_alert_ids_v1()? {
@@ -168,8 +193,15 @@ fn count_sharp_drop_alerts_v1(runtime: &mut SparxRuntimeV1, tenant_id: &str) -> 
     })
 }
 
-fn write_bad_gzip_device_v1(cfg: &sparx::config::ConfigV1, tenant_id: &str, device: &str, name: &str) {
-    let device_dir = Path::new(&cfg.sparx.tenant_root).join(tenant_id).join(device);
+fn write_bad_gzip_device_v1(
+    cfg: &sparx::config::ConfigV1,
+    tenant_id: &str,
+    device: &str,
+    name: &str,
+) {
+    let device_dir = Path::new(&cfg.sparx.tenant_root)
+        .join(tenant_id)
+        .join(device);
     fs::create_dir_all(&device_dir).unwrap();
     fs::write(device_dir.join(name), b"not-a-gzip-stream\n").unwrap();
 }
@@ -194,12 +226,20 @@ fn collect_alert_lines_v1(path: &Path, count: &mut usize) {
             collect_alert_lines_v1(&entry, count);
         } else {
             let content = fs::read_to_string(entry).unwrap();
-            *count = count.saturating_add(content.lines().filter(|line| !line.trim().is_empty()).count());
+            *count = count.saturating_add(
+                content
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .count(),
+            );
         }
     }
 }
 
-fn count_vdrop_alerts_v1(runtime: &mut SparxRuntimeV1, tenant_id: &str) -> Result<usize, sparx::db::DbErrorV1> {
+fn count_vdrop_alerts_v1(
+    runtime: &mut SparxRuntimeV1,
+    tenant_id: &str,
+) -> Result<usize, sparx::db::DbErrorV1> {
     runtime.with_tenant_db_v1(tenant_id, 0, |db| {
         let mut count = 0usize;
         for alert_id in db.list_primary_alert_ids_v1()? {
@@ -347,9 +387,9 @@ fn sample_spooled_alert_v1(tenant_id: &str, device_key: &str, alert_id: &str) ->
     }
 }
 
-
 #[test]
-fn oneshot_single_tenant_pass_emits_alerts_and_advances_cursors_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_single_tenant_pass_emits_alerts_and_advances_cursors_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log", "edge01.gz"]);
 
@@ -369,11 +409,27 @@ fn oneshot_single_tenant_pass_emits_alerts_and_advances_cursors_v1() -> Result<(
     let device_key = device_key_v1("smoke", "edge01");
     let log_file_key = file_key_v1("edge01.log");
     let gz_file_key = file_key_v1("edge01.gz");
-    let log_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log"))?.len();
-    let gz_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.gz"))?.len();
+    let log_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log"),
+    )?
+    .len();
+    let gz_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.gz"),
+    )?
+    .len();
 
-    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &log_file_key))?;
-    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &gz_file_key))?;
+    let log_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &log_file_key)
+    })?;
+    let gz_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| {
+        db.read_cursor_v1(&device_key, &gz_file_key)
+    })?;
     assert_eq!(log_cursor.unwrap().offset, log_size);
     assert_eq!(gz_cursor.unwrap().offset, gz_size);
 
@@ -390,23 +446,31 @@ fn oneshot_single_tenant_pass_emits_alerts_and_advances_cursors_v1() -> Result<(
     assert_eq!(device_state.window_size_s_u32, cfg.ingest.window_size_s);
     assert!(device_state.observed_windows_total_u64 >= 1);
     assert!(tenant_state.observed_windows_total_u64 >= device_state.observed_windows_total_u64);
-    assert_eq!(device_state.last_seen_window_end_ts_i64, tenant_state.last_seen_window_end_ts_i64);
+    assert_eq!(
+        device_state.last_seen_window_end_ts_i64,
+        tenant_state.last_seen_window_end_ts_i64
+    );
     Ok(())
 }
 
 #[test]
-fn oneshot_bad_data_lines_stay_stable_and_status_json_remains_healthy_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_bad_data_lines_stay_stable_and_status_json_remains_healthy_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.ingest.read_chunk_bytes = 8;
     cfg.ingest.max_line_len = 32;
 
     let mut content = Vec::new();
     content.extend_from_slice(b"\xff\xfe\x00not-syslog key=value action=login\n");
-    content.extend_from_slice(b"<34>1 bad-ts host app proc msgid - user=\"unterminated src_ip=10.1.1.1\n");
+    content.extend_from_slice(
+        b"<34>1 bad-ts host app proc msgid - user=\"unterminated src_ip=10.1.1.1\n",
+    );
     content.extend_from_slice(b"{\"event\":\"login\",\"user\":");
     content.extend_from_slice(&[0xff, 0xfe, b'}', b'\n']);
     content.resize(content.len() + 256, b'a');
-    content.extend_from_slice(b"\nCEF:0|vendor|product|version|sig|name|severity|src=10.0.0.1 msg=bad\\\n");
+    content.extend_from_slice(
+        b"\nCEF:0|vendor|product|version|sig|name|severity|src=10.0.0.1 msg=bad\\\n",
+    );
 
     write_custom_device_bytes_v1(&cfg, "badtenant", "baddev", "bad.log", &content);
 
@@ -441,12 +505,16 @@ fn oneshot_bad_data_lines_stay_stable_and_status_json_remains_healthy_v1() -> Re
     assert_eq!(status.exit_code, 0, "stderr={:?}", status.msg_stderr);
     let status_json: serde_json::Value = serde_json::from_str(&status.msg_stdout.unwrap())?;
     assert_eq!(status_json["tenants"]["known_count"], serde_json::json!(1));
-    assert_eq!(status_json["process"]["last_run_exit_code"], serde_json::json!(0));
+    assert_eq!(
+        status_json["process"]["last_run_exit_code"],
+        serde_json::json!(0)
+    );
     Ok(())
 }
 
 #[test]
-fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -467,30 +535,43 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_candidates_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
         None
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_alerts_emitted_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_alerts_emitted_total")?,
         Some(2)
     );
-    assert!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_last_evaluation_ts")?.is_some()
-    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("vdrop_last_evaluation_ts")?
+        .is_some());
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_tracked_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_tracked_subjects__smoke")?,
         Some(2.0)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
         Some(2.0)
     );
     drop(runtime);
@@ -524,23 +605,33 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
         Some(4)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_candidates_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_alerts_emitted_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_alerts_emitted_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
         Some(2.0)
     );
     let device_key = device_key_v1("smoke", "edge01");
@@ -571,28 +662,42 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
         },
         &cfg,
     );
-    assert_eq!(observed_again.exit_code, 0, "stderr={:?}", observed_again.msg_stderr);
+    assert_eq!(
+        observed_again.exit_code, 0,
+        "stderr={:?}",
+        observed_again.msg_stderr
+    );
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
         Some(6)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_candidates_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
         Some(4)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_counter_v1("vdrop_alerts_emitted_total")?,
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("vdrop_alerts_emitted_total")?,
         Some(2)
     );
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_open_silence_subjects__smoke")?,
         Some(0.0)
     );
     let (device_open, tenant_open) = runtime.with_tenant_db_v1("smoke", 0, |db| {
@@ -621,7 +726,8 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
 }
 
 #[test]
-fn oneshot_source_stream_gate_default_off_does_not_record_source_stream_state_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_source_stream_gate_default_off_does_not_record_source_stream_state_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -642,7 +748,10 @@ fn oneshot_source_stream_gate_default_off_does_not_record_source_stream_state_v1
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
-    assert_eq!(count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?, 0);
+    assert_eq!(
+        count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?,
+        0
+    );
     let catalogs = runtime.with_tenant_db_v1("smoke", 0, |db| {
         db.list_source_stream_catalogs_for_device_v1(&device_key)
     })?;
@@ -651,7 +760,8 @@ fn oneshot_source_stream_gate_default_off_does_not_record_source_stream_state_v1
 }
 
 #[test]
-fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -680,9 +790,18 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<()
     assert!(alert.device_path.starts_with("source_stream:"));
     assert!(alert.reasons.iter().any(|reason| {
         reason.code == "V_DROP"
-            && reason.details.iter().any(|(key, value)| key == "drop_kind" && value == "hard_silence")
-            && reason.details.iter().any(|(key, value)| key == "subject_kind" && value == "source_stream")
-            && reason.details.iter().any(|(key, value)| key == "source_path" && value == "edge01.log")
+            && reason
+                .details
+                .iter()
+                .any(|(key, value)| key == "drop_kind" && value == "hard_silence")
+            && reason
+                .details
+                .iter()
+                .any(|(key, value)| key == "subject_kind" && value == "source_stream")
+            && reason
+                .details
+                .iter()
+                .any(|(key, value)| key == "source_path" && value == "edge01.log")
     }));
 
     let (catalogs, expected_states, open_states) = runtime.with_tenant_db_v1("smoke", 0, |db| {
@@ -695,7 +814,10 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<()
     assert_eq!(catalogs.len(), 1);
     assert_eq!(expected_states.len(), 1);
     assert_eq!(open_states.len(), 1);
-    assert_eq!(expected_states[0].1.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
+    assert_eq!(
+        expected_states[0].1.subject_kind_u8,
+        SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1
+    );
     assert_eq!(
         open_states[0].1.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1,
         OPEN_SILENCE_FLAG_OPEN_V1
@@ -705,31 +827,71 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1() -> Result<()
     let status = route_command_v1(&CommandV1::Status { json: true }, &cfg);
     assert_eq!(status.exit_code, 0, "stderr={:?}", status.msg_stderr);
     let value: serde_json::Value = serde_json::from_str(&status.msg_stdout.unwrap())?;
-    assert_eq!(value["vdrop"]["source_stream_enabled"].as_bool(), Some(true));
-    assert_eq!(value["vdrop"]["source_stream_tracked_subjects"].as_u64(), Some(1));
-    assert_eq!(value["vdrop"]["source_stream_open_silence_subjects"].as_u64(), Some(1));
-    assert_eq!(value["vdrop"]["source_stream_open_drop_subjects"].as_u64(), Some(0));
-    assert_eq!(value["vdrop"]["source_stream_evaluated_subjects_total"].as_u64(), Some(1));
-    assert_eq!(value["vdrop"]["source_stream_candidates_total"].as_u64(), Some(1));
-    assert_eq!(value["vdrop"]["source_stream_suppressed_candidates_total"].as_u64(), Some(0));
-    assert_eq!(value["vdrop"]["source_stream_alerts_emitted_total"].as_u64(), Some(1));
-    assert!(value["vdrop"]["source_stream_last_evaluation_ts"].as_u64().is_some());
+    assert_eq!(
+        value["vdrop"]["source_stream_enabled"].as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_tracked_subjects"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_open_silence_subjects"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_open_drop_subjects"].as_u64(),
+        Some(0)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_evaluated_subjects_total"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_candidates_total"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_suppressed_candidates_total"].as_u64(),
+        Some(0)
+    );
+    assert_eq!(
+        value["vdrop"]["source_stream_alerts_emitted_total"].as_u64(),
+        Some(1)
+    );
+    assert!(value["vdrop"]["source_stream_last_evaluation_ts"]
+        .as_u64()
+        .is_some());
     let tenants = value["vdrop"]["tenants"].as_array().expect("vdrop tenants");
     assert_eq!(tenants.len(), 1);
-    assert_eq!(tenants[0]["source_stream_tracked_subjects"].as_u64(), Some(1));
-    assert_eq!(tenants[0]["source_stream_open_silence_subjects"].as_u64(), Some(1));
-    assert_eq!(tenants[0]["source_stream_alerts_emitted_total"].as_u64(), Some(1));
+    assert_eq!(
+        tenants[0]["source_stream_tracked_subjects"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        tenants[0]["source_stream_open_silence_subjects"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        tenants[0]["source_stream_alerts_emitted_total"].as_u64(),
+        Some(1)
+    );
     Ok(())
 }
 
 #[test]
-fn oneshot_tenant_policy_can_disable_source_stream_vdrop_runtime_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_tenant_policy_can_disable_source_stream_vdrop_runtime_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
     cfg.vdrop.source_stream_enabled = true;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
-    write_tenant_policy_v1(&cfg, "smoke", "policy_version = 1\nvdrop_source_stream_enabled = false\n");
+    write_tenant_policy_v1(
+        &cfg,
+        "smoke",
+        "policy_version = 1\nvdrop_source_stream_enabled = false\n",
+    );
 
     let result = route_command_v1(
         &CommandV1::OneShot {
@@ -746,7 +908,10 @@ fn oneshot_tenant_policy_can_disable_source_stream_vdrop_runtime_v1() -> Result<
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     assert_eq!(count_vdrop_alerts_v1(&mut runtime, "smoke")?, 2);
-    assert_eq!(count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?, 0);
+    assert_eq!(
+        count_source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?,
+        0
+    );
     let catalogs = runtime.with_tenant_db_v1("smoke", 0, |db| {
         db.list_source_stream_catalogs_for_device_v1(&device_key)
     })?;
@@ -755,7 +920,8 @@ fn oneshot_tenant_policy_can_disable_source_stream_vdrop_runtime_v1() -> Result<
 }
 
 #[test]
-fn oneshot_global_vdrop_disable_suppresses_runtime_alerts_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_global_vdrop_disable_suppresses_runtime_alerts_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -780,12 +946,17 @@ fn oneshot_global_vdrop_disable_suppresses_runtime_alerts_v1() -> Result<(), Box
 }
 
 #[test]
-fn oneshot_tenant_policy_can_disable_device_vdrop_subjects_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_tenant_policy_can_disable_device_vdrop_subjects_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
-    write_tenant_policy_v1(&cfg, "smoke", "policy_version = 1\nvdrop_device_enabled = false\n");
+    write_tenant_policy_v1(
+        &cfg,
+        "smoke",
+        "policy_version = 1\nvdrop_device_enabled = false\n",
+    );
 
     let result = route_command_v1(
         &CommandV1::OneShot {
@@ -805,13 +976,18 @@ fn oneshot_tenant_policy_can_disable_device_vdrop_subjects_v1() -> Result<(), Bo
 }
 
 #[test]
-fn oneshot_tenant_policy_overrides_global_vdrop_threshold_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_tenant_policy_overrides_global_vdrop_threshold_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
     cfg.vdrop.min_expected_windows_missed = u32::MAX;
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
-    write_tenant_policy_v1(&cfg, "smoke", "policy_version = 1\nvdrop_min_expected_windows_missed = 1\n");
+    write_tenant_policy_v1(
+        &cfg,
+        "smoke",
+        "policy_version = 1\nvdrop_min_expected_windows_missed = 1\n",
+    );
 
     let result = route_command_v1(
         &CommandV1::OneShot {
@@ -830,6 +1006,7 @@ fn oneshot_tenant_policy_overrides_global_vdrop_threshold_v1() -> Result<(), Box
     Ok(())
 }
 
+#[test]
 fn oneshot_device_filter_limits_processing_v1() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
@@ -852,15 +1029,18 @@ fn oneshot_device_filter_limits_processing_v1() -> Result<(), Box<dyn std::error
     let edge02_key = device_key_v1("smoke", "edge02");
     let file_key = file_key_v1("edge01.log");
 
-    let edge01_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge01_key, &file_key))?;
-    let edge02_cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge02_key, &file_key))?;
+    let edge01_cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge01_key, &file_key))?;
+    let edge02_cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge02_key, &file_key))?;
     assert!(edge01_cursor.is_none());
     assert!(edge02_cursor.is_some());
     Ok(())
 }
 
 #[test]
-fn oneshot_time_filter_advances_cursor_without_emitting_alerts_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_time_filter_advances_cursor_without_emitting_alerts_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     copy_fixture_device_v1(&cfg, "smoke", "edge01", &["edge01.log"]);
 
@@ -875,13 +1055,23 @@ fn oneshot_time_filter_advances_cursor_without_emitting_alerts_v1() -> Result<()
         &cfg,
     );
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
-    assert_eq!(count_alert_lines_v1(Path::new(&cfg.sparx.alert_out_root)), 0);
+    assert_eq!(
+        count_alert_lines_v1(Path::new(&cfg.sparx.alert_out_root)),
+        0
+    );
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let device_key = device_key_v1("smoke", "edge01");
     let file_key = file_key_v1("edge01.log");
-    let size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log"))?.len();
-    let cursor = runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
+    let size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log"),
+    )?
+    .len();
+    let cursor =
+        runtime.with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&device_key, &file_key))?;
     assert_eq!(cursor.unwrap().offset, size);
     Ok(())
 }
@@ -910,14 +1100,32 @@ fn oneshot_partial_device_failure_returns_exit6_v1() {
     let edge01_key = device_key_v1("smoke", "edge01");
     let edge01_log_key = file_key_v1("edge01.log");
     let edge01_gz_key = file_key_v1("edge01.gz");
-    let edge01_log_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.log")).unwrap().len();
-    let edge01_gz_size = fs::metadata(Path::new(&cfg.sparx.tenant_root).join("smoke").join("edge01").join("edge01.gz")).unwrap().len();
+    let edge01_log_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.log"),
+    )
+    .unwrap()
+    .len();
+    let edge01_gz_size = fs::metadata(
+        Path::new(&cfg.sparx.tenant_root)
+            .join("smoke")
+            .join("edge01")
+            .join("edge01.gz"),
+    )
+    .unwrap()
+    .len();
 
     let edge01_log_cursor = runtime
-        .with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge01_key, &edge01_log_key))
+        .with_tenant_db_v1("smoke", 0, |db| {
+            db.read_cursor_v1(&edge01_key, &edge01_log_key)
+        })
         .unwrap();
     let edge01_gz_cursor = runtime
-        .with_tenant_db_v1("smoke", 0, |db| db.read_cursor_v1(&edge01_key, &edge01_gz_key))
+        .with_tenant_db_v1("smoke", 0, |db| {
+            db.read_cursor_v1(&edge01_key, &edge01_gz_key)
+        })
         .unwrap();
     assert_eq!(edge01_log_cursor.unwrap().offset, edge01_log_size);
     assert_eq!(edge01_gz_cursor.unwrap().offset, edge01_gz_size);
@@ -942,50 +1150,208 @@ fn oneshot_replays_spooled_alerts_automatically_v1() -> Result<(), Box<dyn std::
     assert_eq!(result.exit_code, 0, "stderr={:?}", result.msg_stderr);
     assert!(!spool_path.exists());
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "smoke", "device-a", alert.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "smoke",
+        "device-a",
+        alert.window_start_ts,
+        0,
+    )
+    .unwrap();
     let line = fs::read_to_string(out_path).unwrap();
     let value: serde_json::Value = serde_json::from_str(line.trim_end()).unwrap();
-    assert_eq!(value["alert_id"].as_str(), Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    assert_eq!(
+        value["alert_id"].as_str(),
+        Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    );
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_automated_replay_attempts_total")?, Some(2));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_replay_fail_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_spool_writes_total")?, Some(0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_automated_replay_attempt_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_replayed")?, Some(0.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_automated_replay_failed")?, Some(0.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_snapshot_ts")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?, Some(0.0));
-    assert_eq!(runtime.global_db_v1().read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?, Some(0.0));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_previous_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_last_counter_snapshot_automated_replay_attempts_total")?, Some(2));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_writes_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replayed_total")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_replay_fail_total")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_history_start_counter_snapshot_automated_replay_attempts_total")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__smoke")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total__smoke")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total__smoke")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__smoke")?, Some(0));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__smoke")?, Some(1));
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__smoke")?.is_some());
-    assert!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__smoke")?.is_some());
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total__smoke")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total__smoke")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__smoke")?, Some(1));
-    assert_eq!(runtime.global_db_v1().read_metric_counter_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__smoke")?, Some(2));
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_automated_replay_attempts_total")?,
+        Some(2)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_replayed_total")?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_replay_fail_total")?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_spool_writes_total")?,
+        Some(0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_automated_replay_attempt_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_automated_replay_replayed")?,
+        Some(0.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_automated_replay_failed")?,
+        Some(0.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_previous_snapshot_ts")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_previous_snapshot_backlog_files")?,
+        Some(0.0)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("recovery_last_snapshot_backlog_files")?,
+        Some(0.0)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_previous_counter_snapshot_ts")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_last_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_previous_counter_snapshot_spool_replayed_total")?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_last_counter_snapshot_spool_replayed_total")?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_previous_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_last_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(2)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_history_start_counter_snapshot_ts")?
+        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_history_start_counter_snapshot_spool_writes_total")?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_spool_replayed_total"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_spool_replay_fail_total"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_history_start_counter_snapshot_automated_replay_attempts_total"
+        )?,
+        Some(1)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_history_start_counter_snapshot_ts__smoke")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_writes_total__smoke"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replayed_total__smoke"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__smoke"
+        )?,
+        Some(0)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__smoke"
+        )?,
+        Some(1)
+    );
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__smoke")?
+        .is_some());
+    assert!(runtime
+        .global_db_v1()
+        .read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__smoke")?
+        .is_some());
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_spool_replayed_total__smoke"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_spool_replayed_total__smoke"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__smoke"
+        )?,
+        Some(1)
+    );
+    assert_eq!(
+        runtime.global_db_v1().read_metric_counter_v1(
+            "recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__smoke"
+        )?,
+        Some(2)
+    );
     Ok(())
 }
 
 #[test]
-fn oneshot_runtime_emits_device_sharp_drop_from_stats_baseline_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_runtime_emits_device_sharp_drop_from_stats_baseline_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -1035,7 +1401,11 @@ fn oneshot_runtime_emits_device_sharp_drop_from_stats_baseline_v1() -> Result<()
         },
         &cfg,
     );
-    assert_eq!(sharp_drop.exit_code, 0, "stderr={:?}", sharp_drop.msg_stderr);
+    assert_eq!(
+        sharp_drop.exit_code, 0,
+        "stderr={:?}",
+        sharp_drop.msg_stderr
+    );
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     assert_eq!(count_sharp_drop_alerts_v1(&mut runtime, "smoke")?, 1);
@@ -1048,7 +1418,9 @@ fn oneshot_runtime_emits_device_sharp_drop_from_stats_baseline_v1() -> Result<()
     assert!(device_open_drop.is_some());
     assert_eq!(tenant_open_drop, None);
     assert_eq!(
-        runtime.global_db_v1().read_metric_gauge_v1("vdrop_open_drop_subjects__smoke")?,
+        runtime
+            .global_db_v1()
+            .read_metric_gauge_v1("vdrop_open_drop_subjects__smoke")?,
         Some(1.0)
     );
     assert_eq!(
@@ -1059,7 +1431,8 @@ fn oneshot_runtime_emits_device_sharp_drop_from_stats_baseline_v1() -> Result<()
 }
 
 #[test]
-fn oneshot_source_stream_runtime_emits_sharp_drop_from_stats_baseline_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn oneshot_source_stream_runtime_emits_sharp_drop_from_stats_baseline_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = temp_cfg_v1();
     cfg.scoring.cold_start_days = 0;
     cfg.scoring.min_lines_per_window = 1;
@@ -1120,7 +1493,11 @@ fn oneshot_source_stream_runtime_emits_sharp_drop_from_stats_baseline_v1() -> Re
         },
         &cfg,
     );
-    assert_eq!(sharp_drop.exit_code, 0, "stderr={:?}", sharp_drop.msg_stderr);
+    assert_eq!(
+        sharp_drop.exit_code, 0,
+        "stderr={:?}",
+        sharp_drop.msg_stderr
+    );
 
     let mut runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
     let source_alerts = source_stream_vdrop_alerts_v1(&mut runtime, "smoke")?;
@@ -1129,9 +1506,18 @@ fn oneshot_source_stream_runtime_emits_sharp_drop_from_stats_baseline_v1() -> Re
         .filter(|alert| {
             alert.reasons.iter().any(|reason| {
                 reason.code == "V_DROP"
-                    && reason.details.iter().any(|(key, value)| key == "drop_kind" && value == "sharp_drop")
-                    && reason.details.iter().any(|(key, value)| key == "subject_kind" && value == "source_stream")
-                    && reason.details.iter().any(|(key, value)| key == "source_stream_id" && value == &source_stream_id)
+                    && reason
+                        .details
+                        .iter()
+                        .any(|(key, value)| key == "drop_kind" && value == "sharp_drop")
+                    && reason
+                        .details
+                        .iter()
+                        .any(|(key, value)| key == "subject_kind" && value == "source_stream")
+                    && reason
+                        .details
+                        .iter()
+                        .any(|(key, value)| key == "source_stream_id" && value == &source_stream_id)
             })
         })
         .collect();

@@ -34,14 +34,21 @@ pub struct CursorPlanV1 {
     pub cursor_resets_total_delta: u64,
 }
 
-pub fn reconcile_cursor_v1(previous: Option<&FileCursorV1>, observed: &ObservedFileStateV1) -> CursorPlanV1 {
+pub fn reconcile_cursor_v1(
+    previous: Option<&FileCursorV1>,
+    observed: &ObservedFileStateV1,
+) -> CursorPlanV1 {
     match previous {
         None => plan_from_offset_v1(observed, 0, 0, None, 0),
         Some(prev) => reconcile_existing_cursor_v1(prev, observed),
     }
 }
 
-pub fn apply_cursor_read_progress_v1(cursor: &FileCursorV1, new_offset: u64, read_ts: UnixSec) -> FileCursorV1 {
+pub fn apply_cursor_read_progress_v1(
+    cursor: &FileCursorV1,
+    new_offset: u64,
+    read_ts: UnixSec,
+) -> FileCursorV1 {
     let next_offset = new_offset.min(cursor.size);
     FileCursorV1 {
         inode: cursor.inode,
@@ -53,7 +60,10 @@ pub fn apply_cursor_read_progress_v1(cursor: &FileCursorV1, new_offset: u64, rea
     }
 }
 
-fn reconcile_existing_cursor_v1(previous: &FileCursorV1, observed: &ObservedFileStateV1) -> CursorPlanV1 {
+fn reconcile_existing_cursor_v1(
+    previous: &FileCursorV1,
+    observed: &ObservedFileStateV1,
+) -> CursorPlanV1 {
     if previous.is_gzip != observed.is_gzip {
         return plan_from_offset_v1(
             observed,
@@ -71,7 +81,10 @@ fn reconcile_existing_cursor_v1(previous: &FileCursorV1, observed: &ObservedFile
     reconcile_plain_cursor_v1(previous, observed)
 }
 
-fn reconcile_plain_cursor_v1(previous: &FileCursorV1, observed: &ObservedFileStateV1) -> CursorPlanV1 {
+fn reconcile_plain_cursor_v1(
+    previous: &FileCursorV1,
+    observed: &ObservedFileStateV1,
+) -> CursorPlanV1 {
     if previous.inode != observed.inode {
         return plan_from_offset_v1(
             observed,
@@ -95,7 +108,10 @@ fn reconcile_plain_cursor_v1(previous: &FileCursorV1, observed: &ObservedFileSta
     plan_from_offset_v1(observed, previous.offset, previous.last_read_ts, None, 0)
 }
 
-fn reconcile_gzip_cursor_v1(previous: &FileCursorV1, observed: &ObservedFileStateV1) -> CursorPlanV1 {
+fn reconcile_gzip_cursor_v1(
+    previous: &FileCursorV1,
+    observed: &ObservedFileStateV1,
+) -> CursorPlanV1 {
     if previous.inode != observed.inode {
         return plan_from_offset_v1(
             observed,

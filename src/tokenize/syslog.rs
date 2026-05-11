@@ -58,7 +58,11 @@ fn parse_pri_prefix_v1(line: &str) -> (Option<u32>, &str) {
     (Some(pri), rest)
 }
 
-fn parse_rfc5424_like_v1(line: &str, pri: Option<u32>, _ingest_ts: UnixSec) -> Option<ParsedLineV1> {
+fn parse_rfc5424_like_v1(
+    line: &str,
+    pri: Option<u32>,
+    _ingest_ts: UnixSec,
+) -> Option<ParsedLineV1> {
     let s = trim_ascii_start_v1(line);
     let (version_token, rest) = take_space_token_v1(s)?;
     let version = version_token.parse::<u32>().ok()?;
@@ -123,7 +127,11 @@ fn parse_bsd_v1(line: &str, pri: Option<u32>, ingest_ts: UnixSec) -> Option<Pars
     })
 }
 
-fn parse_iso_heuristic_v1(line: &str, pri: Option<u32>, _ingest_ts: UnixSec) -> Option<ParsedLineV1> {
+fn parse_iso_heuristic_v1(
+    line: &str,
+    pri: Option<u32>,
+    _ingest_ts: UnixSec,
+) -> Option<ParsedLineV1> {
     let s = trim_ascii_start_v1(line);
     let (ts_guess, consumed) = parse_iso_prefix_v1(s)?;
     let rest = trim_ascii_start_v1(&s[consumed..]);
@@ -166,7 +174,12 @@ fn parse_iso_heuristic_v1(line: &str, pri: Option<u32>, _ingest_ts: UnixSec) -> 
     })
 }
 
-fn peel_vendor_prefixes_v1(envelope: &mut SyslogEnvelopeV1, msg: &mut String, ingest_ts: UnixSec, allow_embedded_override: bool) {
+fn peel_vendor_prefixes_v1(
+    envelope: &mut SyslogEnvelopeV1,
+    msg: &mut String,
+    ingest_ts: UnixSec,
+    allow_embedded_override: bool,
+) {
     let mut current = msg.as_str();
     let mut peeled: Vec<String> = Vec::new();
 
@@ -205,7 +218,8 @@ fn should_peel_prefix_v1(prefix: &str, remainder: &str, ingest_ts: UnixSec) -> b
     if remainder.starts_with('%') {
         return true;
     }
-    parse_iso_timestamp_v1(prefix).is_some() || parse_embedded_bsd_timestamp_v1(prefix, ingest_ts).is_some()
+    parse_iso_timestamp_v1(prefix).is_some()
+        || parse_embedded_bsd_timestamp_v1(prefix, ingest_ts).is_some()
 }
 
 fn split_vendor_prefix_v1(s: &str) -> Option<(&str, &str)> {
@@ -365,7 +379,11 @@ fn parse_iso_basic_utc_v1(s: &str) -> Option<i64> {
         if digits.is_empty() {
             0u32
         } else {
-            let truncated = if digits.len() > 9 { &digits[..9] } else { &digits };
+            let truncated = if digits.len() > 9 {
+                &digits[..9]
+            } else {
+                &digits
+            };
             let mut padded = truncated.to_string();
             while padded.len() < 9 {
                 padded.push('0');
@@ -449,7 +467,12 @@ fn parse_bsd_month_v1(token: &str) -> Option<u32> {
     })
 }
 
-fn infer_bsd_timestamp_v1(ingest_ts: UnixSec, month: u32, day: u32, time: NaiveTime) -> Option<i64> {
+fn infer_bsd_timestamp_v1(
+    ingest_ts: UnixSec,
+    month: u32,
+    day: u32,
+    time: NaiveTime,
+) -> Option<i64> {
     let ingest = Utc.timestamp_opt(ingest_ts, 0).single()?;
     let mut year = ingest.year();
     let mut candidate = Utc
@@ -508,8 +531,6 @@ fn trim_ascii_start_v1(s: &str) -> &str {
 
 fn is_host_like_v1(s: &str) -> bool {
     !s.is_empty()
-        && s.bytes().all(|b| {
-            b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b':')
-        })
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b':'))
 }
-

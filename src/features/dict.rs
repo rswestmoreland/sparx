@@ -8,9 +8,8 @@ use std::collections::BTreeMap;
 
 use crate::config::FeaturesSectionV1;
 use crate::db::keys::{
-    KeyBytes,
     key_tenant_feature_dict_entries_v1, key_tenant_feature_dict_id_v1,
-    key_tenant_feature_dict_next_id_v1, key_tenant_feature_dict_str_v1,
+    key_tenant_feature_dict_next_id_v1, key_tenant_feature_dict_str_v1, KeyBytes,
 };
 use crate::db::tenant_values::{
     encode_feat_dict_id_to_str_v1, encode_feat_dict_meta_entries_v1,
@@ -56,11 +55,20 @@ pub struct FeatureDictionaryResolveV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FeatureDictionaryErrorV1 {
     DictionaryDisabled,
-    DictionaryFull { max_entries: u32 },
+    DictionaryFull {
+        max_entries: u32,
+    },
     NextIdExhausted,
-    DuplicateFeatureString { feature_string: String },
-    DuplicateFeatureId { feature_id: FeatureId },
-    MetaEntriesMismatch { meta_entries: u32, actual_entries: u32 },
+    DuplicateFeatureString {
+        feature_string: String,
+    },
+    DuplicateFeatureId {
+        feature_id: FeatureId,
+    },
+    MetaEntriesMismatch {
+        meta_entries: u32,
+        actual_entries: u32,
+    },
     ReverseEntriesMismatch {
         forward_entries: u32,
         reverse_entries: u32,
@@ -112,7 +120,10 @@ impl FeatureDictionaryV1 {
         let mut id_to_str = BTreeMap::new();
 
         for (feature_string, feature_id) in forward_entries {
-            if str_to_id.insert(feature_string.clone(), feature_id).is_some() {
+            if str_to_id
+                .insert(feature_string.clone(), feature_id)
+                .is_some()
+            {
                 return Err(FeatureDictionaryErrorV1::DuplicateFeatureString { feature_string });
             }
             if id_to_str.insert(feature_id, feature_string).is_some() {

@@ -6,10 +6,8 @@
 // Parses argv into deterministic command and override structures.
 // ASCII-only.
 
+use super::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1};
 use crate::config::CliOverridesV1;
-use super::{
-    AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1,
-};
 
 #[derive(Clone, Debug)]
 pub struct CliErrorV1 {
@@ -209,7 +207,16 @@ pub fn parse_args_v1(argv: &[String]) -> Result<(CommandV1, CliOverridesV1), Cli
                 }
             }
 
-            Ok((CommandV1::OneShot { tenant_id, since, until, device_path, migrate }, cli))
+            Ok((
+                CommandV1::OneShot {
+                    tenant_id,
+                    since,
+                    until,
+                    device_path,
+                    migrate,
+                },
+                cli,
+            ))
         }
         "status" => {
             // status [--json]
@@ -294,7 +301,11 @@ pub fn parse_args_v1(argv: &[String]) -> Result<(CommandV1, CliOverridesV1), Cli
     }
 }
 
-fn parse_tenant(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
+fn parse_tenant(
+    argv: &[String],
+    mut i: usize,
+    cli: CliOverridesV1,
+) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
     if i >= argv.len() {
         return Err(CliErrorV1 {
             msg: "missing tenant subcommand".to_string(),
@@ -360,7 +371,11 @@ fn parse_tenant(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(C
     }
 }
 
-fn parse_migrate(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
+fn parse_migrate(
+    argv: &[String],
+    mut i: usize,
+    cli: CliOverridesV1,
+) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
     // migrate --tenant <id> | --all
     let mut tenant: Option<String> = None;
     let mut all = false;
@@ -398,7 +413,11 @@ fn parse_migrate(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(
     })
 }
 
-fn parse_alerts(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
+fn parse_alerts(
+    argv: &[String],
+    mut i: usize,
+    cli: CliOverridesV1,
+) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
     if i >= argv.len() {
         return Err(CliErrorV1 {
             msg: "missing alerts subcommand".to_string(),
@@ -501,7 +520,14 @@ fn parse_alerts(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(C
             let aid = alert_id.ok_or_else(|| CliErrorV1 {
                 msg: "alerts show: missing --alert-id".to_string(),
             })?;
-            Ok((CommandV1::AlertsShow { tenant_id: tid, alert_id: aid, json }, cli))
+            Ok((
+                CommandV1::AlertsShow {
+                    tenant_id: tid,
+                    alert_id: aid,
+                    json,
+                },
+                cli,
+            ))
         }
         "search" => {
             let mut tenant_id: Option<String> = None;
@@ -636,7 +662,11 @@ fn parse_alerts(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(C
     }
 }
 
-fn parse_alert(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
+fn parse_alert(
+    argv: &[String],
+    mut i: usize,
+    cli: CliOverridesV1,
+) -> Result<(CommandV1, CliOverridesV1), CliErrorV1> {
     if i >= argv.len() {
         return Err(CliErrorV1 {
             msg: "missing alert subcommand".to_string(),
@@ -693,7 +723,16 @@ fn parse_alert(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(Co
             let out = out_path.ok_or_else(|| CliErrorV1 {
                 msg: "alert extract: missing --out".to_string(),
             })?;
-            Ok((CommandV1::AlertExtract { tenant_id: tid, alert_id: aid, out_path: out, max_bytes, max_lines }, cli))
+            Ok((
+                CommandV1::AlertExtract {
+                    tenant_id: tid,
+                    alert_id: aid,
+                    out_path: out,
+                    max_bytes,
+                    max_lines,
+                },
+                cli,
+            ))
         }
         "drill" => {
             let mut tenant_id: Option<String> = None;
@@ -734,7 +773,15 @@ fn parse_alert(argv: &[String], mut i: usize, cli: CliOverridesV1) -> Result<(Co
             let aid = alert_id.ok_or_else(|| CliErrorV1 {
                 msg: "alert drill: missing --alert-id".to_string(),
             })?;
-            Ok((CommandV1::AlertDrill { tenant_id: tid, alert_id: aid, max_bytes, max_lines }, cli))
+            Ok((
+                CommandV1::AlertDrill {
+                    tenant_id: tid,
+                    alert_id: aid,
+                    max_bytes,
+                    max_lines,
+                },
+                cli,
+            ))
         }
         _ => Err(CliErrorV1 {
             msg: format!("unknown alert subcommand: {}", sub),

@@ -12,8 +12,8 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::alert::{AlertV1, FileSpanV1};
 use crate::config::ConfigV1;
-use crate::ingest::reader::open_file_reader_v1;
 use crate::ingest::discover_tenant_devices_v1;
+use crate::ingest::reader::open_file_reader_v1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DrillSpanResultV1 {
@@ -48,7 +48,11 @@ pub struct ExtractAlertResultV1 {
     pub max_lines: Option<u64>,
 }
 
-pub fn resolve_provenance_path_v1(cfg: &ConfigV1, alert: &AlertV1, span: &FileSpanV1) -> io::Result<PathBuf> {
+pub fn resolve_provenance_path_v1(
+    cfg: &ConfigV1,
+    alert: &AlertV1,
+    span: &FileSpanV1,
+) -> io::Result<PathBuf> {
     validate_path_component_v1("tenant_id", &alert.tenant_id)?;
     validate_relative_path_v1("file_rel", &span.file_rel)?;
 
@@ -57,7 +61,6 @@ pub fn resolve_provenance_path_v1(cfg: &ConfigV1, alert: &AlertV1, span: &FileSp
     let path = base.join(&span.file_rel);
     ensure_path_under_root_v1(tenant_root, &path)
 }
-
 
 fn resolve_alert_device_base_v1(tenant_root: &Path, alert: &AlertV1) -> io::Result<PathBuf> {
     if alert.device_path.starts_with("source_stream:") {
@@ -73,12 +76,17 @@ fn resolve_alert_device_base_v1(tenant_root: &Path, alert: &AlertV1) -> io::Resu
     Ok(tenant_root.join(&alert.tenant_id).join(&alert.device_path))
 }
 
-fn resolve_source_stream_device_base_v1(tenant_root: &Path, alert: &AlertV1) -> io::Result<PathBuf> {
+fn resolve_source_stream_device_base_v1(
+    tenant_root: &Path,
+    alert: &AlertV1,
+) -> io::Result<PathBuf> {
     validate_path_component_v1("device_key", &alert.device_key)?;
     let devices = discover_tenant_devices_v1(tenant_root, false)?;
     for device in devices {
         if device.tenant_id == alert.tenant_id && device.device_key == alert.device_key {
-            return Ok(tenant_root.join(device.tenant_id).join(device.device_dir_rel));
+            return Ok(tenant_root
+                .join(device.tenant_id)
+                .join(device.device_dir_rel));
         }
     }
     Err(io::Error::new(
@@ -96,7 +104,10 @@ fn ensure_path_under_root_v1(root: &Path, path: &Path) -> io::Result<PathBuf> {
     if !path_canon.starts_with(&root_canon) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            format!("resolved provenance path escapes tenant root: {}", path.display()),
+            format!(
+                "resolved provenance path escapes tenant root: {}",
+                path.display()
+            ),
         ));
     }
     Ok(path_canon)
@@ -109,7 +120,10 @@ fn validate_path_component_v1(field: &str, value: &str) -> io::Result<()> {
             format!("invalid {} path component", field),
         ));
     }
-    if value.bytes().any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f) {
+    if value
+        .bytes()
+        .any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f)
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("invalid {} path component", field),

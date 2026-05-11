@@ -97,8 +97,18 @@ fn sample_alert_v1(tenant_id: &str, device_key: &str, alert_id: &str, summary: &
 #[test]
 fn replay_spool_all_tenants_replays_and_deletes_files_v1() {
     let cfg = temp_cfg_v1();
-    let alert_a = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tenant a summary");
-    let alert_b = sample_alert_v1("tenant-b", "device-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "tenant b summary");
+    let alert_a = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tenant a summary",
+    );
+    let alert_b = sample_alert_v1(
+        "tenant-b",
+        "device-b",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "tenant b summary",
+    );
 
     let path_a = write_spool_alert_v1(&cfg.sparx.data_root, &alert_a).unwrap();
     let path_b = write_spool_alert_v1(&cfg.sparx.data_root, &alert_b).unwrap();
@@ -113,8 +123,22 @@ fn replay_spool_all_tenants_replays_and_deletes_files_v1() {
     assert!(!path_a.exists());
     assert!(!path_b.exists());
 
-    let out_a = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert_a.window_start_ts, 0).unwrap();
-    let out_b = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-b", "device-b", alert_b.window_start_ts, 0).unwrap();
+    let out_a = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert_a.window_start_ts,
+        0,
+    )
+    .unwrap();
+    let out_b = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-b",
+        "device-b",
+        alert_b.window_start_ts,
+        0,
+    )
+    .unwrap();
     assert!(out_a.is_file());
     assert!(out_b.is_file());
 }
@@ -122,8 +146,18 @@ fn replay_spool_all_tenants_replays_and_deletes_files_v1() {
 #[test]
 fn replay_spool_single_tenant_leaves_other_tenants_untouched_v1() {
     let cfg = temp_cfg_v1();
-    let alert_a = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tenant a summary");
-    let alert_b = sample_alert_v1("tenant-b", "device-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "tenant b summary");
+    let alert_a = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tenant a summary",
+    );
+    let alert_b = sample_alert_v1(
+        "tenant-b",
+        "device-b",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "tenant b summary",
+    );
 
     let path_a = write_spool_alert_v1(&cfg.sparx.data_root, &alert_a).unwrap();
     let path_b = write_spool_alert_v1(&cfg.sparx.data_root, &alert_b).unwrap();
@@ -142,8 +176,22 @@ fn replay_spool_single_tenant_leaves_other_tenants_untouched_v1() {
     assert!(!path_a.exists());
     assert!(path_b.exists());
 
-    let out_a = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert_a.window_start_ts, 0).unwrap();
-    let out_b = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-b", "device-b", alert_b.window_start_ts, 0).unwrap();
+    let out_a = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert_a.window_start_ts,
+        0,
+    )
+    .unwrap();
+    let out_b = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-b",
+        "device-b",
+        alert_b.window_start_ts,
+        0,
+    )
+    .unwrap();
     assert!(out_a.is_file());
     assert!(!out_b.exists());
 }
@@ -151,7 +199,12 @@ fn replay_spool_single_tenant_leaves_other_tenants_untouched_v1() {
 #[test]
 fn replay_spool_partial_failure_preserves_failed_files_v1() {
     let cfg = temp_cfg_v1();
-    let alert = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tenant a summary");
+    let alert = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tenant a summary",
+    );
     let good_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
     let bad_dir = spool_alert_dir_v1(&cfg.sparx.data_root, "tenant-a").unwrap();
     fs::create_dir_all(&bad_dir).unwrap();
@@ -169,15 +222,32 @@ fn replay_spool_partial_failure_preserves_failed_files_v1() {
     assert!(!good_path.exists());
     assert!(bad_path.exists());
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert.window_start_ts,
+        0,
+    )
+    .unwrap();
     assert!(out_path.is_file());
 }
 
 #[test]
 fn replay_spool_is_deterministic_by_filename_v1() {
     let cfg = temp_cfg_v1();
-    let alert_b = sample_alert_v1("tenant-a", "device-a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "second summary");
-    let alert_a = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "first summary");
+    let alert_b = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "second summary",
+    );
+    let alert_a = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "first summary",
+    );
 
     write_spool_alert_v1(&cfg.sparx.data_root, &alert_b).unwrap();
     write_spool_alert_v1(&cfg.sparx.data_root, &alert_a).unwrap();
@@ -185,13 +255,26 @@ fn replay_spool_is_deterministic_by_filename_v1() {
     let r = route_command_v1(&CommandV1::ReplaySpool { tenant_id: None }, &cfg);
     assert_eq!(0, r.exit_code);
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert_a.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert_a.window_start_ts,
+        0,
+    )
+    .unwrap();
     let content = fs::read_to_string(out_path).unwrap();
     let mut lines = content.lines();
     let first: serde_json::Value = serde_json::from_str(lines.next().unwrap()).unwrap();
     let second: serde_json::Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-    assert_eq!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", first["alert_id"].as_str().unwrap());
-    assert_eq!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", second["alert_id"].as_str().unwrap());
+    assert_eq!(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        first["alert_id"].as_str().unwrap()
+    );
+    assert_eq!(
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        second["alert_id"].as_str().unwrap()
+    );
     assert!(lines.next().is_none());
 }
 
@@ -199,7 +282,12 @@ fn replay_spool_is_deterministic_by_filename_v1() {
 fn replay_spool_fails_closed_for_stdout_sink_v1() {
     let mut cfg = temp_cfg_v1();
     cfg.output.sink = "stdout".to_string();
-    let alert = sample_alert_v1("tenant-a", "device-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tenant a summary");
+    let alert = sample_alert_v1(
+        "tenant-a",
+        "device-a",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tenant a summary",
+    );
     let spool_path = write_spool_alert_v1(&cfg.sparx.data_root, &alert).unwrap();
 
     let r = route_command_v1(&CommandV1::ReplaySpool { tenant_id: None }, &cfg);
@@ -209,6 +297,13 @@ fn replay_spool_fails_closed_for_stdout_sink_v1() {
     assert!(stderr.contains("replay-spool requires output.sink=jsonl"));
     assert!(spool_path.exists());
 
-    let out_path = jsonl_alert_path_v1(&cfg.sparx.alert_out_root, "tenant-a", "device-a", alert.window_start_ts, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &cfg.sparx.alert_out_root,
+        "tenant-a",
+        "device-a",
+        alert.window_start_ts,
+        0,
+    )
+    .unwrap();
     assert!(!out_path.exists());
 }

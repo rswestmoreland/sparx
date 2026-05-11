@@ -1,12 +1,18 @@
 // Copyright (c) 2026 Richard S. Westmoreland
 // SPDX-License-Identifier: MIT
 
-use sparx::tokenize::{tokenize_message_bytes_v1, tokenize_message_v1, CsvHeaderModeV1, TokenEventV1};
+use sparx::tokenize::{
+    tokenize_message_bytes_v1, tokenize_message_v1, CsvHeaderModeV1, TokenEventV1,
+};
 
 fn kv_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for event in events {
-        if let TokenEventV1::Kv { key_norm, value_raw } = event {
+        if let TokenEventV1::Kv {
+            key_norm,
+            value_raw,
+        } = event
+        {
             out.push((key_norm.clone(), value_raw.clone()));
         }
     }
@@ -16,7 +22,11 @@ fn kv_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
 fn json_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for event in events {
-        if let TokenEventV1::JsonKv { key_path_norm, value_raw } = event {
+        if let TokenEventV1::JsonKv {
+            key_path_norm,
+            value_raw,
+        } = event
+        {
             out.push((key_path_norm.clone(), value_raw.clone()));
         }
     }
@@ -26,7 +36,11 @@ fn json_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
 fn csv_pairs(events: &[TokenEventV1]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for event in events {
-        if let TokenEventV1::CsvKv { key_norm, value_raw } = event {
+        if let TokenEventV1::CsvKv {
+            key_norm,
+            value_raw,
+        } = event
+        {
             out.push((key_norm.clone(), value_raw.clone()));
         }
     }
@@ -45,7 +59,10 @@ fn words(events: &[TokenEventV1]) -> Vec<String> {
 
 #[test]
 fn kv_parses_quoted_values_with_spaces() {
-    let result = tokenize_message_v1("user=alice msg=\"hello world\" action='sign in' status=ok", None);
+    let result = tokenize_message_v1(
+        "user=alice msg=\"hello world\" action='sign in' status=ok",
+        None,
+    );
     let kvs = kv_pairs(&result.events);
     assert_eq!(
         kvs,
@@ -58,7 +75,12 @@ fn kv_parses_quoted_values_with_spaces() {
     );
     assert_eq!(
         words(&result.events),
-        vec!["hello".to_string(), "world".to_string(), "sign".to_string(), "in".to_string()]
+        vec![
+            "hello".to_string(),
+            "world".to_string(),
+            "sign".to_string(),
+            "in".to_string()
+        ]
     );
 }
 
@@ -114,7 +136,11 @@ fn json_flatten_depth_and_caps() {
 #[test]
 fn csv_header_mode_emits_csv_kvs() {
     let header = CsvHeaderModeV1 {
-        columns: vec!["src_ip".to_string(), "dst_ip".to_string(), "message".to_string()],
+        columns: vec![
+            "src_ip".to_string(),
+            "dst_ip".to_string(),
+            "message".to_string(),
+        ],
     };
     let result = tokenize_message_v1("10.0.0.1,10.0.0.2,\"hello world\"", Some(&header));
     assert_eq!(

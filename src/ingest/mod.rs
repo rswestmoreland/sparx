@@ -17,7 +17,8 @@ use crate::types::{DeviceKey, TenantId, UnixSec};
 pub const DEFAULT_FILE_SUFFIXES_V1: [&str; 6] = [".log", ".txt", ".json", ".csv", ".cef", ".gz"];
 
 pub use cursor::{
-    apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorPlanV1, CursorResetReasonV1, ObservedFileStateV1,
+    apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorPlanV1, CursorResetReasonV1,
+    ObservedFileStateV1,
 };
 
 pub use reader::{
@@ -67,17 +68,28 @@ pub fn file_key_v1(file_rel: &str) -> String {
     stable_hash_hex128_v1(file_rel)
 }
 
-pub fn discover_tenant_devices_v1(watch_root: &Path, follow_symlinks: bool) -> io::Result<Vec<TenantDeviceV1>> {
+pub fn discover_tenant_devices_v1(
+    watch_root: &Path,
+    follow_symlinks: bool,
+) -> io::Result<Vec<TenantDeviceV1>> {
     let mut out = Vec::new();
     for tenant_entry in sorted_dir_entries(watch_root)? {
         let tenant_name = os_name_to_string(tenant_entry.file_name());
-        if !entry_matches_kind(&tenant_entry.path(), follow_symlinks, EntryKindV1::Directory)? {
+        if !entry_matches_kind(
+            &tenant_entry.path(),
+            follow_symlinks,
+            EntryKindV1::Directory,
+        )? {
             continue;
         }
 
         for device_entry in sorted_dir_entries(&tenant_entry.path())? {
             let device_name = os_name_to_string(device_entry.file_name());
-            if !entry_matches_kind(&device_entry.path(), follow_symlinks, EntryKindV1::Directory)? {
+            if !entry_matches_kind(
+                &device_entry.path(),
+                follow_symlinks,
+                EntryKindV1::Directory,
+            )? {
                 continue;
             }
             let device_rel = device_name.clone();
@@ -104,11 +116,16 @@ pub fn discover_device_files_v1(
     device: &TenantDeviceV1,
     follow_symlinks: bool,
 ) -> io::Result<Vec<DiscoveredFileV1>> {
-    let device_root = watch_root.join(&device.tenant_id).join(&device.device_dir_rel);
+    let device_root = watch_root
+        .join(&device.tenant_id)
+        .join(&device.device_dir_rel);
     discover_device_files_at_v1(&device_root, follow_symlinks)
 }
 
-pub fn discover_device_files_at_v1(device_root: &Path, follow_symlinks: bool) -> io::Result<Vec<DiscoveredFileV1>> {
+pub fn discover_device_files_at_v1(
+    device_root: &Path,
+    follow_symlinks: bool,
+) -> io::Result<Vec<DiscoveredFileV1>> {
     let mut out = Vec::new();
     for entry in sorted_dir_entries(device_root)? {
         let name = os_name_to_string(entry.file_name());
@@ -127,11 +144,18 @@ pub fn discover_device_files_at_v1(device_root: &Path, follow_symlinks: bool) ->
             is_gzip: is_gzip_name_v1(&name),
         });
     }
-    out.sort_by(|a, b| a.file_rel.cmp(&b.file_rel).then(a.file_key.cmp(&b.file_key)));
+    out.sort_by(|a, b| {
+        a.file_rel
+            .cmp(&b.file_rel)
+            .then(a.file_key.cmp(&b.file_key))
+    });
     Ok(out)
 }
 
-pub fn discover_device_inventory_v1(watch_root: &Path, follow_symlinks: bool) -> io::Result<Vec<DeviceInventoryV1>> {
+pub fn discover_device_inventory_v1(
+    watch_root: &Path,
+    follow_symlinks: bool,
+) -> io::Result<Vec<DeviceInventoryV1>> {
     let mut out = Vec::new();
     for device in discover_tenant_devices_v1(watch_root, follow_symlinks)? {
         let files = discover_device_files_v1(watch_root, &device, follow_symlinks)?;
@@ -179,7 +203,11 @@ enum EntryKindV1 {
     File,
 }
 
-fn entry_matches_kind(path: &PathBuf, follow_symlinks: bool, want: EntryKindV1) -> io::Result<bool> {
+fn entry_matches_kind(
+    path: &PathBuf,
+    follow_symlinks: bool,
+    want: EntryKindV1,
+) -> io::Result<bool> {
     let meta = if follow_symlinks {
         fs::metadata(path)?
     } else {

@@ -9,8 +9,8 @@ use std::sync::{Mutex, OnceLock};
 
 use sparx::config::load::default_config_v1;
 use sparx::config::load::load_config_v1;
-use sparx::config::CliOverridesV1;
 use sparx::config::validate::validate_config_v1;
+use sparx::config::CliOverridesV1;
 use tempfile::tempdir;
 
 fn env_lock_v1() -> &'static Mutex<()> {
@@ -193,7 +193,6 @@ sink = "stdout"
     assert_eq!(cfg.sparx.log_level, "error");
     assert_eq!(cfg.sparx.log_format, "json");
     assert_eq!(cfg.output.sink, "jsonl");
-
 }
 
 #[test]
@@ -230,7 +229,6 @@ sink = "stdout"
 
     let cfg = load_config_v1(&cli).unwrap();
     assert_eq!(cfg.output.sink, "jsonl");
-
 }
 
 #[test]
@@ -252,10 +250,7 @@ fn validate_rejects_duplicate_metrics_binds_when_both_enabled_v1() {
 #[test]
 fn config_env_overrides_output_recovery_tuning_v1() {
     let _guard = env_lock_v1().lock().unwrap();
-    let _env = EnvGuardV1::clear(&[
-        "SPARX_AUTOMATED_REPLAY_INTERVAL_S",
-        "SPARX_SPOOL_MAX_MB",
-    ]);
+    let _env = EnvGuardV1::clear(&["SPARX_AUTOMATED_REPLAY_INTERVAL_S", "SPARX_SPOOL_MAX_MB"]);
 
     std::env::set_var("SPARX_AUTOMATED_REPLAY_INTERVAL_S", "17");
     std::env::set_var("SPARX_SPOOL_MAX_MB", "99");
@@ -343,25 +338,44 @@ fn config_rejects_zero_vdrop_missed_window_threshold_v1() {
 fn config_rejects_unbounded_ingest_read_and_line_caps_v1() {
     let mut cfg = default_config_v1();
     cfg.ingest.read_chunk_bytes = 0;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.read_chunk_bytes"));
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.read_chunk_bytes"));
 
     let mut cfg = default_config_v1();
     cfg.ingest.read_chunk_bytes = sparx::config::validate::READ_CHUNK_BYTES_MAX_V1 + 1;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.read_chunk_bytes"));
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.read_chunk_bytes"));
 
     let mut cfg = default_config_v1();
     cfg.ingest.max_line_len = 0;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.max_line_len"));
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.max_line_len"));
 
     let mut cfg = default_config_v1();
     cfg.ingest.max_tokens_per_line = sparx::config::validate::MAX_TOKENS_PER_LINE_MAX_V1 + 1;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.max_tokens_per_line"));
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.max_tokens_per_line"));
 
     let mut cfg = default_config_v1();
     cfg.ingest.max_kv_per_line = sparx::config::validate::MAX_KV_PER_LINE_MAX_V1 + 1;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.max_kv_per_line"));
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.max_kv_per_line"));
 
     let mut cfg = default_config_v1();
-    cfg.ingest.max_words_from_quoted_value = sparx::config::validate::MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1 + 1;
-    assert!(validate_config_v1(&cfg).unwrap_err().msg.contains("ingest.max_words_from_quoted_value"));
+    cfg.ingest.max_words_from_quoted_value =
+        sparx::config::validate::MAX_WORDS_FROM_QUOTED_VALUE_MAX_V1 + 1;
+    assert!(validate_config_v1(&cfg)
+        .unwrap_err()
+        .msg
+        .contains("ingest.max_words_from_quoted_value"));
 }

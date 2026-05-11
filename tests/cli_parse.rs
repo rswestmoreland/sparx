@@ -4,9 +4,7 @@
 // CLI parsing tests with no filesystem IO.
 
 use sparx::cli::parse::parse_args_v1;
-use sparx::cli::{
-    AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1,
-};
+use sparx::cli::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1};
 
 fn v(args: &[&str]) -> Vec<String> {
     args.iter().map(|s| s.to_string()).collect()
@@ -15,15 +13,24 @@ fn v(args: &[&str]) -> Vec<String> {
 #[test]
 fn parse_run() {
     let (cmd, ov) = parse_args_v1(&v(&["sparx", "run"])).unwrap();
-    assert_eq!(cmd, CommandV1::Run { migrate: MigrateModeV1::Auto });
+    assert_eq!(
+        cmd,
+        CommandV1::Run {
+            migrate: MigrateModeV1::Auto
+        }
+    );
     assert!(ov.config_path.is_none());
 }
-
 
 #[test]
 fn parse_run_migrate_require() {
     let (cmd, _) = parse_args_v1(&v(&["sparx", "run", "--migrate", "require"])).unwrap();
-    assert_eq!(cmd, CommandV1::Run { migrate: MigrateModeV1::Require });
+    assert_eq!(
+        cmd,
+        CommandV1::Run {
+            migrate: MigrateModeV1::Require
+        }
+    );
 }
 
 #[test]
@@ -56,7 +63,8 @@ fn parse_oneshot_full_args() {
         "edge01",
         "--migrate",
         "require",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::OneShot {
@@ -69,7 +77,6 @@ fn parse_oneshot_full_args() {
     );
 }
 
-
 #[test]
 fn parse_oneshot_requires_tenant() {
     let err = parse_args_v1(&v(&["sparx", "oneshot"])).unwrap_err();
@@ -79,15 +86,9 @@ fn parse_oneshot_requires_tenant() {
 #[test]
 fn parse_oneshot_rejects_inverted_time_range() {
     let err = parse_args_v1(&v(&[
-        "sparx",
-        "oneshot",
-        "--tenant",
-        "t1",
-        "--since",
-        "20",
-        "--until",
-        "10",
-    ])).unwrap_err();
+        "sparx", "oneshot", "--tenant", "t1", "--since", "20", "--until", "10",
+    ]))
+    .unwrap_err();
     assert_eq!(err.msg, "oneshot: --since must be <= --until");
 }
 
@@ -118,8 +119,9 @@ fn parse_alerts_show() {
         "--tenant",
         "t1",
         "--alert-id",
-        "abc"
-    ])).unwrap();
+        "abc",
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsShow {
@@ -130,10 +132,15 @@ fn parse_alerts_show() {
     );
 }
 
-
 #[test]
 fn parse_validate_fixtures() {
-    let (cmd, _) = parse_args_v1(&v(&["sparx", "validate-fixtures", "--fixture-root", "/tmp/fx"])).unwrap();
+    let (cmd, _) = parse_args_v1(&v(&[
+        "sparx",
+        "validate-fixtures",
+        "--fixture-root",
+        "/tmp/fx",
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::ValidateFixtures {
@@ -141,7 +148,6 @@ fn parse_validate_fixtures() {
         }
     );
 }
-
 
 #[test]
 fn parse_tenant_policy_show() {
@@ -165,21 +171,12 @@ fn parse_tenant_policy_check() {
     );
 }
 
-
 #[test]
 fn parse_alerts_list_json() {
     let (cmd, _) = parse_args_v1(&v(&[
-        "sparx",
-        "alerts",
-        "list",
-        "--tenant",
-        "t1",
-        "--since",
-        "10",
-        "--until",
-        "20",
-        "--json",
-    ])).unwrap();
+        "sparx", "alerts", "list", "--tenant", "t1", "--since", "10", "--until", "20", "--json",
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsList {
@@ -208,7 +205,8 @@ fn parse_alerts_list_structured_filters_v1() {
         "userid",
         "--entity-value",
         "alice",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsList {
@@ -234,7 +232,8 @@ fn parse_alerts_show_json() {
         "--alert-id",
         "abc",
         "--json",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsShow {
@@ -259,7 +258,8 @@ fn parse_alerts_search_with_time_bounds() {
         "20",
         "--contains",
         "alice",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsSearch {
@@ -286,7 +286,8 @@ fn parse_alerts_search_rejects_missing_entity_value_v1() {
         "srcip",
         "--contains",
         "alice",
-    ])).unwrap_err();
+    ]))
+    .unwrap_err();
     assert_eq!(err.msg, "alerts search: missing --entity-value");
 }
 
@@ -300,7 +301,8 @@ fn parse_alerts_list_rejects_invalid_category_v1() {
         "t1",
         "--category",
         "weird",
-    ])).unwrap_err();
+    ]))
+    .unwrap_err();
     assert_eq!(err.msg, "invalid alert category: weird");
 }
 
@@ -315,7 +317,8 @@ fn parse_alerts_export_gzip() {
         "--out",
         "/tmp/out.jsonl.gz",
         "--gzip",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertsExport {
@@ -345,7 +348,8 @@ fn parse_alert_extract_with_caps() {
         "128",
         "--max-lines",
         "4",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertExtract {
@@ -372,7 +376,8 @@ fn parse_alert_drill_with_caps() {
         "64",
         "--max-lines",
         "2",
-    ])).unwrap();
+    ]))
+    .unwrap();
     assert_eq!(
         cmd,
         CommandV1::AlertDrill {

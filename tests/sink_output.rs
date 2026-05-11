@@ -5,11 +5,15 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use sparx::alert::{AlertV1, CountedStringV1, EntitiesV1, FileSpanV1, ReasonV1, TopFeatureV1, ALERT_SCHEMA_VERSION_V1};
+use sparx::alert::{
+    AlertV1, CountedStringV1, EntitiesV1, FileSpanV1, ReasonV1, TopFeatureV1,
+    ALERT_SCHEMA_VERSION_V1,
+};
 use sparx::sink::{
-    enforce_spool_cap_v1, jsonl_alert_path_v1, jsonl_day_dir_v1, jsonl_file_name_v1, read_spooled_alert_v1, spool_alert_path_v1,
-    spool_backlog_per_tenant_v1, write_spool_alert_v1, AlertSinkV1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1,
-    SpoolEmitOutcomeV1, SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
+    enforce_spool_cap_v1, jsonl_alert_path_v1, jsonl_day_dir_v1, jsonl_file_name_v1,
+    read_spooled_alert_v1, spool_alert_path_v1, spool_backlog_per_tenant_v1, write_spool_alert_v1,
+    AlertSinkV1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1, SpoolEmitOutcomeV1,
+    SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
 };
 use sparx::types::{ConfidenceV1, FeatureFamilyV1, LabelV1};
 
@@ -47,7 +51,8 @@ fn sample_alert(window_start_ts: i64, window_end_ts: i64) -> AlertV1 {
             idf: 1.11,
             contrib: 0.46,
         }],
-        summary_analyst: "outlier score 0.950. Reasons: R_NEW_FEATURE. Top features: w=failed.".to_string(),
+        summary_analyst: "outlier score 0.950. Reasons: R_NEW_FEATURE. Top features: w=failed."
+            .to_string(),
         summary_customer: "An unusual pattern was observed in this log window.".to_string(),
         entities: EntitiesV1 {
             src_ips: vec![CountedStringV1 {
@@ -89,7 +94,10 @@ fn jsonl_path_mapping_is_deterministic() {
     let file = jsonl_file_name_v1("device-001", ts, 12).unwrap();
     let path = jsonl_alert_path_v1("/tmp/out", "tenant-a", "device-001", ts, 12).unwrap();
 
-    assert_eq!(dir, PathBuf::from("/tmp/out/tenant=tenant-a/device=device-001/2023/11/14"));
+    assert_eq!(
+        dir,
+        PathBuf::from("/tmp/out/tenant=tenant-a/device=device-001/2023/11/14")
+    );
     assert_eq!(file, "alerts_device-001_20231114_0012.jsonl");
     assert_eq!(
         path,
@@ -117,7 +125,10 @@ fn jsonl_sink_writes_valid_json_line_with_newline() {
     let trimmed = line.trim_end_matches('\n');
     let value: serde_json::Value = serde_json::from_str(trimmed).unwrap();
     assert_eq!(value["alert_id"], serde_json::Value::String(alert.alert_id));
-    assert_eq!(value["tenant_id"], serde_json::Value::String("tenant-a".to_string()));
+    assert_eq!(
+        value["tenant_id"],
+        serde_json::Value::String("tenant-a".to_string())
+    );
 }
 
 #[test]
@@ -199,7 +210,12 @@ fn spool_write_on_simulated_jsonl_failure() {
 
     assert_eq!(
         spooled_path,
-        spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap()
+        spool_alert_path_v1(
+            &root.to_string_lossy(),
+            "tenant-a",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        )
+        .unwrap()
     );
     assert!(spooled_path.is_file());
     let spooled_alert = read_spooled_alert_v1(&spooled_path).unwrap();
@@ -237,10 +253,20 @@ fn spool_replay_succeeds_and_deletes_file() {
     assert!(!spooled_path.exists());
     assert_eq!(sink.counters_v1().sink_spool_replayed_total, 1);
 
-    let out_path = jsonl_alert_path_v1(&jsonl_root.to_string_lossy(), "tenant-a", "device-001", 1_700_000_000, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &jsonl_root.to_string_lossy(),
+        "tenant-a",
+        "device-001",
+        1_700_000_000,
+        0,
+    )
+    .unwrap();
     let line = fs::read_to_string(out_path).unwrap();
     let value: serde_json::Value = serde_json::from_str(line.trim_end()).unwrap();
-    assert_eq!(value["alert_id"], serde_json::Value::String("dddddddddddddddddddddddddddddddd".to_string()));
+    assert_eq!(
+        value["alert_id"],
+        serde_json::Value::String("dddddddddddddddddddddddddddddddd".to_string())
+    );
 }
 
 #[test]
@@ -266,21 +292,41 @@ fn spool_replay_can_be_bounded_per_pass() {
     };
     let mut sink = SpoolingJsonlAlertSinkV1::new(jsonl_cfg, spool_cfg);
 
-    let report = sink.replay_spooled_alerts_limited_v1(1_700_000_120, 2).unwrap();
+    let report = sink
+        .replay_spooled_alerts_limited_v1(1_700_000_120, 2)
+        .unwrap();
     sink.shutdown_v1().unwrap();
 
     assert_eq!(report.replayed_paths.len(), 2);
     assert!(report.failed_paths.is_empty());
-    let remaining = spool_alert_path_v1(&root.to_string_lossy(), "tenant-a", "0000000000000000000000000000000c").unwrap();
+    let remaining = spool_alert_path_v1(
+        &root.to_string_lossy(),
+        "tenant-a",
+        "0000000000000000000000000000000c",
+    )
+    .unwrap();
     assert!(remaining.exists());
 
-    let out_path = jsonl_alert_path_v1(&jsonl_root.to_string_lossy(), "tenant-a", "device-001", 1_700_000_000, 0).unwrap();
+    let out_path = jsonl_alert_path_v1(
+        &jsonl_root.to_string_lossy(),
+        "tenant-a",
+        "device-001",
+        1_700_000_000,
+        0,
+    )
+    .unwrap();
     let content = fs::read_to_string(out_path).unwrap();
     let mut lines = content.lines();
     let first: serde_json::Value = serde_json::from_str(lines.next().unwrap()).unwrap();
     let second: serde_json::Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-    assert_eq!(first["alert_id"], serde_json::Value::String("0000000000000000000000000000000a".to_string()));
-    assert_eq!(second["alert_id"], serde_json::Value::String("0000000000000000000000000000000b".to_string()));
+    assert_eq!(
+        first["alert_id"],
+        serde_json::Value::String("0000000000000000000000000000000a".to_string())
+    );
+    assert_eq!(
+        second["alert_id"],
+        serde_json::Value::String("0000000000000000000000000000000b".to_string())
+    );
     assert!(lines.next().is_none());
 }
 
@@ -329,8 +375,14 @@ fn stdout_sink_emits_one_line_per_alert() {
     assert_eq!(lines.len(), 2);
     let first_json: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
     let second_json: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
-    assert_eq!(first_json["alert_id"], serde_json::Value::String("stdout-a".to_string()));
-    assert_eq!(second_json["alert_id"], serde_json::Value::String("stdout-b".to_string()));
+    assert_eq!(
+        first_json["alert_id"],
+        serde_json::Value::String("stdout-a".to_string())
+    );
+    assert_eq!(
+        second_json["alert_id"],
+        serde_json::Value::String("stdout-b".to_string())
+    );
 }
 
 #[test]
@@ -358,7 +410,10 @@ fn spool_backlog_per_tenant_is_deterministic_v1() {
     assert_eq!(summaries.len(), 2);
     assert_eq!(summaries[0].tenant_id, "tenant-a");
     assert_eq!(summaries[0].files, 2);
-    assert_eq!(summaries[0].bytes, fs::metadata(path_b).unwrap().len() + fs::metadata(path_c).unwrap().len());
+    assert_eq!(
+        summaries[0].bytes,
+        fs::metadata(path_b).unwrap().len() + fs::metadata(path_c).unwrap().len()
+    );
     assert!(summaries[0].oldest_file_ts.is_some());
     assert!(summaries[0].oldest_age_s.is_some());
     assert_eq!(summaries[1].tenant_id, "tenant-b");

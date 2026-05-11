@@ -14,14 +14,17 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use flate2::write::GzEncoder;
-use flate2::Compression;
+use super::{AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1};
 use crate::alert::{
     build_alert_v1, build_sharp_drop_alert_v1, build_source_stream_sharp_drop_alert_v1,
     build_source_stream_vdrop_alert_v1, build_vdrop_alert_v1, AlertScoringConfigV1, AlertV1,
     FileSpanV1,
 };
-use crate::drilldown::{drill_alert_v1, extract_alert_v1};
+use crate::baseline::{
+    plan_centroid_stats_update_v1, plan_df_ring_update_v1, BucketBaselineV1, CentroidPairV1,
+    CentroidStatsConfigV1, DfPairV1, DfRingConfigV1, DfRingMetaStateV1, DfRingMutationV1,
+    DfRingSlotBucketStateV1,
+};
 use crate::config::ConfigV1;
 use crate::db::layout::filesystem_layout_v1;
 use crate::db::silence::{
@@ -33,10 +36,10 @@ use crate::db::silence::{
     SharpDropEvaluationV1, SharpDropExpectedVolumeV1, SharpDropSuppressionReasonV1,
     VDropEvaluationConfigV1, VDropEvaluationV1, OPEN_DROP_FLAG_OPEN_V1,
     OPEN_SILENCE_FLAG_CLOSED_V1, OPEN_SILENCE_FLAG_OPEN_V1,
-    SHARP_DROP_DEFAULT_MAX_OBSERVED_EXPECTED_RATIO_V1,
-    SHARP_DROP_DEFAULT_MIN_DROP_RATIO_V1, SHARP_DROP_DEFAULT_TENANT_MATURE_DEVICE_FLOOR_V1,
-    SHARP_DROP_DEFAULT_VARIANCE_GATE_STDDEVS_V1, SILENCE_SUBJECT_KIND_DEVICE_V1,
-    SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1, SILENCE_SUBJECT_KIND_TENANT_V1,
+    SHARP_DROP_DEFAULT_MAX_OBSERVED_EXPECTED_RATIO_V1, SHARP_DROP_DEFAULT_MIN_DROP_RATIO_V1,
+    SHARP_DROP_DEFAULT_TENANT_MATURE_DEVICE_FLOOR_V1, SHARP_DROP_DEFAULT_VARIANCE_GATE_STDDEVS_V1,
+    SILENCE_SUBJECT_KIND_DEVICE_V1, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
+    SILENCE_SUBJECT_KIND_TENANT_V1,
 };
 use crate::db::source_stream::{
     evaluate_source_stream_hard_silence_candidate_v1,
@@ -47,66 +50,37 @@ use crate::db::source_stream::{
     SourceStreamIdentityV1, SourceStreamSubjectV1,
 };
 use crate::db::tenant_values::{
-    decode_feat_dict_id_to_str_v1, decode_feat_dict_meta_entries_v1, decode_feat_dict_meta_last_gc_ts_v1,
-    decode_feat_dict_meta_next_id_v1, decode_feat_dict_str_to_id_v1,
-    decode_meta_df_ring_current_day_epoch_v1, decode_meta_df_ring_day_slot_epoch_v1,
+    decode_feat_dict_id_to_str_v1, decode_feat_dict_meta_entries_v1,
+    decode_feat_dict_meta_last_gc_ts_v1, decode_feat_dict_meta_next_id_v1,
+    decode_feat_dict_str_to_id_v1, decode_meta_df_ring_current_day_epoch_v1,
+    decode_meta_df_ring_day_slot_epoch_v1,
 };
 use crate::db::DbErrorV1;
-use crate::policy::{
-    load_tenant_policy_v1, resolve_vdrop_source_stream_enabled_v1, tenant_policy_path_parts_v1,
-    TenantPolicyLoadErrorKindV1, TenantPolicyV1,
+use crate::drilldown::{drill_alert_v1, extract_alert_v1};
+use crate::features::{
+    emit_line_features_v1, FeatureDictionaryConfigV1, FeatureDictionaryMetaV1, FeatureDictionaryV1,
 };
-use crate::features::{emit_line_features_v1, FeatureDictionaryConfigV1, FeatureDictionaryMetaV1, FeatureDictionaryV1};
 use crate::ingest::{
-    apply_cursor_read_progress_v1, device_key_v1, discover_device_inventory_v1, open_file_reader_v1,
-    reconcile_cursor_v1, CursorPlanV1, DiscoveredFileV1, FileCursorV1, ObservedFileStateV1,
-    TenantDeviceV1,
-};
-use crate::runtime::{
-    GlobalSchemaMigrateResultV1, MigrateAllResultV1, SchemaMigrateOutcomeKindV1, SparxRuntimeV1,
-    TenantPurgeOutcomeKindV1, TenantPurgeResultV1, TenantSchemaMigrateResultV1,
+    apply_cursor_read_progress_v1, device_key_v1, discover_device_inventory_v1,
+    open_file_reader_v1, reconcile_cursor_v1, CursorPlanV1, DiscoveredFileV1, FileCursorV1,
+    ObservedFileStateV1, TenantDeviceV1,
 };
 use crate::observability::{
-    build_status_snapshot_from_runtime_v1, format_status_text_v1, ObservabilityServersV1,
-    METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
-    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1,
-    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1,
-    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1,
-    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
-    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
-    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
-    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
-    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1,
-    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1,
-    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1,
-    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1,
-    METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1,
-    METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1,
-    METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1,
-    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
-    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
-    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
-    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
-    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1,
-    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
-    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
-    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
-    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
-    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1,
-    METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1,
-    metric_recovery_tenant_last_snapshot_backlog_bytes_v1,
-    metric_recovery_tenant_last_snapshot_backlog_files_v1,
-    metric_recovery_tenant_last_snapshot_ts_v1,
-    metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1,
-    metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1,
-    metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1,
-    metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1,
-    metric_recovery_tenant_last_counter_snapshot_ts_v1,
+    build_status_snapshot_from_runtime_v1, format_status_text_v1,
+    metric_recovery_tenant_automated_replay_attempts_total_v1,
     metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1,
     metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1,
     metric_recovery_tenant_history_start_counter_snapshot_spool_replayed_total_v1,
     metric_recovery_tenant_history_start_counter_snapshot_spool_writes_total_v1,
     metric_recovery_tenant_history_start_counter_snapshot_ts_v1,
+    metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1,
+    metric_recovery_tenant_last_counter_snapshot_ts_v1,
+    metric_recovery_tenant_last_snapshot_backlog_bytes_v1,
+    metric_recovery_tenant_last_snapshot_backlog_files_v1,
+    metric_recovery_tenant_last_snapshot_ts_v1,
     metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1,
     metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1,
     metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1,
@@ -116,16 +90,10 @@ use crate::observability::{
     metric_recovery_tenant_previous_snapshot_backlog_files_v1,
     metric_recovery_tenant_previous_snapshot_ts_v1,
     metric_recovery_tenant_spool_replay_fail_total_v1,
-    metric_recovery_tenant_spool_replayed_total_v1,
-    metric_recovery_tenant_spool_writes_total_v1,
-    metric_recovery_tenant_automated_replay_attempts_total_v1,
-    metric_vdrop_tenant_alerts_emitted_total_v1,
-    metric_vdrop_tenant_candidates_total_v1,
-    metric_vdrop_tenant_evaluated_subjects_total_v1,
-    metric_vdrop_tenant_last_evaluation_ts_v1,
-    metric_vdrop_tenant_open_silence_subjects_v1,
-    metric_vdrop_tenant_open_drop_subjects_v1,
-    metric_vdrop_tenant_suppressed_candidates_total_v1,
+    metric_recovery_tenant_spool_replayed_total_v1, metric_recovery_tenant_spool_writes_total_v1,
+    metric_vdrop_tenant_alerts_emitted_total_v1, metric_vdrop_tenant_candidates_total_v1,
+    metric_vdrop_tenant_evaluated_subjects_total_v1, metric_vdrop_tenant_last_evaluation_ts_v1,
+    metric_vdrop_tenant_open_drop_subjects_v1, metric_vdrop_tenant_open_silence_subjects_v1,
     metric_vdrop_tenant_source_stream_alerts_emitted_total_v1,
     metric_vdrop_tenant_source_stream_candidates_total_v1,
     metric_vdrop_tenant_source_stream_evaluated_subjects_total_v1,
@@ -134,10 +102,31 @@ use crate::observability::{
     metric_vdrop_tenant_source_stream_open_silence_subjects_v1,
     metric_vdrop_tenant_source_stream_suppressed_candidates_total_v1,
     metric_vdrop_tenant_source_stream_tracked_subjects_v1,
-    metric_vdrop_tenant_tracked_subjects_v1,
-    METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1,
-    METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1,
-    METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1,
+    metric_vdrop_tenant_suppressed_candidates_total_v1, metric_vdrop_tenant_tracked_subjects_v1,
+    ObservabilityServersV1, METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1,
+    METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1,
+    METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1, METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1,
+    METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1, METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1,
+    METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1, METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1,
+    METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1, METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1,
     METRIC_RUN_ALERTS_EMITTED_TOTAL_V1, METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1,
     METRIC_RUN_DEVICES_FAILED_TOTAL_V1, METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1,
     METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1, METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1,
@@ -154,20 +143,25 @@ use crate::observability::{
     METRIC_VDROP_SOURCE_STREAM_SUPPRESSED_CANDIDATES_TOTAL_V1,
     METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1,
 };
+use crate::policy::{
+    load_tenant_policy_v1, resolve_vdrop_source_stream_enabled_v1, tenant_policy_path_parts_v1,
+    TenantPolicyLoadErrorKindV1, TenantPolicyV1,
+};
+use crate::runtime::{
+    GlobalSchemaMigrateResultV1, MigrateAllResultV1, SchemaMigrateOutcomeKindV1, SparxRuntimeV1,
+    TenantPurgeOutcomeKindV1, TenantPurgeResultV1, TenantSchemaMigrateResultV1,
+};
 use crate::sink::{
-    read_spooled_alert_v1, sorted_spool_files_for_replay_v1, spool_backlog_per_tenant_v1, spool_backlog_summary_v1, JsonlAlertSinkV1,
-    JsonlSinkConfigV1, SpoolConfigV1, SpoolCountersV1, SpoolEmitOutcomeV1, SpoolReplayReportV1,
-    SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
+    read_spooled_alert_v1, sorted_spool_files_for_replay_v1, spool_backlog_per_tenant_v1,
+    spool_backlog_summary_v1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1, SpoolCountersV1,
+    SpoolEmitOutcomeV1, SpoolReplayReportV1, SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
 };
 use crate::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
-use crate::window::{align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1};
-use crate::baseline::{
-    BucketBaselineV1, CentroidPairV1, CentroidStatsConfigV1, DfPairV1, DfRingConfigV1, DfRingMetaStateV1,
-    DfRingMutationV1, DfRingSlotBucketStateV1, plan_centroid_stats_update_v1, plan_df_ring_update_v1,
+use crate::window::{
+    align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1,
 };
-use super::{
-    AlertCategoryFilterV1, AlertEntityKindFilterV1, CommandV1, MigrateModeV1,
-};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct AlertEntityFilterV1 {
@@ -221,7 +215,7 @@ struct VDropDiagnosticsDeltaV1 {
     source_stream_alerts_emitted: u64,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct VDropCollectResultV1 {
     alerts: Vec<AlertV1>,
     diagnostics: VDropDiagnosticsDeltaV1,
@@ -267,7 +261,6 @@ struct ProcessDeviceResultV1 {
     source_stream_windows: Vec<SourceStreamRuntimeWindowV1>,
 }
 
-
 static RUN_TEST_CYCLE_HOOK_V1: OnceLock<Mutex<Option<RunTestCycleHookV1>>> = OnceLock::new();
 
 fn build_alert_entity_filter_from_parts_v1(
@@ -299,10 +292,16 @@ pub fn clear_run_test_cycle_hook_v1() {
     }
 }
 
-fn maybe_call_run_test_cycle_hook_v1(cycle_completed: u32, runtime: &mut SparxRuntimeV1, cfg: &ConfigV1) {
-    let hook = RUN_TEST_CYCLE_HOOK_V1
-        .get()
-        .and_then(|cell| cell.lock().ok().and_then(|guard| guard.as_ref().map(Arc::clone)));
+fn maybe_call_run_test_cycle_hook_v1(
+    cycle_completed: u32,
+    runtime: &mut SparxRuntimeV1,
+    cfg: &ConfigV1,
+) {
+    let hook = RUN_TEST_CYCLE_HOOK_V1.get().and_then(|cell| {
+        cell.lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(Arc::clone))
+    });
     if let Some(hook) = hook {
         hook(cycle_completed, runtime, cfg);
     }
@@ -338,10 +337,25 @@ pub fn route_command_no_config_v1(cmd: &CommandV1) -> RouteResultV1 {
 pub fn route_command_v1(cmd: &CommandV1, cfg: &ConfigV1) -> RouteResultV1 {
     match cmd {
         CommandV1::Run { migrate } => route_run_v1(cfg, *migrate),
-        CommandV1::OneShot { tenant_id, since, until, device_path, migrate } => route_oneshot_v1(cfg, tenant_id, *since, *until, device_path.as_deref(), *migrate),
+        CommandV1::OneShot {
+            tenant_id,
+            since,
+            until,
+            device_path,
+            migrate,
+        } => route_oneshot_v1(
+            cfg,
+            tenant_id,
+            *since,
+            *until,
+            device_path.as_deref(),
+            *migrate,
+        ),
         CommandV1::Status { json } => route_status_v1(cfg, *json),
         CommandV1::ReplaySpool { tenant_id } => route_replay_spool_v1(cfg, tenant_id.as_deref()),
-        CommandV1::TenantPurge { tenant_id, force } => route_tenant_purge_v1(cfg, tenant_id, *force),
+        CommandV1::TenantPurge { tenant_id, force } => {
+            route_tenant_purge_v1(cfg, tenant_id, *force)
+        }
         CommandV1::TenantPolicyShow { tenant_id } => route_tenant_policy_show_v1(cfg, tenant_id),
         CommandV1::TenantPolicyCheck { tenant_id } => route_tenant_policy_check_v1(cfg, tenant_id),
         CommandV1::MigrateTenant { tenant_id } => route_migrate_tenant_v1(cfg, tenant_id),
@@ -441,12 +455,14 @@ fn command_label_v1(cmd: &CommandV1) -> &'static str {
     }
 }
 
-
 fn validate_cli_path_component_v1(field: &str, value: &str) -> Result<(), String> {
     if value.is_empty() || value == "." || value == ".." {
         return Err(format!("invalid {} filesystem component", field));
     }
-    if value.bytes().any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f) {
+    if value
+        .bytes()
+        .any(|b| b == b'/' || b == b'\\' || b < 0x20 || b == 0x7f)
+    {
         return Err(format!("invalid {} filesystem component", field));
     }
     Ok(())
@@ -495,14 +511,21 @@ fn route_tenant_policy_show_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV1
         return invalid_cli_input_result_v1("tenant policy show", e);
     }
     let layout = filesystem_layout_v1(cfg);
-    let (tenant_dir, policy_path) = tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
+    let (tenant_dir, policy_path) =
+        tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
     match load_tenant_policy_v1(&tenant_dir, &policy_path) {
         Ok(policy) => RouteResultV1 {
             exit_code: 0,
-            msg_stdout: Some(format_tenant_policy_show_v1(tenant_id, &policy_path, &policy)),
+            msg_stdout: Some(format_tenant_policy_show_v1(
+                tenant_id,
+                &policy_path,
+                &policy,
+            )),
             msg_stderr: None,
         },
-        Err(err) => route_tenant_policy_error_v1("show", tenant_id, &policy_path, err.kind, err.details),
+        Err(err) => {
+            route_tenant_policy_error_v1("show", tenant_id, &policy_path, err.kind, err.details)
+        }
     }
 }
 
@@ -511,14 +534,21 @@ fn route_tenant_policy_check_v1(cfg: &ConfigV1, tenant_id: &str) -> RouteResultV
         return invalid_cli_input_result_v1("tenant policy check", e);
     }
     let layout = filesystem_layout_v1(cfg);
-    let (tenant_dir, policy_path) = tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
+    let (tenant_dir, policy_path) =
+        tenant_policy_path_parts_v1(&layout.tenant_root_v1(), tenant_id);
     match load_tenant_policy_v1(&tenant_dir, &policy_path) {
         Ok(policy) => RouteResultV1 {
             exit_code: 0,
-            msg_stdout: Some(format_tenant_policy_check_v1(tenant_id, &policy_path, &policy)),
+            msg_stdout: Some(format_tenant_policy_check_v1(
+                tenant_id,
+                &policy_path,
+                &policy,
+            )),
             msg_stderr: None,
         },
-        Err(err) => route_tenant_policy_error_v1("check", tenant_id, &policy_path, err.kind, err.details),
+        Err(err) => {
+            route_tenant_policy_error_v1("check", tenant_id, &policy_path, err.kind, err.details)
+        }
     }
 }
 
@@ -590,7 +620,12 @@ fn route_alerts_list_v1(
     }
 }
 
-fn route_alerts_show_v1(cfg: &ConfigV1, tenant_id: &str, alert_id: &str, json: bool) -> RouteResultV1 {
+fn route_alerts_show_v1(
+    cfg: &ConfigV1,
+    tenant_id: &str,
+    alert_id: &str,
+    json: bool,
+) -> RouteResultV1 {
     if let Err(e) = validate_cli_path_component_v1("tenant_id", tenant_id) {
         return invalid_cli_input_result_v1("alerts show", e);
     }
@@ -692,7 +727,9 @@ fn route_alerts_search_v1(
 
     RouteResultV1 {
         exit_code: 0,
-        msg_stdout: Some(format_alert_search_text_v1(tenant_id, contains, &alerts, &filters)),
+        msg_stdout: Some(format_alert_search_text_v1(
+            tenant_id, contains, &alerts, &filters,
+        )),
         msg_stderr: None,
     }
 }
@@ -761,7 +798,8 @@ fn route_alerts_export_v1(
 
     let write_result = if gzip {
         let mut encoder = GzEncoder::new(file, Compression::default());
-        write_alert_jsonl_v1(&mut encoder, &alerts).and_then(|_| encoder.finish().map(|_| ()).map_err(|e| e.to_string()))
+        write_alert_jsonl_v1(&mut encoder, &alerts)
+            .and_then(|_| encoder.finish().map(|_| ()).map_err(|e| e.to_string()))
     } else {
         let mut writer = std::io::BufWriter::new(file);
         write_alert_jsonl_v1(&mut writer, &alerts)
@@ -994,7 +1032,9 @@ fn load_alert_by_id_v1(
     if !tenant_db_dir.exists() {
         return Ok(None);
     }
-    runtime.with_tenant_db_v1(tenant_id, current_unix_ts_v1(), |db| db.read_primary_alert_v1(alert_id))
+    runtime.with_tenant_db_v1(tenant_id, current_unix_ts_v1(), |db| {
+        db.read_primary_alert_v1(alert_id)
+    })
 }
 
 fn alert_matches_query_filters_v1(alert: &AlertV1, filters: &AlertQueryFiltersV1) -> bool {
@@ -1031,7 +1071,9 @@ fn alert_matches_time_filter_v1(alert: &AlertV1, since: Option<i64>, until: Opti
 fn alert_matches_category_filter_v1(alert: &AlertV1, category: AlertCategoryFilterV1) -> bool {
     match category {
         AlertCategoryFilterV1::Outlier => matches!(alert.label, crate::types::LabelV1::Outlier),
-        AlertCategoryFilterV1::NoiseSuspect => matches!(alert.label, crate::types::LabelV1::NoiseSuspect),
+        AlertCategoryFilterV1::NoiseSuspect => {
+            matches!(alert.label, crate::types::LabelV1::NoiseSuspect)
+        }
         AlertCategoryFilterV1::Info => matches!(alert.label, crate::types::LabelV1::Info),
     }
 }
@@ -1039,11 +1081,31 @@ fn alert_matches_category_filter_v1(alert: &AlertV1, category: AlertCategoryFilt
 fn alert_matches_entity_filter_v1(alert: &AlertV1, entity: &AlertEntityFilterV1) -> bool {
     let needle = entity.value.as_str();
     match entity.kind {
-        AlertEntityKindFilterV1::SrcIp => alert.entities.src_ips.iter().any(|entry| entry.value == needle),
-        AlertEntityKindFilterV1::DstIp => alert.entities.dst_ips.iter().any(|entry| entry.value == needle),
-        AlertEntityKindFilterV1::UserId => alert.entities.user_ids.iter().any(|entry| entry.value == needle),
-        AlertEntityKindFilterV1::Domain => alert.entities.domains.iter().any(|entry| entry.value == needle),
-        AlertEntityKindFilterV1::Host => alert.entities.hosts.iter().any(|entry| entry.value == needle),
+        AlertEntityKindFilterV1::SrcIp => alert
+            .entities
+            .src_ips
+            .iter()
+            .any(|entry| entry.value == needle),
+        AlertEntityKindFilterV1::DstIp => alert
+            .entities
+            .dst_ips
+            .iter()
+            .any(|entry| entry.value == needle),
+        AlertEntityKindFilterV1::UserId => alert
+            .entities
+            .user_ids
+            .iter()
+            .any(|entry| entry.value == needle),
+        AlertEntityKindFilterV1::Domain => alert
+            .entities
+            .domains
+            .iter()
+            .any(|entry| entry.value == needle),
+        AlertEntityKindFilterV1::Host => alert
+            .entities
+            .hosts
+            .iter()
+            .any(|entry| entry.value == needle),
     }
 }
 
@@ -1088,7 +1150,9 @@ fn alert_contains_text_v1(alert: &AlertV1, contains: &str) -> bool {
         haystacks.push(value.value.as_str());
     }
 
-    haystacks.into_iter().any(|s| s.to_ascii_lowercase().contains(&needle))
+    haystacks
+        .into_iter()
+        .any(|s| s.to_ascii_lowercase().contains(&needle))
 }
 
 fn format_alert_list_text_v1(
@@ -1100,11 +1164,17 @@ fn format_alert_list_text_v1(
     let mut out = String::new();
     out.push_str(title);
     out.push('\n');
-    out.push_str(&format!("tenant_id: {}
-", tenant_id));
+    out.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
     append_alert_query_filter_lines_v1(&mut out, filters);
-    out.push_str(&format!("count: {}
-", alerts.len()));
+    out.push_str(&format!(
+        "count: {}
+",
+        alerts.len()
+    ));
     for alert in alerts {
         out.push_str(&format!(
             "- alert_id: {} window_start_ts: {} label: {} confidence: {} score_total: {:.3} device_path: {}
@@ -1127,15 +1197,26 @@ fn format_alert_search_text_v1(
     filters: &AlertQueryFiltersV1,
 ) -> String {
     let mut out = String::new();
-    out.push_str("alerts search
-");
-    out.push_str(&format!("tenant_id: {}
-", tenant_id));
+    out.push_str(
+        "alerts search
+",
+    );
+    out.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
     append_alert_query_filter_lines_v1(&mut out, filters);
-    out.push_str(&format!("contains: {}
-", contains));
-    out.push_str(&format!("count: {}
-", alerts.len()));
+    out.push_str(&format!(
+        "contains: {}
+",
+        contains
+    ));
+    out.push_str(&format!(
+        "count: {}
+",
+        alerts.len()
+    ));
     for alert in alerts {
         out.push_str(&format!(
             "- alert_id: {} window_start_ts: {} label: {} score_total: {:.3} summary_analyst: {}
@@ -1152,22 +1233,37 @@ fn format_alert_search_text_v1(
 
 fn append_alert_query_filter_lines_v1(out: &mut String, filters: &AlertQueryFiltersV1) {
     if let Some(since) = filters.since {
-        out.push_str(&format!("since: {}
-", since));
+        out.push_str(&format!(
+            "since: {}
+",
+            since
+        ));
     }
     if let Some(until) = filters.until {
-        out.push_str(&format!("until: {}
-", until));
+        out.push_str(&format!(
+            "until: {}
+",
+            until
+        ));
     }
     if let Some(category) = filters.category {
-        out.push_str(&format!("category: {}
-", alert_category_filter_name_v1(category)));
+        out.push_str(&format!(
+            "category: {}
+",
+            alert_category_filter_name_v1(category)
+        ));
     }
     if let Some(entity) = &filters.entity {
-        out.push_str(&format!("entity_kind: {}
-", alert_entity_kind_filter_name_v1(entity.kind)));
-        out.push_str(&format!("entity_value: {}
-", entity.value));
+        out.push_str(&format!(
+            "entity_kind: {}
+",
+            alert_entity_kind_filter_name_v1(entity.kind)
+        ));
+        out.push_str(&format!(
+            "entity_value: {}
+",
+            entity.value
+        ));
     }
 }
 
@@ -1201,36 +1297,80 @@ fn alert_entity_kind_filter_name_v1(kind: AlertEntityKindFilterV1) -> &'static s
 
 fn format_alert_show_text_v1(tenant_id: &str, alert: &AlertV1) -> String {
     let mut out = String::new();
-    out.push_str("alerts show
-");
-    out.push_str(&format!("tenant_id: {}
-", tenant_id));
-    out.push_str(&format!("alert_id: {}
-", alert.alert_id));
-    out.push_str(&format!("device_key: {}
-", alert.device_key));
-    out.push_str(&format!("device_path: {}
-", alert.device_path));
-    out.push_str(&format!("window_start_ts: {}
-", alert.window_start_ts));
-    out.push_str(&format!("window_end_ts: {}
-", alert.window_end_ts));
-    out.push_str(&format!("label: {}
-", format_label_v1(alert)));
-    out.push_str(&format!("confidence: {}
-", format_confidence_v1(alert)));
-    out.push_str(&format!("score_total: {:.3}
-", alert.score_total));
-    out.push_str(&format!("summary_analyst: {}
-", alert.summary_analyst));
-    out.push_str(&format!("summary_customer: {}
-", alert.summary_customer));
-    out.push_str(&format!("reasons_count: {}
-", alert.reasons.len()));
-    out.push_str(&format!("top_features_count: {}
-", alert.top_features.len()));
-    out.push_str(&format!("provenance_count: {}
-", alert.provenance.len()));
+    out.push_str(
+        "alerts show
+",
+    );
+    out.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
+    out.push_str(&format!(
+        "alert_id: {}
+",
+        alert.alert_id
+    ));
+    out.push_str(&format!(
+        "device_key: {}
+",
+        alert.device_key
+    ));
+    out.push_str(&format!(
+        "device_path: {}
+",
+        alert.device_path
+    ));
+    out.push_str(&format!(
+        "window_start_ts: {}
+",
+        alert.window_start_ts
+    ));
+    out.push_str(&format!(
+        "window_end_ts: {}
+",
+        alert.window_end_ts
+    ));
+    out.push_str(&format!(
+        "label: {}
+",
+        format_label_v1(alert)
+    ));
+    out.push_str(&format!(
+        "confidence: {}
+",
+        format_confidence_v1(alert)
+    ));
+    out.push_str(&format!(
+        "score_total: {:.3}
+",
+        alert.score_total
+    ));
+    out.push_str(&format!(
+        "summary_analyst: {}
+",
+        alert.summary_analyst
+    ));
+    out.push_str(&format!(
+        "summary_customer: {}
+",
+        alert.summary_customer
+    ));
+    out.push_str(&format!(
+        "reasons_count: {}
+",
+        alert.reasons.len()
+    ));
+    out.push_str(&format!(
+        "top_features_count: {}
+",
+        alert.top_features.len()
+    ));
+    out.push_str(&format!(
+        "provenance_count: {}
+",
+        alert.provenance.len()
+    ));
     out
 }
 
@@ -1240,26 +1380,55 @@ fn format_alert_drill_text_v1(
     result: &crate::drilldown::DrillAlertResultV1,
 ) -> String {
     let mut out = String::new();
-    out.push_str("alert drill
-");
-    out.push_str(&format!("tenant_id: {}
-", tenant_id));
-    out.push_str(&format!("alert_id: {}
-", alert_id));
-    out.push_str(&format!("spans_total: {}
-", result.spans.len()));
-    out.push_str(&format!("spans_emitted: {}
-", result.spans_emitted));
-    out.push_str(&format!("gzip_spans_skipped: {}
-", result.gzip_spans_skipped));
-    out.push_str(&format!("bytes_emitted: {}
-", result.bytes_emitted));
-    out.push_str(&format!("lines_emitted: {}
-", result.lines_emitted));
-    out.push_str(&format!("max_bytes: {}
-", format_cap_v1(result.max_bytes)));
-    out.push_str(&format!("max_lines: {}
-", format_cap_v1(result.max_lines)));
+    out.push_str(
+        "alert drill
+",
+    );
+    out.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
+    out.push_str(&format!(
+        "alert_id: {}
+",
+        alert_id
+    ));
+    out.push_str(&format!(
+        "spans_total: {}
+",
+        result.spans.len()
+    ));
+    out.push_str(&format!(
+        "spans_emitted: {}
+",
+        result.spans_emitted
+    ));
+    out.push_str(&format!(
+        "gzip_spans_skipped: {}
+",
+        result.gzip_spans_skipped
+    ));
+    out.push_str(&format!(
+        "bytes_emitted: {}
+",
+        result.bytes_emitted
+    ));
+    out.push_str(&format!(
+        "lines_emitted: {}
+",
+        result.lines_emitted
+    ));
+    out.push_str(&format!(
+        "max_bytes: {}
+",
+        format_cap_v1(result.max_bytes)
+    ));
+    out.push_str(&format!(
+        "max_lines: {}
+",
+        format_cap_v1(result.max_lines)
+    ));
     for span in &result.spans {
         out.push_str(&format!(
             "- span_index: {} path: {} offset_start: {} offset_end: {} gzip_skipped: {} bytes_emitted: {} lines_emitted: {}
@@ -1323,12 +1492,20 @@ fn route_tenant_policy_error_v1(
     let mut stderr = String::new();
     stderr.push_str("tenant policy ");
     stderr.push_str(action);
-    stderr.push_str(" failed
-");
-    stderr.push_str(&format!("tenant_id: {}
-", tenant_id));
-    stderr.push_str(&format!("path: {}
-", policy_path.display()));
+    stderr.push_str(
+        " failed
+",
+    );
+    stderr.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
+    stderr.push_str(&format!(
+        "path: {}
+",
+        policy_path.display()
+    ));
     for detail in details {
         stderr.push_str("- ");
         stderr.push_str(&detail);
@@ -1350,14 +1527,25 @@ fn format_tenant_policy_show_v1(
     policy: &TenantPolicyV1,
 ) -> String {
     let mut out = String::new();
-    out.push_str("tenant policy show
-");
-    out.push_str(&format!("tenant_id: {}
-", tenant_id));
-    out.push_str(&format!("path: {}
-", policy_path.display()));
-    out.push_str(&format!("policy_version: {}
-", policy.policy_version));
+    out.push_str(
+        "tenant policy show
+",
+    );
+    out.push_str(&format!(
+        "tenant_id: {}
+",
+        tenant_id
+    ));
+    out.push_str(&format!(
+        "path: {}
+",
+        policy_path.display()
+    ));
+    out.push_str(&format!(
+        "policy_version: {}
+",
+        policy.policy_version
+    ));
     out.push_str(&format!(
         "min_identity_confidence: {}
 ",
@@ -1368,8 +1556,11 @@ fn format_tenant_policy_show_v1(
 ",
         policy.ip_bucket.as_deref().unwrap_or("none")
     ));
-    out.push_str(&format!("key_overrides_count: {}
-", policy.key_overrides.len()));
+    out.push_str(&format!(
+        "key_overrides_count: {}
+",
+        policy.key_overrides.len()
+    ));
     out.push_str(&format!(
         "vdrop_enabled: {}
 ",
@@ -1405,11 +1596,16 @@ fn format_tenant_policy_show_v1(
 ",
         format_optional_u64_inherit_v1(policy.vdrop_min_expected_lines)
     ));
-    out.push_str("key_overrides:
-");
+    out.push_str(
+        "key_overrides:
+",
+    );
     for (norm_key, category) in &policy.key_overrides {
-        out.push_str(&format!("- {} => {}
-", norm_key, category));
+        out.push_str(&format!(
+            "- {} => {}
+",
+            norm_key, category
+        ));
     }
     out
 }
@@ -1423,11 +1619,15 @@ fn format_optional_bool_v1(value: Option<bool>) -> &'static str {
 }
 
 fn format_optional_u32_inherit_v1(value: Option<u32>) -> String {
-    value.map(|v| v.to_string()).unwrap_or_else(|| "inherit".to_string())
+    value
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "inherit".to_string())
 }
 
 fn format_optional_u64_inherit_v1(value: Option<u64>) -> String {
-    value.map(|v| v.to_string()).unwrap_or_else(|| "inherit".to_string())
+    value
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "inherit".to_string())
 }
 
 fn format_tenant_policy_check_v1(
@@ -1862,12 +2062,20 @@ fn route_replay_spool_v1(cfg: &ConfigV1, tenant_id: Option<&str>) -> RouteResult
 
     RouteResultV1 {
         exit_code: if failed_paths.is_empty() { 0 } else { 6 },
-        msg_stdout: Some(format_replay_spool_summary_v1(tenant_id, replayed_paths.len(), failed_paths.len())),
+        msg_stdout: Some(format_replay_spool_summary_v1(
+            tenant_id,
+            replayed_paths.len(),
+            failed_paths.len(),
+        )),
         msg_stderr: format_replay_spool_failures_v1(tenant_id, &failed_paths),
     }
 }
 
-fn format_replay_spool_summary_v1(tenant_id: Option<&str>, replayed_count: usize, failed_count: usize) -> String {
+fn format_replay_spool_summary_v1(
+    tenant_id: Option<&str>,
+    replayed_count: usize,
+    failed_count: usize,
+) -> String {
     let scope = tenant_id.unwrap_or("all");
     format!(
         "replay-spool\nscope: {}\nsink: jsonl\nreplayed: {}\nfailed: {}\n",
@@ -1875,7 +2083,10 @@ fn format_replay_spool_summary_v1(tenant_id: Option<&str>, replayed_count: usize
     )
 }
 
-fn format_replay_spool_failures_v1(tenant_id: Option<&str>, failed_paths: &[PathBuf]) -> Option<String> {
+fn format_replay_spool_failures_v1(
+    tenant_id: Option<&str>,
+    failed_paths: &[PathBuf],
+) -> Option<String> {
     if failed_paths.is_empty() {
         return None;
     }
@@ -1914,12 +2125,21 @@ enum OneShotSinkV1 {
 impl OneShotSinkV1 {
     fn emit_v1(&mut self, alert: &AlertV1) -> Result<Option<SpoolEmitOutcomeV1>, String> {
         match self {
-            OneShotSinkV1::Jsonl(sink) => sink.emit_at_v1(alert, alert.window_end_ts).map(Some).map_err(|e| e.msg),
-            OneShotSinkV1::Stdout(sink) => sink.emit_line_v1(alert).map(|_| None).map_err(|e| e.msg),
+            OneShotSinkV1::Jsonl(sink) => sink
+                .emit_at_v1(alert, alert.window_end_ts)
+                .map(Some)
+                .map_err(|e| e.msg),
+            OneShotSinkV1::Stdout(sink) => {
+                sink.emit_line_v1(alert).map(|_| None).map_err(|e| e.msg)
+            }
         }
     }
 
-    fn replay_automated_v1(&mut self, now_ts: i64, max_files: usize) -> Result<Option<SpoolReplayReportV1>, String> {
+    fn replay_automated_v1(
+        &mut self,
+        now_ts: i64,
+        max_files: usize,
+    ) -> Result<Option<SpoolReplayReportV1>, String> {
         match self {
             OneShotSinkV1::Jsonl(sink) => sink
                 .replay_spooled_alerts_limited_v1(now_ts, max_files)
@@ -1973,9 +2193,13 @@ struct RunCycleSummaryV1 {
 impl RunCycleSummaryV1 {
     fn add_v1(&mut self, other: &RunCycleSummaryV1) {
         self.tenants_total = self.tenants_total.saturating_add(other.tenants_total);
-        self.tenants_processed = self.tenants_processed.saturating_add(other.tenants_processed);
+        self.tenants_processed = self
+            .tenants_processed
+            .saturating_add(other.tenants_processed);
         self.tenants_skipped = self.tenants_skipped.saturating_add(other.tenants_skipped);
-        self.devices_processed = self.devices_processed.saturating_add(other.devices_processed);
+        self.devices_processed = self
+            .devices_processed
+            .saturating_add(other.devices_processed);
         self.devices_failed = self.devices_failed.saturating_add(other.devices_failed);
         self.alerts_emitted = self.alerts_emitted.saturating_add(other.alerts_emitted);
     }
@@ -2000,7 +2224,9 @@ struct TenantRecoveryMetricsTotalsV1 {
 
 impl RecoveryMetricsTotalsV1 {
     fn add_counter_delta_v1(&mut self, delta: &SpoolCountersV1) {
-        self.spool_writes_total = self.spool_writes_total.saturating_add(delta.sink_spool_total);
+        self.spool_writes_total = self
+            .spool_writes_total
+            .saturating_add(delta.sink_spool_total);
         self.spool_replayed_total = self
             .spool_replayed_total
             .saturating_add(delta.sink_spool_replayed_total);
@@ -2027,11 +2253,15 @@ impl TenantRecoveryMetricsTotalsV1 {
     }
 
     fn add_automated_attempt_v1(&mut self) {
-        self.automated_replay_attempts_total = self.automated_replay_attempts_total.saturating_add(1);
+        self.automated_replay_attempts_total =
+            self.automated_replay_attempts_total.saturating_add(1);
     }
 }
 
-fn read_metric_gauge_as_u64_v1(runtime: &SparxRuntimeV1, name: &str) -> Result<Option<u64>, DbErrorV1> {
+fn read_metric_gauge_as_u64_v1(
+    runtime: &SparxRuntimeV1,
+    name: &str,
+) -> Result<Option<u64>, DbErrorV1> {
     let value = match runtime.global_db_v1().read_metric_gauge_v1(name)? {
         Some(value) => value,
         None => return Ok(None),
@@ -2064,7 +2294,9 @@ fn write_metric_gauge_u64_v1(
     name: &str,
     value: u64,
 ) -> Result<(), DbErrorV1> {
-    runtime.global_db_v1().write_metric_gauge_v1(name, value as f64)
+    runtime
+        .global_db_v1()
+        .write_metric_gauge_v1(name, value as f64)
 }
 
 fn persist_vdrop_diagnostics_delta_v1(
@@ -2073,10 +2305,26 @@ fn persist_vdrop_diagnostics_delta_v1(
     diagnostics: &VDropDiagnosticsDeltaV1,
     eval_ts_i64: i64,
 ) -> Result<(), DbErrorV1> {
-    increment_metric_counter_by_v1(runtime, METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1, diagnostics.evaluated_subjects)?;
-    increment_metric_counter_by_v1(runtime, METRIC_VDROP_CANDIDATES_TOTAL_V1, diagnostics.candidates)?;
-    increment_metric_counter_by_v1(runtime, METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1, diagnostics.suppressed_candidates)?;
-    increment_metric_counter_by_v1(runtime, METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1, diagnostics.alerts_emitted)?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1,
+        diagnostics.evaluated_subjects,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_CANDIDATES_TOTAL_V1,
+        diagnostics.candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1,
+        diagnostics.suppressed_candidates,
+    )?;
+    increment_metric_counter_by_v1(
+        runtime,
+        METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1,
+        diagnostics.alerts_emitted,
+    )?;
     increment_metric_counter_by_v1(
         runtime,
         METRIC_VDROP_SOURCE_STREAM_EVALUATED_SUBJECTS_TOTAL_V1,
@@ -2098,7 +2346,9 @@ fn persist_vdrop_diagnostics_delta_v1(
         diagnostics.source_stream_alerts_emitted,
     )?;
     if eval_ts_i64 >= 0 {
-        runtime.global_db_v1().write_metric_counter_v1(METRIC_VDROP_LAST_EVALUATION_TS_V1, eval_ts_i64 as u64)?;
+        runtime
+            .global_db_v1()
+            .write_metric_counter_v1(METRIC_VDROP_LAST_EVALUATION_TS_V1, eval_ts_i64 as u64)?;
         if diagnostics.source_stream_evaluated_subjects > 0
             || diagnostics.source_stream_candidates > 0
             || diagnostics.source_stream_alerts_emitted > 0
@@ -2198,9 +2448,14 @@ fn persist_vdrop_diagnostics_delta_v1(
     Ok(())
 }
 
-fn spool_counters_delta_v1(current: &SpoolCountersV1, previous: &SpoolCountersV1) -> SpoolCountersV1 {
+fn spool_counters_delta_v1(
+    current: &SpoolCountersV1,
+    previous: &SpoolCountersV1,
+) -> SpoolCountersV1 {
     SpoolCountersV1 {
-        sink_spool_total: current.sink_spool_total.saturating_sub(previous.sink_spool_total),
+        sink_spool_total: current
+            .sink_spool_total
+            .saturating_sub(previous.sink_spool_total),
         sink_spool_replayed_total: current
             .sink_spool_replayed_total
             .saturating_sub(previous.sink_spool_replayed_total),
@@ -2213,24 +2468,46 @@ fn spool_counters_delta_v1(current: &SpoolCountersV1, previous: &SpoolCountersV1
     }
 }
 
-fn read_persisted_recovery_metrics_v1(runtime: &SparxRuntimeV1) -> Result<RecoveryMetricsTotalsV1, DbErrorV1> {
+fn read_persisted_recovery_metrics_v1(
+    runtime: &SparxRuntimeV1,
+) -> Result<RecoveryMetricsTotalsV1, DbErrorV1> {
     let db = runtime.global_db_v1();
     Ok(RecoveryMetricsTotalsV1 {
-        spool_writes_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1)?.unwrap_or(0),
-        spool_replayed_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?.unwrap_or(0),
-        spool_replay_fail_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?.unwrap_or(0),
-        spool_drop_total: db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1)?.unwrap_or(0),
+        spool_writes_total: db
+            .read_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1)?
+            .unwrap_or(0),
+        spool_replayed_total: db
+            .read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?
+            .unwrap_or(0),
+        spool_replay_fail_total: db
+            .read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?
+            .unwrap_or(0),
+        spool_drop_total: db
+            .read_metric_counter_v1(METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1)?
+            .unwrap_or(0),
         automated_replay_attempts_total: db
             .read_metric_counter_v1(METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?
             .unwrap_or(0),
     })
 }
 
-fn persist_recovery_metrics_v1(runtime: &SparxRuntimeV1, totals: &RecoveryMetricsTotalsV1) -> Result<(), DbErrorV1> {
+fn persist_recovery_metrics_v1(
+    runtime: &SparxRuntimeV1,
+    totals: &RecoveryMetricsTotalsV1,
+) -> Result<(), DbErrorV1> {
     let db = runtime.global_db_v1();
-    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1, totals.spool_writes_total)?;
-    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1, totals.spool_replayed_total)?;
-    db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1, totals.spool_replay_fail_total)?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1,
+        totals.spool_writes_total,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1,
+        totals.spool_replayed_total,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1,
+        totals.spool_replay_fail_total,
+    )?;
     db.write_metric_counter_v1(METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1, totals.spool_drop_total)?;
     db.write_metric_counter_v1(
         METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
@@ -2252,10 +2529,14 @@ fn read_persisted_tenant_recovery_metrics_v1(
             .read_metric_counter_v1(&metric_recovery_tenant_spool_replayed_total_v1(tenant_id))?
             .unwrap_or(0),
         spool_replay_fail_total: db
-            .read_metric_counter_v1(&metric_recovery_tenant_spool_replay_fail_total_v1(tenant_id))?
+            .read_metric_counter_v1(&metric_recovery_tenant_spool_replay_fail_total_v1(
+                tenant_id,
+            ))?
             .unwrap_or(0),
         automated_replay_attempts_total: db
-            .read_metric_counter_v1(&metric_recovery_tenant_automated_replay_attempts_total_v1(tenant_id))?
+            .read_metric_counter_v1(&metric_recovery_tenant_automated_replay_attempts_total_v1(
+                tenant_id,
+            ))?
             .unwrap_or(0),
     })
 }
@@ -2298,9 +2579,9 @@ where
         let persisted = read_persisted_tenant_recovery_metrics_v1(runtime, tenant_id)?;
         cache.insert(tenant_id.to_string(), persisted);
     }
-    let totals = cache
-        .get_mut(tenant_id)
-        .ok_or_else(|| DbErrorV1::new_v1("tenant recovery metrics cache entry missing after insert"))?;
+    let totals = cache.get_mut(tenant_id).ok_or_else(|| {
+        DbErrorV1::new_v1("tenant recovery metrics cache entry missing after insert")
+    })?;
     apply(totals);
     persist_tenant_recovery_metrics_v1(runtime, tenant_id, totals)
 }
@@ -2376,8 +2657,14 @@ fn persist_last_automated_replay_summary_v1(
         METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1,
         attempt_ts as u64,
     )?;
-    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1, replayed as f64)?;
-    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1, failed as f64)?;
+    db.write_metric_gauge_v1(
+        METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1,
+        replayed as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1,
+        failed as f64,
+    )?;
     Ok(())
 }
 
@@ -2446,7 +2733,8 @@ fn persist_tenant_recovery_history_start_counter_snapshot_v1(
     automated_replay_attempts_total: Option<u64>,
 ) -> Result<(), DbErrorV1> {
     let db = runtime.global_db_v1();
-    let history_start_ts_name = metric_recovery_tenant_history_start_counter_snapshot_ts_v1(tenant_id);
+    let history_start_ts_name =
+        metric_recovery_tenant_history_start_counter_snapshot_ts_v1(tenant_id);
     if db.read_metric_counter_v1(&history_start_ts_name)?.is_some() {
         return Ok(());
     }
@@ -2461,11 +2749,15 @@ fn persist_tenant_recovery_history_start_counter_snapshot_v1(
         spool_replayed_total.unwrap_or(0),
     )?;
     db.write_metric_counter_v1(
-        &metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1(tenant_id),
+        &metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1(
+            tenant_id,
+        ),
         spool_replay_fail_total.unwrap_or(0),
     )?;
     db.write_metric_counter_v1(
-        &metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1(tenant_id),
+        &metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1(
+            tenant_id,
+        ),
         automated_replay_attempts_total.unwrap_or(0),
     )?;
     Ok(())
@@ -2476,23 +2768,39 @@ fn persist_recovery_backlog_snapshot_v1(
     runtime: &SparxRuntimeV1,
     snapshot_ts: i64,
 ) -> Result<(), DbErrorV1> {
-    let summary = spool_backlog_summary_v1(&cfg.sparx.data_root)
-        .map_err(|e| DbErrorV1::new_v1(format!("failed to read spool backlog summary: {}", e.msg)))?;
-    let tenant_summaries = spool_backlog_per_tenant_v1(&cfg.sparx.data_root)
-        .map_err(|e| DbErrorV1::new_v1(format!("failed to read per-tenant spool backlog summary: {}", e.msg)))?;
+    let summary = spool_backlog_summary_v1(&cfg.sparx.data_root).map_err(|e| {
+        DbErrorV1::new_v1(format!("failed to read spool backlog summary: {}", e.msg))
+    })?;
+    let tenant_summaries = spool_backlog_per_tenant_v1(&cfg.sparx.data_root).map_err(|e| {
+        DbErrorV1::new_v1(format!(
+            "failed to read per-tenant spool backlog summary: {}",
+            e.msg
+        ))
+    })?;
     let db = runtime.global_db_v1();
     let last_snapshot_ts = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1)?;
-    let last_snapshot_backlog_files = read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1)?;
-    let last_snapshot_backlog_bytes = read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1)?;
-    let last_counter_snapshot_ts = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1)?;
-    let last_counter_snapshot_spool_writes_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
-    let last_counter_snapshot_spool_replayed_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
-    let last_counter_snapshot_spool_replay_fail_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
-    let last_counter_snapshot_automated_replay_attempts_total = db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+    let last_snapshot_backlog_files =
+        read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1)?;
+    let last_snapshot_backlog_bytes =
+        read_metric_gauge_as_u64_v1(runtime, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1)?;
+    let last_counter_snapshot_ts =
+        db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1)?;
+    let last_counter_snapshot_spool_writes_total =
+        db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
+    let last_counter_snapshot_spool_replayed_total =
+        db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
+    let last_counter_snapshot_spool_replay_fail_total = db
+        .read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let last_counter_snapshot_automated_replay_attempts_total = db.read_metric_counter_v1(
+        METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    )?;
     let spool_writes_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1)?;
-    let spool_replayed_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?;
-    let spool_replay_fail_total = db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
-    let automated_replay_attempts_total = db.read_metric_counter_v1(METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+    let spool_replayed_total =
+        db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1)?;
+    let spool_replay_fail_total =
+        db.read_metric_counter_v1(METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let automated_replay_attempts_total =
+        db.read_metric_counter_v1(METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
 
     persist_recovery_history_start_counter_snapshot_v1(
         runtime,
@@ -2504,89 +2812,186 @@ fn persist_recovery_backlog_snapshot_v1(
     )?;
 
     match last_snapshot_ts {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1, value)?,
+        Some(value) => {
+            db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1, value)?
+        }
         None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1)?,
     }
     match last_snapshot_backlog_files {
-        Some(value) => db.write_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1, value as f64)?,
+        Some(value) => db.write_metric_gauge_v1(
+            METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1,
+            value as f64,
+        )?,
         None => db.delete_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1)?,
     }
     match last_snapshot_backlog_bytes {
-        Some(value) => db.write_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1, value as f64)?,
+        Some(value) => db.write_metric_gauge_v1(
+            METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1,
+            value as f64,
+        )?,
         None => db.delete_metric_gauge_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1)?,
     }
     match last_counter_snapshot_ts {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1, value)?,
+        Some(value) => {
+            db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1, value)?
+        }
         None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1)?,
     }
     match last_counter_snapshot_spool_writes_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+        )?,
     }
     match last_counter_snapshot_spool_replayed_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+        )?,
     }
     match last_counter_snapshot_spool_replay_fail_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+        )?,
     }
     match last_counter_snapshot_automated_replay_attempts_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        )?,
     }
 
     db.write_metric_counter_v1(METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1, snapshot_ts as u64)?;
-    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1, summary.files as f64)?;
-    db.write_metric_gauge_v1(METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1, summary.bytes as f64)?;
-    db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1, snapshot_ts as u64)?;
+    db.write_metric_gauge_v1(
+        METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1,
+        summary.files as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1,
+        summary.bytes as f64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1,
+        snapshot_ts as u64,
+    )?;
     match spool_writes_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+        )?,
     }
     match spool_replayed_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+        )?,
     }
     match spool_replay_fail_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+        )?,
     }
     match automated_replay_attempts_total {
-        Some(value) => db.write_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1, value)?,
-        None => db.delete_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?,
+        Some(value) => db.write_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+            value,
+        )?,
+        None => db.delete_metric_counter_v1(
+            METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        )?,
     }
 
     for tenant in tenant_summaries {
         let previous_ts_name = metric_recovery_tenant_previous_snapshot_ts_v1(&tenant.tenant_id);
-        let previous_files_name = metric_recovery_tenant_previous_snapshot_backlog_files_v1(&tenant.tenant_id);
-        let previous_bytes_name = metric_recovery_tenant_previous_snapshot_backlog_bytes_v1(&tenant.tenant_id);
+        let previous_files_name =
+            metric_recovery_tenant_previous_snapshot_backlog_files_v1(&tenant.tenant_id);
+        let previous_bytes_name =
+            metric_recovery_tenant_previous_snapshot_backlog_bytes_v1(&tenant.tenant_id);
         let last_ts_name = metric_recovery_tenant_last_snapshot_ts_v1(&tenant.tenant_id);
-        let last_files_name = metric_recovery_tenant_last_snapshot_backlog_files_v1(&tenant.tenant_id);
-        let last_bytes_name = metric_recovery_tenant_last_snapshot_backlog_bytes_v1(&tenant.tenant_id);
-        let previous_counter_ts_name = metric_recovery_tenant_previous_counter_snapshot_ts_v1(&tenant.tenant_id);
-        let previous_counter_spool_writes_name = metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1(&tenant.tenant_id);
-        let previous_counter_spool_replayed_name = metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1(&tenant.tenant_id);
-        let previous_counter_spool_replay_fail_name = metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1(&tenant.tenant_id);
-        let previous_counter_automated_attempts_name = metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1(&tenant.tenant_id);
-        let last_counter_ts_name = metric_recovery_tenant_last_counter_snapshot_ts_v1(&tenant.tenant_id);
-        let last_counter_spool_writes_name = metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1(&tenant.tenant_id);
-        let last_counter_spool_replayed_name = metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1(&tenant.tenant_id);
-        let last_counter_spool_replay_fail_name = metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1(&tenant.tenant_id);
-        let last_counter_automated_attempts_name = metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1(&tenant.tenant_id);
+        let last_files_name =
+            metric_recovery_tenant_last_snapshot_backlog_files_v1(&tenant.tenant_id);
+        let last_bytes_name =
+            metric_recovery_tenant_last_snapshot_backlog_bytes_v1(&tenant.tenant_id);
+        let previous_counter_ts_name =
+            metric_recovery_tenant_previous_counter_snapshot_ts_v1(&tenant.tenant_id);
+        let previous_counter_spool_writes_name =
+            metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1(
+                &tenant.tenant_id,
+            );
+        let previous_counter_spool_replayed_name =
+            metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1(
+                &tenant.tenant_id,
+            );
+        let previous_counter_spool_replay_fail_name =
+            metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1(
+                &tenant.tenant_id,
+            );
+        let previous_counter_automated_attempts_name =
+            metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1(
+                &tenant.tenant_id,
+            );
+        let last_counter_ts_name =
+            metric_recovery_tenant_last_counter_snapshot_ts_v1(&tenant.tenant_id);
+        let last_counter_spool_writes_name =
+            metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1(&tenant.tenant_id);
+        let last_counter_spool_replayed_name =
+            metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1(&tenant.tenant_id);
+        let last_counter_spool_replay_fail_name =
+            metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1(
+                &tenant.tenant_id,
+            );
+        let last_counter_automated_attempts_name =
+            metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1(
+                &tenant.tenant_id,
+            );
 
         let tenant_last_snapshot_ts = db.read_metric_counter_v1(&last_ts_name)?;
         let tenant_last_snapshot_backlog_files = db.read_metric_gauge_v1(&last_files_name)?;
         let tenant_last_snapshot_backlog_bytes = db.read_metric_gauge_v1(&last_bytes_name)?;
         let tenant_last_counter_snapshot_ts = db.read_metric_counter_v1(&last_counter_ts_name)?;
-        let tenant_last_counter_snapshot_spool_writes_total = db.read_metric_counter_v1(&last_counter_spool_writes_name)?;
-        let tenant_last_counter_snapshot_spool_replayed_total = db.read_metric_counter_v1(&last_counter_spool_replayed_name)?;
-        let tenant_last_counter_snapshot_spool_replay_fail_total = db.read_metric_counter_v1(&last_counter_spool_replay_fail_name)?;
-        let tenant_last_counter_snapshot_automated_replay_attempts_total = db.read_metric_counter_v1(&last_counter_automated_attempts_name)?;
-        let tenant_spool_writes_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_writes_total_v1(&tenant.tenant_id))?;
-        let tenant_spool_replayed_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_replayed_total_v1(&tenant.tenant_id))?;
-        let tenant_spool_replay_fail_total = db.read_metric_counter_v1(&metric_recovery_tenant_spool_replay_fail_total_v1(&tenant.tenant_id))?;
-        let tenant_automated_replay_attempts_total = db.read_metric_counter_v1(&metric_recovery_tenant_automated_replay_attempts_total_v1(&tenant.tenant_id))?;
+        let tenant_last_counter_snapshot_spool_writes_total =
+            db.read_metric_counter_v1(&last_counter_spool_writes_name)?;
+        let tenant_last_counter_snapshot_spool_replayed_total =
+            db.read_metric_counter_v1(&last_counter_spool_replayed_name)?;
+        let tenant_last_counter_snapshot_spool_replay_fail_total =
+            db.read_metric_counter_v1(&last_counter_spool_replay_fail_name)?;
+        let tenant_last_counter_snapshot_automated_replay_attempts_total =
+            db.read_metric_counter_v1(&last_counter_automated_attempts_name)?;
+        let tenant_spool_writes_total = db.read_metric_counter_v1(
+            &metric_recovery_tenant_spool_writes_total_v1(&tenant.tenant_id),
+        )?;
+        let tenant_spool_replayed_total = db.read_metric_counter_v1(
+            &metric_recovery_tenant_spool_replayed_total_v1(&tenant.tenant_id),
+        )?;
+        let tenant_spool_replay_fail_total = db.read_metric_counter_v1(
+            &metric_recovery_tenant_spool_replay_fail_total_v1(&tenant.tenant_id),
+        )?;
+        let tenant_automated_replay_attempts_total = db.read_metric_counter_v1(
+            &metric_recovery_tenant_automated_replay_attempts_total_v1(&tenant.tenant_id),
+        )?;
 
         persist_tenant_recovery_history_start_counter_snapshot_v1(
             runtime,
@@ -2615,19 +3020,27 @@ fn persist_recovery_backlog_snapshot_v1(
             None => db.delete_metric_counter_v1(&previous_counter_ts_name)?,
         }
         match tenant_last_counter_snapshot_spool_writes_total {
-            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_writes_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&previous_counter_spool_writes_name, value)?
+            }
             None => db.delete_metric_counter_v1(&previous_counter_spool_writes_name)?,
         }
         match tenant_last_counter_snapshot_spool_replayed_total {
-            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_replayed_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&previous_counter_spool_replayed_name, value)?
+            }
             None => db.delete_metric_counter_v1(&previous_counter_spool_replayed_name)?,
         }
         match tenant_last_counter_snapshot_spool_replay_fail_total {
-            Some(value) => db.write_metric_counter_v1(&previous_counter_spool_replay_fail_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&previous_counter_spool_replay_fail_name, value)?
+            }
             None => db.delete_metric_counter_v1(&previous_counter_spool_replay_fail_name)?,
         }
         match tenant_last_counter_snapshot_automated_replay_attempts_total {
-            Some(value) => db.write_metric_counter_v1(&previous_counter_automated_attempts_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&previous_counter_automated_attempts_name, value)?
+            }
             None => db.delete_metric_counter_v1(&previous_counter_automated_attempts_name)?,
         }
 
@@ -2644,26 +3057,44 @@ fn persist_recovery_backlog_snapshot_v1(
             None => db.delete_metric_counter_v1(&last_counter_spool_replayed_name)?,
         }
         match tenant_spool_replay_fail_total {
-            Some(value) => db.write_metric_counter_v1(&last_counter_spool_replay_fail_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&last_counter_spool_replay_fail_name, value)?
+            }
             None => db.delete_metric_counter_v1(&last_counter_spool_replay_fail_name)?,
         }
         match tenant_automated_replay_attempts_total {
-            Some(value) => db.write_metric_counter_v1(&last_counter_automated_attempts_name, value)?,
+            Some(value) => {
+                db.write_metric_counter_v1(&last_counter_automated_attempts_name, value)?
+            }
             None => db.delete_metric_counter_v1(&last_counter_automated_attempts_name)?,
         }
     }
     Ok(())
 }
 
-fn read_persisted_run_cycle_summary_v1(runtime: &SparxRuntimeV1) -> Result<RunCycleSummaryV1, DbErrorV1> {
+fn read_persisted_run_cycle_summary_v1(
+    runtime: &SparxRuntimeV1,
+) -> Result<RunCycleSummaryV1, DbErrorV1> {
     let db = runtime.global_db_v1();
     Ok(RunCycleSummaryV1 {
-        tenants_total: db.read_metric_counter_v1(METRIC_RUN_TENANTS_TOTAL_V1)?.unwrap_or(0) as usize,
-        tenants_processed: db.read_metric_counter_v1(METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1)?.unwrap_or(0) as usize,
-        tenants_skipped: db.read_metric_counter_v1(METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1)?.unwrap_or(0) as usize,
-        devices_processed: db.read_metric_counter_v1(METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1)?.unwrap_or(0) as usize,
-        devices_failed: db.read_metric_counter_v1(METRIC_RUN_DEVICES_FAILED_TOTAL_V1)?.unwrap_or(0) as usize,
-        alerts_emitted: db.read_metric_counter_v1(METRIC_RUN_ALERTS_EMITTED_TOTAL_V1)?.unwrap_or(0) as usize,
+        tenants_total: db
+            .read_metric_counter_v1(METRIC_RUN_TENANTS_TOTAL_V1)?
+            .unwrap_or(0) as usize,
+        tenants_processed: db
+            .read_metric_counter_v1(METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1)?
+            .unwrap_or(0) as usize,
+        tenants_skipped: db
+            .read_metric_counter_v1(METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1)?
+            .unwrap_or(0) as usize,
+        devices_processed: db
+            .read_metric_counter_v1(METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1)?
+            .unwrap_or(0) as usize,
+        devices_failed: db
+            .read_metric_counter_v1(METRIC_RUN_DEVICES_FAILED_TOTAL_V1)?
+            .unwrap_or(0) as usize,
+        alerts_emitted: db
+            .read_metric_counter_v1(METRIC_RUN_ALERTS_EMITTED_TOTAL_V1)?
+            .unwrap_or(0) as usize,
     })
 }
 
@@ -2674,20 +3105,61 @@ fn persist_run_metrics_v1(
     cycle_completed_ts: i64,
 ) -> Result<(), DbErrorV1> {
     let db = runtime.global_db_v1();
-    db.write_metric_counter_v1(METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1, db.read_metric_counter_v1(METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1)?.unwrap_or(0).saturating_add(1))?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1,
+        db.read_metric_counter_v1(METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1)?
+            .unwrap_or(0)
+            .saturating_add(1),
+    )?;
     db.write_metric_counter_v1(METRIC_RUN_TENANTS_TOTAL_V1, totals.tenants_total as u64)?;
-    db.write_metric_counter_v1(METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1, totals.tenants_processed as u64)?;
-    db.write_metric_counter_v1(METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1, totals.tenants_skipped as u64)?;
-    db.write_metric_counter_v1(METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1, totals.devices_processed as u64)?;
-    db.write_metric_counter_v1(METRIC_RUN_DEVICES_FAILED_TOTAL_V1, totals.devices_failed as u64)?;
-    db.write_metric_counter_v1(METRIC_RUN_ALERTS_EMITTED_TOTAL_V1, totals.alerts_emitted as u64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_TENANTS_TOTAL_V1, last_cycle.tenants_total as f64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_TENANTS_PROCESSED_V1, last_cycle.tenants_processed as f64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_TENANTS_SKIPPED_V1, last_cycle.tenants_skipped as f64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_DEVICES_PROCESSED_V1, last_cycle.devices_processed as f64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_DEVICES_FAILED_V1, last_cycle.devices_failed as f64)?;
-    db.write_metric_gauge_v1(METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1, last_cycle.alerts_emitted as f64)?;
-    db.write_metric_counter_v1(METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1, cycle_completed_ts as u64)?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1,
+        totals.tenants_processed as u64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1,
+        totals.tenants_skipped as u64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1,
+        totals.devices_processed as u64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_DEVICES_FAILED_TOTAL_V1,
+        totals.devices_failed as u64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_ALERTS_EMITTED_TOTAL_V1,
+        totals.alerts_emitted as u64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_TENANTS_TOTAL_V1,
+        last_cycle.tenants_total as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_TENANTS_PROCESSED_V1,
+        last_cycle.tenants_processed as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_TENANTS_SKIPPED_V1,
+        last_cycle.tenants_skipped as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_DEVICES_PROCESSED_V1,
+        last_cycle.devices_processed as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_DEVICES_FAILED_V1,
+        last_cycle.devices_failed as f64,
+    )?;
+    db.write_metric_gauge_v1(
+        METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1,
+        last_cycle.alerts_emitted as f64,
+    )?;
+    db.write_metric_counter_v1(
+        METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1,
+        cycle_completed_ts as u64,
+    )?;
     Ok(())
 }
 
@@ -2708,7 +3180,11 @@ fn is_nonfatal_run_warning_v1(item: &str) -> bool {
     item.starts_with("automated spool replay warning:")
 }
 
-fn format_automated_spool_replay_warning_v1(scope: &str, report: &SpoolReplayReportV1, max_files: usize) -> Option<String> {
+fn format_automated_spool_replay_warning_v1(
+    scope: &str,
+    report: &SpoolReplayReportV1,
+    max_files: usize,
+) -> Option<String> {
     if report.failed_paths.is_empty() && report.replayed_paths.is_empty() {
         return None;
     }
@@ -2724,7 +3200,11 @@ fn format_automated_spool_replay_warning_v1(scope: &str, report: &SpoolReplayRep
     ))
 }
 
-fn should_run_automated_replay_v1(last_attempt_ts: Option<i64>, now_ts: i64, interval_s: u32) -> bool {
+fn should_run_automated_replay_v1(
+    last_attempt_ts: Option<i64>,
+    now_ts: i64,
+    interval_s: u32,
+) -> bool {
     match last_attempt_ts {
         None => true,
         Some(last_attempt_ts) => now_ts.saturating_sub(last_attempt_ts) >= i64::from(interval_s),
@@ -2849,7 +3329,8 @@ fn run_daemon_inner_v1(
         }
     };
     let mut last_sink_counters = sink.spool_counters_snapshot_v1();
-    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> = BTreeMap::new();
+    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> =
+        BTreeMap::new();
 
     let automated_replay_max_files = cfg.output.automated_replay_max_files_per_pass as usize;
     let automated_replay_interval_s = cfg.output.automated_replay_interval_s;
@@ -2858,7 +3339,11 @@ fn run_daemon_inner_v1(
     loop {
         let cycle_now_ts = current_unix_ts_v1();
         if sink.supports_recovery_v1()
-            && should_run_automated_replay_v1(last_automated_replay_attempt_ts, cycle_now_ts, automated_replay_interval_s)
+            && should_run_automated_replay_v1(
+                last_automated_replay_attempt_ts,
+                cycle_now_ts,
+                automated_replay_interval_s,
+            )
         {
             recovery_totals.automated_replay_attempts_total = recovery_totals
                 .automated_replay_attempts_total
@@ -2915,7 +3400,8 @@ fn run_daemon_inner_v1(
                             msg_stderr: Some(format!("run recovery metrics error: {}", e)),
                         };
                     }
-                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts)
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -2933,7 +3419,9 @@ fn run_daemon_inner_v1(
                     }
                 }
                 Ok(None) => {
-                    if let Err(e) = persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0) {
+                    if let Err(e) =
+                        persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0)
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -2942,7 +3430,8 @@ fn run_daemon_inner_v1(
                             msg_stderr: Some(format!("run recovery metrics error: {}", e)),
                         };
                     }
-                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts)
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -2953,7 +3442,9 @@ fn run_daemon_inner_v1(
                     }
                 }
                 Err(e) => {
-                    if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0) {
+                    if let Err(db_err) =
+                        persist_last_automated_replay_summary_v1(runtime, cycle_now_ts, 0, 0)
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -2976,7 +3467,9 @@ fn run_daemon_inner_v1(
                             msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
                         };
                     }
-                    if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts) {
+                    if let Err(db_err) =
+                        persist_recovery_backlog_snapshot_v1(cfg, runtime, cycle_now_ts)
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -2985,7 +3478,10 @@ fn run_daemon_inner_v1(
                             msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
                         };
                     }
-                    failures.push(format!("automated spool replay warning: scope=run error={}", e));
+                    failures.push(format!(
+                        "automated spool replay warning: scope=run error={}",
+                        e
+                    ));
                 }
             }
             last_automated_replay_attempt_ts = Some(cycle_now_ts);
@@ -2994,7 +3490,12 @@ fn run_daemon_inner_v1(
             Ok((cycle_summary, cycle_failures)) => {
                 summary.add_v1(&cycle_summary);
                 metric_totals.add_v1(&cycle_summary);
-                if let Err(e) = persist_run_metrics_v1(runtime, &metric_totals, &cycle_summary, current_unix_ts_v1()) {
+                if let Err(e) = persist_run_metrics_v1(
+                    runtime,
+                    &metric_totals,
+                    &cycle_summary,
+                    current_unix_ts_v1(),
+                ) {
                     observability.shutdown_v1();
                     let _ = sink.shutdown_v1();
                     return RouteResultV1 {
@@ -3018,7 +3519,9 @@ fn run_daemon_inner_v1(
                     };
                 }
                 if sink.supports_recovery_v1() {
-                    if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, current_unix_ts_v1()) {
+                    if let Err(e) =
+                        persist_recovery_backlog_snapshot_v1(cfg, runtime, current_unix_ts_v1())
+                    {
                         observability.shutdown_v1();
                         let _ = sink.shutdown_v1();
                         return RouteResultV1 {
@@ -3047,7 +3550,9 @@ fn run_daemon_inner_v1(
                 break;
             }
         }
-        thread::sleep(Duration::from_millis(u64::from(cfg.ingest.poll_interval_ms)));
+        thread::sleep(Duration::from_millis(u64::from(
+            cfg.ingest.poll_interval_ms,
+        )));
     }
 
     if sink.supports_recovery_v1() {
@@ -3065,120 +3570,131 @@ fn run_daemon_inner_v1(
             };
         }
         match sink.replay_automated_v1(final_replay_ts, automated_replay_max_files) {
-        Ok(Some(report)) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(
-                runtime,
-                final_replay_ts,
-                report.replayed_paths.len() as u64,
-                report.failed_paths.len() as u64,
-            ) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
+            Ok(Some(report)) => {
+                if let Err(e) = persist_last_automated_replay_summary_v1(
+                    runtime,
+                    final_replay_ts,
+                    report.replayed_paths.len() as u64,
+                    report.failed_paths.len() as u64,
+                ) {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                    runtime,
+                    &mut tenant_recovery_metrics_cache,
+                    &report,
+                ) {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts)
+                {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if let Some(warning) = format_automated_spool_replay_warning_v1(
+                    "run-final",
+                    &report,
+                    automated_replay_max_files,
+                ) {
+                    failures.push(warning);
+                }
             }
-            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
+            Ok(None) => {
+                if let Err(e) =
+                    persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0)
+                {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts)
+                {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", e)),
+                    };
+                }
             }
-            if let Err(e) = persist_tenant_recovery_replay_report_v1(
-                runtime,
-                &mut tenant_recovery_metrics_cache,
-                &report,
-            ) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
+            Err(e) => {
+                if let Err(db_err) =
+                    persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0)
+                {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) =
+                    persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts)
+                {
+                    observability.shutdown_v1();
+                    let _ = sink.shutdown_v1();
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
+                    };
+                }
+                failures.push(format!(
+                    "automated spool replay warning: scope=run-final error={}",
+                    e
+                ));
             }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
-            }
-            if let Some(warning) = format_automated_spool_replay_warning_v1(
-                "run-final",
-                &report,
-                automated_replay_max_files,
-            ) {
-                failures.push(warning);
-            }
-        }
-        Ok(None) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
-            }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", e)),
-                };
-            }
-        }
-        Err(e) => {
-            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, final_replay_ts, 0, 0) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, final_replay_ts) {
-                observability.shutdown_v1();
-                let _ = sink.shutdown_v1();
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("run recovery metrics error: {}", db_err)),
-                };
-            }
-            failures.push(format!("automated spool replay warning: scope=run-final error={}", e));
-        }
         }
     }
 
@@ -3202,7 +3718,6 @@ fn run_daemon_inner_v1(
             };
         }
     };
-
 
     let stdout = match stdout_from_sink {
         Some(s) => Some(s),
@@ -3242,7 +3757,14 @@ alerts_emitted: {}
     observability.shutdown_v1();
 
     RouteResultV1 {
-        exit_code: if failures.iter().any(|item| !is_nonfatal_run_warning_v1(item)) { 3 } else { 0 },
+        exit_code: if failures
+            .iter()
+            .any(|item| !is_nonfatal_run_warning_v1(item))
+        {
+            3
+        } else {
+            0
+        },
         msg_stdout: stdout,
         msg_stderr: stderr,
     }
@@ -3255,7 +3777,10 @@ fn run_single_cycle_v1(
     sink: &mut OneShotSinkV1,
     now_ts: i64,
 ) -> Result<(RunCycleSummaryV1, Vec<String>), RouteResultV1> {
-    let inventory = match discover_device_inventory_v1(Path::new(&cfg.sparx.tenant_root), cfg.ingest.follow_symlinks) {
+    let inventory = match discover_device_inventory_v1(
+        Path::new(&cfg.sparx.tenant_root),
+        cfg.ingest.follow_symlinks,
+    ) {
         Ok(inventory) => inventory,
         Err(e) => {
             return Err(RouteResultV1 {
@@ -3298,6 +3823,8 @@ fn run_single_cycle_v1(
         ..RunCycleSummaryV1::default()
     };
     let mut failures: Vec<String> = Vec::new();
+    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> =
+        BTreeMap::new();
 
     for tenant_id in tenant_ids {
         let inventories = by_tenant.remove(&tenant_id).unwrap_or_default();
@@ -3405,16 +3932,31 @@ fn run_single_cycle_v1(
         let mut sharp_drop_windows = Vec::new();
         let mut source_stream_windows = Vec::new();
         for inventory in &inventories_sorted {
-            match process_device_oneshot_v1(runtime, cfg, inventory, None, None, source_stream_enabled, sink, &mut tenant_recovery_metrics_cache, now_ts) {
+            match process_device_oneshot_v1(
+                runtime,
+                cfg,
+                inventory,
+                None,
+                None,
+                source_stream_enabled,
+                sink,
+                &mut tenant_recovery_metrics_cache,
+                now_ts,
+            ) {
                 Ok(device_result) => {
                     summary.devices_processed = summary.devices_processed.saturating_add(1);
-                    summary.alerts_emitted = summary.alerts_emitted.saturating_add(device_result.alerts_emitted);
+                    summary.alerts_emitted = summary
+                        .alerts_emitted
+                        .saturating_add(device_result.alerts_emitted);
                     sharp_drop_windows.extend(device_result.sharp_drop_windows);
                     source_stream_windows.extend(device_result.source_stream_windows);
                 }
                 Err(e) => {
                     summary.devices_failed = summary.devices_failed.saturating_add(1);
-                    failures.push(format!("{}/{}: {}", inventory.device.tenant_id, inventory.device.device_dir_rel, e));
+                    failures.push(format!(
+                        "{}/{}: {}",
+                        inventory.device.tenant_id, inventory.device.device_dir_rel, e
+                    ));
                 }
             }
         }
@@ -3465,7 +4007,11 @@ fn ensure_run_global_schema_mode_v1(
         MigrateModeV1::Off => {
             let global = runtime.read_global_schema_state_v1()?;
             match global {
-                Some(state) if state.version == crate::runtime::GLOBAL_SCHEMA_VERSION_CURRENT_V1 => Ok(()),
+                Some(state)
+                    if state.version == crate::runtime::GLOBAL_SCHEMA_VERSION_CURRENT_V1 =>
+                {
+                    Ok(())
+                }
                 Some(state) => Err(DbErrorV1::new_v1(format!(
                     "global schema version {} does not match required {} with --migrate off",
                     state.version,
@@ -3499,9 +4045,14 @@ fn ensure_run_tenant_schema_mode_v1(
             }
         }
         MigrateModeV1::Off => {
-            let tenant_schema = runtime.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
+            let tenant_schema =
+                runtime.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
             match tenant_schema {
-                Some(state) if state.version == crate::runtime::TENANT_SCHEMA_VERSION_CURRENT_V1 => Ok(()),
+                Some(state)
+                    if state.version == crate::runtime::TENANT_SCHEMA_VERSION_CURRENT_V1 =>
+                {
+                    Ok(())
+                }
                 Some(state) => Err(DbErrorV1::new_v1(format!(
                     "tenant schema version {} does not match required {} with --migrate off",
                     state.version,
@@ -3540,7 +4091,6 @@ fn ensure_tenant_record_for_run_v1(
     Ok(record)
 }
 
-
 fn route_oneshot_v1(
     cfg: &ConfigV1,
     tenant_id: &str,
@@ -3574,7 +4124,15 @@ fn route_oneshot_v1(
         };
     }
 
-    let result = run_oneshot_inner_v1(&mut runtime, cfg, tenant_id, since, until, device_path, migrate);
+    let result = run_oneshot_inner_v1(
+        &mut runtime,
+        cfg,
+        tenant_id,
+        since,
+        until,
+        device_path,
+        migrate,
+    );
     let _ = runtime.mark_process_end_v1(current_unix_ts_v1(), result.exit_code);
     result
 }
@@ -3653,7 +4211,8 @@ fn run_oneshot_inner_v1(
         }
     };
     let mut last_sink_counters = sink.spool_counters_snapshot_v1();
-    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> = BTreeMap::new();
+    let mut tenant_recovery_metrics_cache: BTreeMap<String, TenantRecoveryMetricsTotalsV1> =
+        BTreeMap::new();
 
     if sink.supports_recovery_v1() {
         let pre_replay_ts = current_unix_ts_v1();
@@ -3669,102 +4228,111 @@ fn run_oneshot_inner_v1(
         }
 
         match sink.replay_automated_v1(pre_replay_ts, automated_replay_max_files) {
-        Ok(Some(report)) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(
-                runtime,
-                pre_replay_ts,
-                report.replayed_paths.len() as u64,
-                report.failed_paths.len() as u64,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Ok(Some(report)) => {
+                if let Err(e) = persist_last_automated_replay_summary_v1(
+                    runtime,
+                    pre_replay_ts,
+                    report.replayed_paths.len() as u64,
+                    report.failed_paths.len() as u64,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                    runtime,
+                    &mut tenant_recovery_metrics_cache,
+                    &report,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Some(warning) = format_automated_spool_replay_warning_v1(
+                    "oneshot-pre",
+                    &report,
+                    automated_replay_max_files,
+                ) {
+                    warnings.push(warning);
+                }
             }
-            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Ok(None) => {
+                if let Err(e) =
+                    persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
             }
-            if let Err(e) = persist_tenant_recovery_replay_report_v1(
-                runtime,
-                &mut tenant_recovery_metrics_cache,
-                &report,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Err(e) => {
+                if let Err(db_err) =
+                    persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) =
+                    persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                warnings.push(format!(
+                    "automated spool replay warning: scope=oneshot-pre error={}",
+                    e
+                ));
             }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-            if let Some(warning) = format_automated_spool_replay_warning_v1(
-                "oneshot-pre",
-                &report,
-                automated_replay_max_files,
-            ) {
-                warnings.push(warning);
-            }
-        }
-        Ok(None) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-        }
-        Err(e) => {
-            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, pre_replay_ts, 0, 0) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, pre_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            warnings.push(format!("automated spool replay warning: scope=oneshot-pre error={}", e));
-        }
         }
     }
 
@@ -3787,14 +4355,27 @@ fn run_oneshot_inner_v1(
     let mut sharp_drop_windows = Vec::new();
     let mut source_stream_windows = Vec::new();
     for inventory in &inventories {
-        match process_device_oneshot_v1(runtime, cfg, inventory, since, until, source_stream_enabled, &mut sink, &mut tenant_recovery_metrics_cache, now_ts) {
+        match process_device_oneshot_v1(
+            runtime,
+            cfg,
+            inventory,
+            since,
+            until,
+            source_stream_enabled,
+            &mut sink,
+            &mut tenant_recovery_metrics_cache,
+            now_ts,
+        ) {
             Ok(device_result) => {
                 total_alerts = total_alerts.saturating_add(device_result.alerts_emitted);
                 sharp_drop_windows.extend(device_result.sharp_drop_windows);
                 source_stream_windows.extend(device_result.source_stream_windows);
             }
             Err(e) => {
-                failed_devices.push(format!("{}/{}: {}", inventory.device.tenant_id, inventory.device.device_dir_rel, e));
+                failed_devices.push(format!(
+                    "{}/{}: {}",
+                    inventory.device.tenant_id, inventory.device.device_dir_rel, e
+                ));
             }
         }
     }
@@ -3859,102 +4440,111 @@ fn run_oneshot_inner_v1(
         }
 
         match sink.replay_automated_v1(post_replay_ts, automated_replay_max_files) {
-        Ok(Some(report)) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(
-                runtime,
-                post_replay_ts,
-                report.replayed_paths.len() as u64,
-                report.failed_paths.len() as u64,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Ok(Some(report)) => {
+                if let Err(e) = persist_last_automated_replay_summary_v1(
+                    runtime,
+                    post_replay_ts,
+                    report.replayed_paths.len() as u64,
+                    report.failed_paths.len() as u64,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_tenant_recovery_replay_report_v1(
+                    runtime,
+                    &mut tenant_recovery_metrics_cache,
+                    &report,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Some(warning) = format_automated_spool_replay_warning_v1(
+                    "oneshot-post",
+                    &report,
+                    automated_replay_max_files,
+                ) {
+                    warnings.push(warning);
+                }
             }
-            if let Err(e) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Ok(None) => {
+                if let Err(e) =
+                    persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
+                if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
+                    };
+                }
             }
-            if let Err(e) = persist_tenant_recovery_replay_report_v1(
-                runtime,
-                &mut tenant_recovery_metrics_cache,
-                &report,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
+            Err(e) => {
+                if let Err(db_err) =
+                    persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
+                    runtime,
+                    &sink,
+                    &mut recovery_totals,
+                    &mut last_sink_counters,
+                ) {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                if let Err(db_err) =
+                    persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts)
+                {
+                    return RouteResultV1 {
+                        exit_code: 4,
+                        msg_stdout: None,
+                        msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
+                    };
+                }
+                warnings.push(format!(
+                    "automated spool replay warning: scope=oneshot-post error={}",
+                    e
+                ));
             }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-            if let Some(warning) = format_automated_spool_replay_warning_v1(
-                "oneshot-post",
-                &report,
-                automated_replay_max_files,
-            ) {
-                warnings.push(warning);
-            }
-        }
-        Ok(None) => {
-            if let Err(e) = persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-            if let Err(e) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", e)),
-                };
-            }
-        }
-        Err(e) => {
-            if let Err(db_err) = persist_last_automated_replay_summary_v1(runtime, post_replay_ts, 0, 0) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_counter_delta_from_sink_v1(
-                runtime,
-                &sink,
-                &mut recovery_totals,
-                &mut last_sink_counters,
-            ) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            if let Err(db_err) = persist_recovery_backlog_snapshot_v1(cfg, runtime, post_replay_ts) {
-                return RouteResultV1 {
-                    exit_code: 4,
-                    msg_stdout: None,
-                    msg_stderr: Some(format!("oneshot recovery metrics error: {}", db_err)),
-                };
-            }
-            warnings.push(format!("automated spool replay warning: scope=oneshot-post error={}", e));
-        }
         }
     }
 
@@ -4000,10 +4590,15 @@ alerts_emitted: {}
     } else {
         let mut s = String::new();
         if !failed_devices.is_empty() {
-            s.push_str("oneshot partial failure
-");
-            s.push_str(&format!("tenant_id: {}
-", tenant_id));
+            s.push_str(
+                "oneshot partial failure
+",
+            );
+            s.push_str(&format!(
+                "tenant_id: {}
+",
+                tenant_id
+            ));
             for item in &failed_devices {
                 s.push_str("- ");
                 s.push_str(item);
@@ -4079,7 +4674,8 @@ fn ensure_oneshot_schema_mode_v1(
         MigrateModeV1::Off => {
             let global = runtime.read_global_schema_state_v1()?;
             match global {
-                Some(state) if state.version == crate::runtime::GLOBAL_SCHEMA_VERSION_CURRENT_V1 => {}
+                Some(state)
+                    if state.version == crate::runtime::GLOBAL_SCHEMA_VERSION_CURRENT_V1 => {}
                 Some(state) => {
                     return Err(DbErrorV1::new_v1(format!(
                         "global schema version {} does not match required {} with --migrate off",
@@ -4094,9 +4690,14 @@ fn ensure_oneshot_schema_mode_v1(
                 }
             }
 
-            let tenant_schema = runtime.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
+            let tenant_schema =
+                runtime.with_tenant_db_v1(tenant_id, now_ts, |db| db.read_schema_state_v1())?;
             match tenant_schema {
-                Some(state) if state.version == crate::runtime::TENANT_SCHEMA_VERSION_CURRENT_V1 => Ok(()),
+                Some(state)
+                    if state.version == crate::runtime::TENANT_SCHEMA_VERSION_CURRENT_V1 =>
+                {
+                    Ok(())
+                }
                 Some(state) => Err(DbErrorV1::new_v1(format!(
                     "tenant schema version {} does not match required {} with --migrate off",
                     state.version,
@@ -4116,13 +4717,11 @@ fn build_oneshot_inventory_v1(
     device_path: Option<&str>,
 ) -> Result<Vec<crate::ingest::DeviceInventoryV1>, std::io::Error> {
     let watch_root = Path::new(&cfg.sparx.tenant_root);
-    let mut inventories: Vec<crate::ingest::DeviceInventoryV1> = discover_device_inventory_v1(
-        watch_root,
-        cfg.ingest.follow_symlinks,
-    )?
-    .into_iter()
-    .filter(|inventory| inventory.device.tenant_id == tenant_id)
-    .collect();
+    let mut inventories: Vec<crate::ingest::DeviceInventoryV1> =
+        discover_device_inventory_v1(watch_root, cfg.ingest.follow_symlinks)?
+            .into_iter()
+            .filter(|inventory| inventory.device.tenant_id == tenant_id)
+            .collect();
 
     if let Some(device_path) = device_path {
         inventories.retain(|inventory| inventory.device.device_dir_rel == device_path);
@@ -4163,20 +4762,26 @@ fn process_device_oneshot_v1(
         centroid_alpha: 0.5,
         centroid_cap: 10_000,
     };
-    let mut alert_cfg = AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
+    let mut alert_cfg =
+        AlertScoringConfigV1::from_sections_v1(&cfg.scoring, cfg.ingest.window_size_s);
     alert_cfg.include_debug_fields = cfg.output.include_debug_fields;
 
     let tenant_id = inventory.device.tenant_id.clone();
     let device = &inventory.device;
 
     let mut dict = runtime
-        .with_tenant_db_v1(&tenant_id, now_ts, |db| load_dict_from_tenant_db_v1(db, dict_cfg.clone()))
+        .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+            load_dict_from_tenant_db_v1(db, dict_cfg.clone())
+        })
         .map_err(|e| e.to_string())?;
     let mut acc = runtime
-        .with_tenant_db_v1(&tenant_id, now_ts, |db| restore_active_window_from_tenant_db_v1(db, &device.device_key, caps.clone(), &dict))
+        .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+            restore_active_window_from_tenant_db_v1(db, &device.device_key, caps.clone(), &dict)
+        })
         .map_err(|e| e.to_string())?;
     let mut active_spans: Vec<ActiveSpanStateV1> = Vec::new();
-    let mut active_source_streams: BTreeMap<String, SourceStreamActiveObservationV1> = BTreeMap::new();
+    let mut active_source_streams: BTreeMap<String, SourceStreamActiveObservationV1> =
+        BTreeMap::new();
     let mut result = ProcessDeviceResultV1::default();
     let mut ordered_files = inventory.files.clone();
     ordered_files.sort_by(|a, b| {
@@ -4191,42 +4796,49 @@ fn process_device_oneshot_v1(
             .join(&device.tenant_id)
             .join(&device.device_dir_rel)
             .join(&file.file_rel);
-        let observed = observed_file_state_for_path_v1(&file_path, file.is_gzip).map_err(|e| e.to_string())?;
+        let observed =
+            observed_file_state_for_path_v1(&file_path, file.is_gzip).map_err(|e| e.to_string())?;
         let previous_cursor = runtime
-            .with_tenant_db_v1(&tenant_id, now_ts, |db| db.read_cursor_v1(&device.device_key, &file.file_key))
+            .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+                db.read_cursor_v1(&device.device_key, &file.file_key)
+            })
             .map_err(|e| e.to_string())?;
         let cursor_plan = reconcile_cursor_v1(previous_cursor.as_ref(), &observed);
         let mut cursor = cursor_plan.cursor.clone();
         runtime
-            .with_tenant_db_v1(&tenant_id, now_ts, |db| db.write_cursor_v1(&device.device_key, &file.file_key, &cursor))
+            .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+                db.write_cursor_v1(&device.device_key, &file.file_key, &cursor)
+            })
             .map_err(|e| e.to_string())?;
         if !cursor_plan.should_read {
             continue;
         }
-        result.alerts_emitted = result.alerts_emitted.saturating_add(process_file_oneshot_v1(
-            runtime,
-            cfg,
-            &mut dict,
-            &mut acc,
-            &mut active_spans,
-            &mut active_source_streams,
-            &mut result.sharp_drop_windows,
-            &mut result.source_stream_windows,
-            &mut cursor,
-            sink,
-            tenant_recovery_metrics_cache,
-            device,
-            file,
-            &file_path,
-            &cursor_plan,
-            since,
-            until,
-            source_stream_enabled,
-            &df_cfg,
-            &centroid_cfg,
-            &alert_cfg,
-            now_ts,
-        )?);
+        result.alerts_emitted = result
+            .alerts_emitted
+            .saturating_add(process_file_oneshot_v1(
+                runtime,
+                cfg,
+                &mut dict,
+                &mut acc,
+                &mut active_spans,
+                &mut active_source_streams,
+                &mut result.sharp_drop_windows,
+                &mut result.source_stream_windows,
+                &mut cursor,
+                sink,
+                tenant_recovery_metrics_cache,
+                device,
+                file,
+                &file_path,
+                &cursor_plan,
+                since,
+                until,
+                source_stream_enabled,
+                &df_cfg,
+                &centroid_cfg,
+                &alert_cfg,
+                now_ts,
+            )?);
     }
 
     if let Some(acc_final) = acc.take() {
@@ -4249,13 +4861,25 @@ fn process_device_oneshot_v1(
                 )
             })
             .map_err(|e| e.to_string())?;
-        persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &finalize_result.emit_outcome)
-            .map_err(|e| e.to_string())?;
-        result.alerts_emitted = result.alerts_emitted.saturating_add(finalize_result.alerts_emitted);
-        result.sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
-        result.source_stream_windows.extend(finalize_result.source_stream_windows);
+        persist_tenant_recovery_emit_outcome_v1(
+            runtime,
+            tenant_recovery_metrics_cache,
+            &finalize_result.emit_outcome,
+        )
+        .map_err(|e| e.to_string())?;
+        result.alerts_emitted = result
+            .alerts_emitted
+            .saturating_add(finalize_result.alerts_emitted);
+        result
+            .sharp_drop_windows
+            .extend(finalize_result.sharp_drop_windows);
+        result
+            .source_stream_windows
+            .extend(finalize_result.source_stream_windows);
         runtime
-            .with_tenant_db_v1(&tenant_id, now_ts, |db| apply_window_finalize_mutations_to_db_v1(db, &finalized.mutations))
+            .with_tenant_db_v1(&tenant_id, now_ts, |db| {
+                apply_window_finalize_mutations_to_db_v1(db, &finalized.mutations)
+            })
             .map_err(|e| e.to_string())?;
     }
 
@@ -4290,11 +4914,20 @@ fn process_file_oneshot_v1(
     let reader_chunk_bytes = if file.is_gzip {
         1
     } else {
-        usize::try_from(cfg.ingest.read_chunk_bytes).unwrap_or(usize::MAX).max(1)
+        usize::try_from(cfg.ingest.read_chunk_bytes)
+            .unwrap_or(usize::MAX)
+            .max(1)
     };
-    let mut reader = open_file_reader_v1(file_path, file.is_gzip, cursor_plan.start_offset, reader_chunk_bytes)
-        .map_err(|e| format!("open file reader failed: {}", e))?;
-    let max_line_bytes = usize::try_from(cfg.ingest.max_line_len).unwrap_or(usize::MAX).max(1);
+    let mut reader = open_file_reader_v1(
+        file_path,
+        file.is_gzip,
+        cursor_plan.start_offset,
+        reader_chunk_bytes,
+    )
+    .map_err(|e| format!("open file reader failed: {}", e))?;
+    let max_line_bytes = usize::try_from(cfg.ingest.max_line_len)
+        .unwrap_or(usize::MAX)
+        .max(1);
     // Keep malformed or delimiter-free input bounded. The first capped slice is
     // processed, then the rest of the physical line is skipped until newline.
     let mut line_buf = Vec::new();
@@ -4304,7 +4937,9 @@ fn process_file_oneshot_v1(
     let mut alerts_emitted = 0usize;
 
     loop {
-        let chunk = reader.read_chunk_v1().map_err(|e| format!("read file chunk failed: {}", e))?;
+        let chunk = reader
+            .read_chunk_v1()
+            .map_err(|e| format!("read file chunk failed: {}", e))?;
         let Some(chunk) = chunk else {
             if !line_buf.is_empty() {
                 let line_end = current_offset;
@@ -4343,7 +4978,10 @@ fn process_file_oneshot_v1(
             let byte_end = if file.is_gzip {
                 chunk.offset_end
             } else {
-                chunk.offset_start.saturating_add(idx as u64).saturating_add(1)
+                chunk
+                    .offset_start
+                    .saturating_add(idx as u64)
+                    .saturating_add(1)
             };
 
             if dropping_overlong_line {
@@ -4397,7 +5035,9 @@ fn process_file_oneshot_v1(
     if final_offset > cursor.offset {
         *cursor = apply_cursor_read_progress_v1(cursor, final_offset, cursor.last_read_ts);
         runtime
-            .with_tenant_db_v1(&device.tenant_id, now_ts, |db| db.write_cursor_v1(&device.device_key, &file.file_key, cursor))
+            .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
+            })
             .map_err(|e| e.to_string())?;
     }
     Ok(alerts_emitted)
@@ -4492,7 +5132,9 @@ fn process_line_oneshot_v1(
     if since.map(|v| line_ts < v).unwrap_or(false) || until.map(|v| line_ts > v).unwrap_or(false) {
         *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
         runtime
-            .with_tenant_db_v1(&device.tenant_id, now_ts, |db| db.write_cursor_v1(&device.device_key, &file.file_key, cursor))
+            .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
+            })
             .map_err(|e| e.to_string())?;
         return Ok(0);
     }
@@ -4521,14 +5163,25 @@ fn process_line_oneshot_v1(
             .as_mut()
             .ok_or_else(|| "window accumulator missing after initialization".to_string())?;
         let result = acc
-            .apply_line_v1(line_ts, line_ts, usize::try_from(byte_len).unwrap_or(usize::MAX), &emitted, dict)
+            .apply_line_v1(
+                line_ts,
+                line_ts,
+                usize::try_from(byte_len).unwrap_or(usize::MAX),
+                &emitted,
+                dict,
+            )
             .map_err(|e| format!("apply line failed: {:?}", e))?;
         match result {
             WindowApplyLineResultV1::Applied(applied) => {
                 runtime
                     .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
                         apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
-                        apply_window_checkpoint_writes_to_db_v1(db, &acc.checkpoint_writes_v1().map_err(|e| DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e)))?)
+                        apply_window_checkpoint_writes_to_db_v1(
+                            db,
+                            &acc.checkpoint_writes_v1().map_err(|e| {
+                                DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
+                            })?,
+                        )
                     })
                     .map_err(|e| e.to_string())?;
                 update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
@@ -4545,11 +5198,15 @@ fn process_line_oneshot_v1(
                 }
                 *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
                 runtime
-                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| db.write_cursor_v1(&device.device_key, &file.file_key, cursor))
+                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                        db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
+                    })
                     .map_err(|e| e.to_string())?;
                 return Ok(0);
             }
-            WindowApplyLineResultV1::DifferentWindow { line_window_start_ts } => {
+            WindowApplyLineResultV1::DifferentWindow {
+                line_window_start_ts,
+            } => {
                 let (plan, next) = acc
                     .finalize_and_advance_v1(line_window_start_ts, line_ts)
                     .map_err(|e| format!("finalize and advance failed: {:?}", e))?;
@@ -4574,38 +5231,44 @@ fn process_line_oneshot_v1(
                         Ok(finalize_result)
                     })
                     .map_err(|e| e.to_string())?;
-                persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &finalize_result.emit_outcome)
-                    .map_err(|e| e.to_string())?;
+                persist_tenant_recovery_emit_outcome_v1(
+                    runtime,
+                    tenant_recovery_metrics_cache,
+                    &finalize_result.emit_outcome,
+                )
+                .map_err(|e| e.to_string())?;
                 let finalized_alerts_emitted = finalize_result.alerts_emitted;
                 sharp_drop_windows.extend(finalize_result.sharp_drop_windows);
                 source_stream_windows.extend(finalize_result.source_stream_windows);
                 *acc_opt = Some(next);
-                return Ok(finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
-                    runtime,
-                    cfg,
-                    dict,
-                    acc_opt,
-                    active_spans,
-                    active_source_streams,
-                    sharp_drop_windows,
-                    source_stream_windows,
-                    cursor,
-                    sink,
-                    tenant_recovery_metrics_cache,
-                    device,
-                    file,
-                    line,
-                    offset_start,
-                    offset_end,
-                    byte_len,
-                    since,
-                    until,
-                    source_stream_enabled,
-                    df_cfg,
-                    centroid_cfg,
-                    alert_cfg,
-                    now_ts,
-                )?));
+                return Ok(
+                    finalized_alerts_emitted.saturating_add(process_line_oneshot_v1(
+                        runtime,
+                        cfg,
+                        dict,
+                        acc_opt,
+                        active_spans,
+                        active_source_streams,
+                        sharp_drop_windows,
+                        source_stream_windows,
+                        cursor,
+                        sink,
+                        tenant_recovery_metrics_cache,
+                        device,
+                        file,
+                        line,
+                        offset_start,
+                        offset_end,
+                        byte_len,
+                        since,
+                        until,
+                        source_stream_enabled,
+                        df_cfg,
+                        centroid_cfg,
+                        alert_cfg,
+                        now_ts,
+                    )?),
+                );
             }
         }
     }
@@ -4626,7 +5289,8 @@ fn finalize_window_oneshot_v1(
     centroid_cfg: &CentroidStatsConfigV1,
     alert_cfg: &AlertScoringConfigV1,
 ) -> Result<FinalizeWindowEmitResultV1, DbErrorV1> {
-    let baseline_before = build_bucket_baseline_from_tenant_db_v1(db, &device.device_key, row.key.bucket, df_cfg)?;
+    let baseline_before =
+        build_bucket_baseline_from_tenant_db_v1(db, &device.device_key, row.key.bucket, df_cfg)?;
     let current_stats = db
         .read_device_baseline_state_v1(&device.device_key, row.key.bucket)?
         .and_then(|state| state.stats);
@@ -4652,7 +5316,9 @@ fn finalize_window_oneshot_v1(
         observed_lines_u64: u64::from(row.meta.lines),
         observed_bytes_u64: row.meta.bytes,
         bucket_u8: row.key.bucket,
-        expected: current_stats.as_ref().map(sharp_drop_expected_volume_from_device_stats_v1),
+        expected: current_stats
+            .as_ref()
+            .map(sharp_drop_expected_volume_from_device_stats_v1),
         provenance: spans.clone(),
     }];
 
@@ -4668,11 +5334,18 @@ fn finalize_window_oneshot_v1(
     )
     .map_err(|e| DbErrorV1::new_v1(format!("build alert failed: {:?}", e)))?;
 
-    let df_plan = plan_df_ring_update_v1(&row, df_cfg, &df_meta, &current_slot_bucket, &stale_slot_keys)
-        .map_err(|e| DbErrorV1::new_v1(format!("df update failed: {:?}", e)))?;
+    let df_plan = plan_df_ring_update_v1(
+        &row,
+        df_cfg,
+        &df_meta,
+        &current_slot_bucket,
+        &stale_slot_keys,
+    )
+    .map_err(|e| DbErrorV1::new_v1(format!("df update failed: {:?}", e)))?;
     apply_df_mutations_to_db_v1(db, &df_plan.mutations)?;
 
-    let centroid_pairs_before = load_centroid_pairs_from_tenant_db_v1(db, &device.device_key, row.key.bucket)?;
+    let centroid_pairs_before =
+        load_centroid_pairs_from_tenant_db_v1(db, &device.device_key, row.key.bucket)?;
     let centroid_plan = plan_centroid_stats_update_v1(
         &row,
         dict,
@@ -4684,7 +5357,11 @@ fn finalize_window_oneshot_v1(
     )
     .map_err(|e| DbErrorV1::new_v1(format!("centroid update failed: {:?}", e)))?;
     apply_centroid_mutations_to_db_v1(db, &centroid_plan.mutations)?;
-    update_expected_source_states_from_finalized_window_v1(db, &row, alert_cfg.min_lines_per_window)?;
+    update_expected_source_states_from_finalized_window_v1(
+        db,
+        &row,
+        alert_cfg.min_lines_per_window,
+    )?;
     let source_stream_windows = if source_stream_enabled {
         update_source_stream_states_from_finalized_window_v1(
             db,
@@ -4727,7 +5404,9 @@ fn update_expected_source_states_from_finalized_window_v1(
         .window_end_ts
         .checked_sub(row.key.window_start_ts)
         .and_then(|v| u32::try_from(v).ok())
-        .ok_or_else(|| DbErrorV1::new_v1("expected-source state update invalid finalized window bounds"))?;
+        .ok_or_else(|| {
+            DbErrorV1::new_v1("expected-source state update invalid finalized window bounds")
+        })?;
     let update_common = |subject_kind_u8| ExpectedSourceStateUpdateV1 {
         subject_kind_u8,
         window_size_s_u32: window_size,
@@ -4749,7 +5428,6 @@ fn update_expected_source_states_from_finalized_window_v1(
     Ok(())
 }
 
-
 fn update_source_stream_states_from_finalized_window_v1(
     db: &crate::db::TenantDbV1,
     row: &crate::window::FinalizedWindowRowV1,
@@ -4761,7 +5439,9 @@ fn update_source_stream_states_from_finalized_window_v1(
         .window_end_ts
         .checked_sub(row.key.window_start_ts)
         .and_then(|v| u32::try_from(v).ok())
-        .ok_or_else(|| DbErrorV1::new_v1("source-stream state update invalid finalized window bounds"))?;
+        .ok_or_else(|| {
+            DbErrorV1::new_v1("source-stream state update invalid finalized window bounds")
+        })?;
     let mut windows = Vec::with_capacity(observations.len());
 
     for observation in observations {
@@ -4772,8 +5452,9 @@ fn update_source_stream_states_from_finalized_window_v1(
         )?;
         let expected = match previous_stats.as_ref() {
             Some(stats) => Some(
-                sharp_drop_expected_volume_from_source_stream_stats_v1(stats)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected volume failed: {:?}", e)))?,
+                sharp_drop_expected_volume_from_source_stream_stats_v1(stats).map_err(|e| {
+                    DbErrorV1::new_v1(format!("source-stream expected volume failed: {:?}", e))
+                })?,
             ),
             None => None,
         };
@@ -4889,7 +5570,8 @@ fn close_open_silence_state_after_observation_v1(
     if (state.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) == 0 {
         return None;
     }
-    state.state_flags_u8 = (state.state_flags_u8 & !OPEN_SILENCE_FLAG_OPEN_V1) | OPEN_SILENCE_FLAG_CLOSED_V1;
+    state.state_flags_u8 =
+        (state.state_flags_u8 & !OPEN_SILENCE_FLAG_OPEN_V1) | OPEN_SILENCE_FLAG_CLOSED_V1;
     Some(state)
 }
 
@@ -5022,8 +5704,11 @@ fn emit_vdrop_alerts_for_tenant_v1(
         let emit_outcome = sink
             .emit_v1(&alert)
             .map_err(|e| DbErrorV1::new_v1(format!("vdrop sink emit failed: {}", e)))?;
-        let emit_outcome = Some(emit_outcome);
-        persist_tenant_recovery_emit_outcome_v1(runtime, tenant_recovery_metrics_cache, &emit_outcome)?;
+        persist_tenant_recovery_emit_outcome_v1(
+            runtime,
+            tenant_recovery_metrics_cache,
+            &emit_outcome,
+        )?;
         emitted = emitted.saturating_add(1);
     }
     result.diagnostics.alerts_emitted = emitted as u64;
@@ -5062,8 +5747,10 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
         }
         source_stream_device_keys.insert(window.subject.device_key.clone());
     }
-    let device_open_by_key: BTreeMap<String, OpenSilenceStateV1> = device_open_states.into_iter().collect();
-    let mut device_open_drop_by_key: BTreeMap<String, OpenDropStateV1> = device_open_drop_states.into_iter().collect();
+    let device_open_by_key: BTreeMap<String, OpenSilenceStateV1> =
+        device_open_states.into_iter().collect();
+    let mut device_open_drop_by_key: BTreeMap<String, OpenDropStateV1> =
+        device_open_drop_states.into_iter().collect();
     let tenant_state = db.read_tenant_expected_source_state_v1()?;
     let tenant_open = db.read_tenant_open_silence_state_v1()?;
     let mut tenant_open_drop = db.read_tenant_open_drop_state_v1()?;
@@ -5075,14 +5762,16 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
         .count() as u64;
     if device_filter_key.is_none() {
         if tenant_state.is_some() {
-            result.diagnostics.tracked_subjects = result.diagnostics.tracked_subjects.saturating_add(1);
+            result.diagnostics.tracked_subjects =
+                result.diagnostics.tracked_subjects.saturating_add(1);
         }
         if tenant_open
             .as_ref()
             .map(open_silence_state_is_open_v1)
             .unwrap_or(false)
         {
-            result.diagnostics.open_silence_subjects = result.diagnostics.open_silence_subjects.saturating_add(1);
+            result.diagnostics.open_silence_subjects =
+                result.diagnostics.open_silence_subjects.saturating_add(1);
         }
     }
 
@@ -5091,7 +5780,8 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
 
     if policy.device_enabled {
         for (device_key, state) in device_states {
-            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            result.diagnostics.evaluated_subjects =
+                result.diagnostics.evaluated_subjects.saturating_add(1);
             match evaluate_vdrop_candidate_v1(
                 tenant_id,
                 &device_key,
@@ -5101,8 +5791,9 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
             ) {
                 VDropEvaluationV1::Candidate(candidate) => {
                     result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
-                    let built = build_vdrop_alert_v1(&candidate)
-                        .map_err(|e| DbErrorV1::new_v1(format!("vdrop alert build failed: {:?}", e)))?;
+                    let built = build_vdrop_alert_v1(&candidate).map_err(|e| {
+                        DbErrorV1::new_v1(format!("vdrop alert build failed: {:?}", e))
+                    })?;
                     db.write_primary_alert_v1(&built.alert)?;
                     db.write_device_open_silence_state_v1(&device_key, &built.open_silence)?;
                     if let Some(open_drop) = device_open_drop_by_key.get(&device_key).cloned() {
@@ -5118,14 +5809,16 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
                     result.alerts.push(built.alert);
                 }
                 VDropEvaluationV1::Suppressed(_) => {
-                    result.diagnostics.suppressed_candidates = result.diagnostics.suppressed_candidates.saturating_add(1);
+                    result.diagnostics.suppressed_candidates =
+                        result.diagnostics.suppressed_candidates.saturating_add(1);
                 }
             }
         }
     }
 
     if policy.tenant_enabled && device_filter_key.is_none() {
-        result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+        result.diagnostics.evaluated_subjects =
+            result.diagnostics.evaluated_subjects.saturating_add(1);
         match evaluate_vdrop_candidate_v1(
             tenant_id,
             tenant_id,
@@ -5152,7 +5845,8 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
                 result.alerts.push(built.alert);
             }
             VDropEvaluationV1::Suppressed(_) => {
-                result.diagnostics.suppressed_candidates = result.diagnostics.suppressed_candidates.saturating_add(1);
+                result.diagnostics.suppressed_candidates =
+                    result.diagnostics.suppressed_candidates.saturating_add(1);
             }
         }
     }
@@ -5180,7 +5874,8 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
             .map(open_drop_state_is_open_v1)
             .unwrap_or(false)
     {
-        result.diagnostics.open_drop_subjects = result.diagnostics.open_drop_subjects.saturating_add(1);
+        result.diagnostics.open_drop_subjects =
+            result.diagnostics.open_drop_subjects.saturating_add(1);
     }
 
     collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
@@ -5196,8 +5891,6 @@ fn collect_and_persist_vdrop_alerts_for_tenant_db_v1(
 
     Ok(result)
 }
-
-
 
 fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
     db: &crate::db::TenantDbV1,
@@ -5239,7 +5932,10 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
             .values()
             .filter(|state| open_silence_state_is_open_v1(state))
             .count() as u64;
-        result.diagnostics.tracked_subjects = result.diagnostics.tracked_subjects.saturating_add(tracked_source_streams);
+        result.diagnostics.tracked_subjects = result
+            .diagnostics
+            .tracked_subjects
+            .saturating_add(tracked_source_streams);
         result.diagnostics.source_stream_tracked_subjects = result
             .diagnostics
             .source_stream_tracked_subjects
@@ -5268,30 +5964,56 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
                 canonical_source_path: catalog.canonical_source_path.clone(),
             };
 
-            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
-            result.diagnostics.source_stream_evaluated_subjects =
-                result.diagnostics.source_stream_evaluated_subjects.saturating_add(1);
+            result.diagnostics.evaluated_subjects =
+                result.diagnostics.evaluated_subjects.saturating_add(1);
+            result.diagnostics.source_stream_evaluated_subjects = result
+                .diagnostics
+                .source_stream_evaluated_subjects
+                .saturating_add(1);
             match evaluate_source_stream_hard_silence_candidate_v1(
                 &subject,
                 Some(&state),
                 open_silence_by_id.get(&source_stream_id),
                 eval_cfg,
             )
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream hard-silence evaluation failed: {:?}", e)))?
-            {
+            .map_err(|e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream hard-silence evaluation failed: {:?}",
+                    e
+                ))
+            })? {
                 VDropEvaluationV1::Candidate(candidate) => {
                     result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
-                    result.diagnostics.source_stream_candidates =
-                        result.diagnostics.source_stream_candidates.saturating_add(1);
-                    let built = build_source_stream_vdrop_alert_v1(&subject, &candidate)
-                        .map_err(|e| DbErrorV1::new_v1(format!("source-stream vdrop alert build failed: {:?}", e)))?;
+                    result.diagnostics.source_stream_candidates = result
+                        .diagnostics
+                        .source_stream_candidates
+                        .saturating_add(1);
+                    let built =
+                        build_source_stream_vdrop_alert_v1(&subject, &candidate).map_err(|e| {
+                            DbErrorV1::new_v1(format!(
+                                "source-stream vdrop alert build failed: {:?}",
+                                e
+                            ))
+                        })?;
                     db.write_primary_alert_v1(&built.alert)?;
-                    db.write_source_stream_open_silence_state_v1(device_key, &source_stream_id, &built.open_silence)?;
-                    if let Some(open_drop) = open_drop_by_key.get(&(device_key.clone(), source_stream_id.clone())).cloned() {
+                    db.write_source_stream_open_silence_state_v1(
+                        device_key,
+                        &source_stream_id,
+                        &built.open_silence,
+                    )?;
+                    if let Some(open_drop) = open_drop_by_key
+                        .get(&(device_key.clone(), source_stream_id.clone()))
+                        .cloned()
+                    {
                         if open_drop_state_is_open_v1(&open_drop) {
                             let closed = close_open_drop_state_by_hard_silence_v1(&open_drop);
-                            db.write_source_stream_open_drop_state_v1(device_key, &source_stream_id, &closed)?;
-                            open_drop_by_key.insert((device_key.clone(), source_stream_id.clone()), closed);
+                            db.write_source_stream_open_drop_state_v1(
+                                device_key,
+                                &source_stream_id,
+                                &closed,
+                            )?;
+                            open_drop_by_key
+                                .insert((device_key.clone(), source_stream_id.clone()), closed);
                         }
                     }
                     hard_silence_keys.insert((device_key.clone(), source_stream_id.clone()));
@@ -5301,8 +6023,10 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
                         .diagnostics
                         .source_stream_open_silence_subjects
                         .saturating_add(1);
-                    result.diagnostics.source_stream_alerts_emitted =
-                        result.diagnostics.source_stream_alerts_emitted.saturating_add(1);
+                    result.diagnostics.source_stream_alerts_emitted = result
+                        .diagnostics
+                        .source_stream_alerts_emitted
+                        .saturating_add(1);
                     result.alerts.push(built.alert);
                 }
                 VDropEvaluationV1::Suppressed(_) => {
@@ -5336,7 +6060,10 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
         {
             continue;
         }
-        let source_key = (window.subject.device_key.clone(), window.subject.source_stream_id.clone());
+        let source_key = (
+            window.subject.device_key.clone(),
+            window.subject.source_stream_id.clone(),
+        );
         if hard_silence_keys.contains(&source_key) {
             continue;
         }
@@ -5352,23 +6079,36 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
             observed_bytes_u64: window.observed_bytes_u64,
             bucket_u8: window.bucket_u8,
         };
-        result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
-        result.diagnostics.source_stream_evaluated_subjects =
-            result.diagnostics.source_stream_evaluated_subjects.saturating_add(1);
+        result.diagnostics.evaluated_subjects =
+            result.diagnostics.evaluated_subjects.saturating_add(1);
+        result.diagnostics.source_stream_evaluated_subjects = result
+            .diagnostics
+            .source_stream_evaluated_subjects
+            .saturating_add(1);
         match evaluate_source_stream_sharp_drop_candidate_v1(&current, expected, &source_cfg)
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream sharp-drop evaluation failed: {:?}", e)))?
-        {
+            .map_err(|e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream sharp-drop evaluation failed: {:?}",
+                    e
+                ))
+            })? {
             SharpDropEvaluationV1::Candidate(candidate) => {
                 result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
-                result.diagnostics.source_stream_candidates =
-                    result.diagnostics.source_stream_candidates.saturating_add(1);
+                result.diagnostics.source_stream_candidates = result
+                    .diagnostics
+                    .source_stream_candidates
+                    .saturating_add(1);
                 if source_stream_open_drop_state_suppresses_candidate_v1(
                     &window.subject,
                     &candidate,
                     open_drop_by_key.get(&source_key),
                 )
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop suppression failed: {:?}", e)))?
-                {
+                .map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream open-drop suppression failed: {:?}",
+                        e
+                    ))
+                })? {
                     result.diagnostics.suppressed_candidates =
                         result.diagnostics.suppressed_candidates.saturating_add(1);
                     result.diagnostics.source_stream_suppressed_candidates = result
@@ -5377,8 +6117,17 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
                         .saturating_add(1);
                     continue;
                 }
-                let built = build_source_stream_sharp_drop_alert_v1(&window.subject, &candidate, &window.provenance)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream sharp-drop alert build failed: {:?}", e)))?;
+                let built = build_source_stream_sharp_drop_alert_v1(
+                    &window.subject,
+                    &candidate,
+                    &window.provenance,
+                )
+                .map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream sharp-drop alert build failed: {:?}",
+                        e
+                    ))
+                })?;
                 db.write_primary_alert_v1(&built.alert)?;
                 db.write_source_stream_open_drop_state_v1(
                     &window.subject.device_key,
@@ -5386,8 +6135,10 @@ fn collect_and_persist_source_stream_vdrop_alerts_for_tenant_db_v1(
                     &built.open_drop,
                 )?;
                 open_drop_by_key.insert(source_key, built.open_drop);
-                result.diagnostics.source_stream_alerts_emitted =
-                    result.diagnostics.source_stream_alerts_emitted.saturating_add(1);
+                result.diagnostics.source_stream_alerts_emitted = result
+                    .diagnostics
+                    .source_stream_alerts_emitted
+                    .saturating_add(1);
                 result.alerts.push(built.alert);
             }
             SharpDropEvaluationV1::Suppressed(reason) => {
@@ -5468,7 +6219,8 @@ fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
             };
 
             let current = sharp_drop_current_window_for_device_v1(tenant_id, window);
-            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            result.diagnostics.evaluated_subjects =
+                result.diagnostics.evaluated_subjects.saturating_add(1);
             match evaluate_sharp_drop_candidate_v1(&current, expected, &device_cfg) {
                 SharpDropEvaluationV1::Candidate(candidate) => {
                     result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
@@ -5480,8 +6232,10 @@ fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
                             result.diagnostics.suppressed_candidates.saturating_add(1);
                         continue;
                     }
-                    let built = build_sharp_drop_alert_v1(&candidate, &window.provenance)
-                        .map_err(|e| DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e)))?;
+                    let built =
+                        build_sharp_drop_alert_v1(&candidate, &window.provenance).map_err(|e| {
+                            DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e))
+                        })?;
                     db.write_primary_alert_v1(&built.alert)?;
                     db.write_device_open_drop_state_v1(&window.device_key, &built.open_drop)?;
                     device_open_drop_by_key.insert(window.device_key.clone(), built.open_drop);
@@ -5491,7 +6245,9 @@ fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
                     result.diagnostics.suppressed_candidates =
                         result.diagnostics.suppressed_candidates.saturating_add(1);
                     if sharp_drop_suppression_closes_recovery_v1(&reason) {
-                        if let Some(open_drop) = device_open_drop_by_key.get(&window.device_key).cloned() {
+                        if let Some(open_drop) =
+                            device_open_drop_by_key.get(&window.device_key).cloned()
+                        {
                             if open_drop_state_is_open_v1(&open_drop) {
                                 let closed = close_open_drop_state_by_recovery_v1(&open_drop);
                                 db.write_device_open_drop_state_v1(&window.device_key, &closed)?;
@@ -5512,7 +6268,11 @@ fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
                 continue;
             }
             groups
-                .entry((window.window_start_ts_i64, window.window_end_ts_i64, window.bucket_u8))
+                .entry((
+                    window.window_start_ts_i64,
+                    window.window_end_ts_i64,
+                    window.bucket_u8,
+                ))
                 .or_default()
                 .push(window);
         }
@@ -5552,17 +6312,22 @@ fn collect_and_persist_sharp_drop_alerts_for_tenant_db_v1(
                 bucket_u8,
             };
 
-            result.diagnostics.evaluated_subjects = result.diagnostics.evaluated_subjects.saturating_add(1);
+            result.diagnostics.evaluated_subjects =
+                result.diagnostics.evaluated_subjects.saturating_add(1);
             match evaluate_sharp_drop_candidate_v1(&current, &expected, &tenant_cfg) {
                 SharpDropEvaluationV1::Candidate(candidate) => {
                     result.diagnostics.candidates = result.diagnostics.candidates.saturating_add(1);
-                    if open_drop_state_suppresses_candidate_v1(&candidate, tenant_open_drop.as_ref()) {
+                    if open_drop_state_suppresses_candidate_v1(
+                        &candidate,
+                        tenant_open_drop.as_ref(),
+                    ) {
                         result.diagnostics.suppressed_candidates =
                             result.diagnostics.suppressed_candidates.saturating_add(1);
                         continue;
                     }
-                    let built = build_sharp_drop_alert_v1(&candidate, &[])
-                        .map_err(|e| DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e)))?;
+                    let built = build_sharp_drop_alert_v1(&candidate, &[]).map_err(|e| {
+                        DbErrorV1::new_v1(format!("sharp-drop alert build failed: {:?}", e))
+                    })?;
                     db.write_primary_alert_v1(&built.alert)?;
                     db.write_tenant_open_drop_state_v1(&built.open_drop)?;
                     *tenant_open_drop = Some(built.open_drop);
@@ -5617,12 +6382,14 @@ fn open_drop_state_is_open_v1(state: &OpenDropStateV1) -> bool {
     (state.state_flags_u8 & OPEN_DROP_FLAG_OPEN_V1) != 0
 }
 
-
 fn open_silence_state_is_open_v1(state: &OpenSilenceStateV1) -> bool {
     (state.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) != 0
 }
 
-fn observed_file_state_for_path_v1(path: &Path, is_gzip: bool) -> Result<ObservedFileStateV1, std::io::Error> {
+fn observed_file_state_for_path_v1(
+    path: &Path,
+    is_gzip: bool,
+) -> Result<ObservedFileStateV1, std::io::Error> {
     let md = fs::metadata(path)?;
     #[cfg(unix)]
     let inode = {
@@ -5649,39 +6416,47 @@ fn load_dict_from_tenant_db_v1(
     db: &crate::db::TenantDbV1,
     cfg: FeatureDictionaryConfigV1,
 ) -> Result<FeatureDictionaryV1, DbErrorV1> {
-    let next_id_bytes = match db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_next_id_v1().as_bytes())? {
-        Some(bytes) => bytes,
-        None => return Ok(FeatureDictionaryV1::new_empty_v1(cfg, 1, 0)),
-    };
+    let next_id_bytes =
+        match db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_next_id_v1().as_bytes())? {
+            Some(bytes) => bytes,
+            None => return Ok(FeatureDictionaryV1::new_empty_v1(cfg, 1, 0)),
+        };
     let entries = db
         .get_raw_v1(crate::db::keys::key_tenant_feature_dict_entries_v1().as_bytes())?
         .ok_or_else(|| DbErrorV1::new_v1("feature dict missing entries"))?;
-    let last_gc_ts = db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_last_gc_ts_v1().as_bytes())?;
+    let last_gc_ts =
+        db.get_raw_v1(crate::db::keys::key_tenant_feature_dict_last_gc_ts_v1().as_bytes())?;
     let meta = FeatureDictionaryMetaV1 {
-        next_id: decode_feat_dict_meta_next_id_v1(&next_id_bytes)
-            .map_err(|e| DbErrorV1::new_v1(format!("feature dict next_id decode failed: {:?}", e)))?,
-        entries: decode_feat_dict_meta_entries_v1(&entries)
-            .map_err(|e| DbErrorV1::new_v1(format!("feature dict entries decode failed: {:?}", e)))?,
+        next_id: decode_feat_dict_meta_next_id_v1(&next_id_bytes).map_err(|e| {
+            DbErrorV1::new_v1(format!("feature dict next_id decode failed: {:?}", e))
+        })?,
+        entries: decode_feat_dict_meta_entries_v1(&entries).map_err(|e| {
+            DbErrorV1::new_v1(format!("feature dict entries decode failed: {:?}", e))
+        })?,
         last_gc_ts: match last_gc_ts {
-            Some(bytes) => decode_feat_dict_meta_last_gc_ts_v1(&bytes)
-                .map_err(|e| DbErrorV1::new_v1(format!("feature dict last_gc_ts decode failed: {:?}", e)))?,
+            Some(bytes) => decode_feat_dict_meta_last_gc_ts_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("feature dict last_gc_ts decode failed: {:?}", e))
+            })?,
             None => 0,
         },
     };
     let mut forward_entries = Vec::new();
     let mut reverse_entries = Vec::new();
     for (key, value) in db.scan_prefix_raw_v1(b"feat_dict/v1/str/")? {
-        let key_text = String::from_utf8(key).map_err(|e| DbErrorV1::new_v1(format!("feature dict key utf8 failed: {}", e)))?;
+        let key_text = String::from_utf8(key)
+            .map_err(|e| DbErrorV1::new_v1(format!("feature dict key utf8 failed: {}", e)))?;
         let prefix = "feat_dict/v1/str/";
         let feature_string = key_text
             .strip_prefix(prefix)
             .ok_or_else(|| DbErrorV1::new_v1("feature dict str key missing prefix"))?;
-        let feature_id = decode_feat_dict_str_to_id_v1(&value)
-            .map_err(|e| DbErrorV1::new_v1(format!("feature dict str->id decode failed: {:?}", e)))?;
+        let feature_id = decode_feat_dict_str_to_id_v1(&value).map_err(|e| {
+            DbErrorV1::new_v1(format!("feature dict str->id decode failed: {:?}", e))
+        })?;
         forward_entries.push((feature_string.to_string(), feature_id));
     }
     for (key, value) in db.scan_prefix_raw_v1(b"feat_dict/v1/id/")? {
-        let key_text = String::from_utf8(key).map_err(|e| DbErrorV1::new_v1(format!("feature dict key utf8 failed: {}", e)))?;
+        let key_text = String::from_utf8(key)
+            .map_err(|e| DbErrorV1::new_v1(format!("feature dict key utf8 failed: {}", e)))?;
         let prefix = "feat_dict/v1/id/";
         let feature_id_text = key_text
             .strip_prefix(prefix)
@@ -5689,8 +6464,9 @@ fn load_dict_from_tenant_db_v1(
         let feature_id = feature_id_text
             .parse::<u32>()
             .map_err(|e| DbErrorV1::new_v1(format!("feature dict id parse failed: {}", e)))?;
-        let feature_string = decode_feat_dict_id_to_str_v1(&value)
-            .map_err(|e| DbErrorV1::new_v1(format!("feature dict id->str decode failed: {:?}", e)))?;
+        let feature_string = decode_feat_dict_id_to_str_v1(&value).map_err(|e| {
+            DbErrorV1::new_v1(format!("feature dict id->str decode failed: {:?}", e))
+        })?;
         reverse_entries.push((feature_id, feature_string));
     }
     forward_entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -5729,17 +6505,22 @@ fn load_df_meta_from_tenant_db_v1(
         .map_err(|_| DbErrorV1::new_v1("df ring slot count does not fit usize"))?;
     let mut day_slot_epochs = vec![None; slot_count];
     for slot in 0..cfg.df_ring_slots {
-        if let Some(value) = db.get_raw_v1(crate::db::keys::key_tenant_df_ring_day_slot_epoch_v1(slot as u8).as_bytes())? {
-            day_slot_epochs[slot as usize] = Some(
-                decode_meta_df_ring_day_slot_epoch_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("df day slot epoch decode failed: {:?}", e)))?,
-            );
+        if let Some(value) = db.get_raw_v1(
+            crate::db::keys::key_tenant_df_ring_day_slot_epoch_v1(slot as u8).as_bytes(),
+        )? {
+            day_slot_epochs[slot as usize] =
+                Some(decode_meta_df_ring_day_slot_epoch_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!("df day slot epoch decode failed: {:?}", e))
+                })?);
         }
     }
-    let current_day_epoch = match db.get_raw_v1(crate::db::keys::key_tenant_df_ring_current_day_epoch_v1().as_bytes())? {
+    let current_day_epoch = match db
+        .get_raw_v1(crate::db::keys::key_tenant_df_ring_current_day_epoch_v1().as_bytes())?
+    {
         Some(value) => Some(
-            decode_meta_df_ring_current_day_epoch_v1(&value)
-                .map_err(|e| DbErrorV1::new_v1(format!("df current day epoch decode failed: {:?}", e)))?,
+            decode_meta_df_ring_current_day_epoch_v1(&value).map_err(|e| {
+                DbErrorV1::new_v1(format!("df current day epoch decode failed: {:?}", e))
+            })?,
         ),
         None => None,
     };
@@ -5754,10 +6535,14 @@ fn collect_stale_slot_keys_from_tenant_db_v1(
     slot: u8,
 ) -> Result<Vec<crate::db::keys::KeyBytes>, DbErrorV1> {
     let mut keys = Vec::new();
-    for (key, _) in db.scan_prefix_raw_v1(crate::db::keys::key_prefix_tenant_dfm_slot_v1(slot).as_bytes())? {
+    for (key, _) in
+        db.scan_prefix_raw_v1(crate::db::keys::key_prefix_tenant_dfm_slot_v1(slot).as_bytes())?
+    {
         keys.push(crate::db::keys::KeyBytes { bytes: key });
     }
-    for (key, _) in db.scan_prefix_raw_v1(crate::db::keys::key_prefix_tenant_dfn_slot_v1(slot).as_bytes())? {
+    for (key, _) in
+        db.scan_prefix_raw_v1(crate::db::keys::key_prefix_tenant_dfn_slot_v1(slot).as_bytes())?
+    {
         keys.push(crate::db::keys::KeyBytes { bytes: key });
     }
     keys.sort_by(|a, b| a.bytes.cmp(&b.bytes));
@@ -5797,7 +6582,10 @@ fn build_bucket_baseline_from_tenant_db_v1(
         .unwrap_or_default();
     let df = df_totals
         .into_iter()
-        .map(|(feature_id, df_count)| DfPairV1 { feature_id, df_count })
+        .map(|(feature_id, df_count)| DfPairV1 {
+            feature_id,
+            df_count,
+        })
         .collect::<Vec<DfPairV1>>();
     Ok(BucketBaselineV1 {
         bucket,
@@ -5844,8 +6632,12 @@ fn apply_window_finalize_mutations_to_db_v1(
 ) -> Result<(), DbErrorV1> {
     for mutation in mutations {
         match mutation {
-            crate::window::WindowFinalizeMutationV1::Put(kv) => db.put_raw_v1(kv.key.as_bytes(), &kv.value)?,
-            crate::window::WindowFinalizeMutationV1::Delete(key) => db.delete_raw_v1(key.as_bytes())?,
+            crate::window::WindowFinalizeMutationV1::Put(kv) => {
+                db.put_raw_v1(kv.key.as_bytes(), &kv.value)?
+            }
+            crate::window::WindowFinalizeMutationV1::Delete(key) => {
+                db.delete_raw_v1(key.as_bytes())?
+            }
         }
     }
     Ok(())
@@ -5870,7 +6662,9 @@ fn apply_centroid_mutations_to_db_v1(
 ) -> Result<(), DbErrorV1> {
     for mutation in mutations {
         match mutation {
-            crate::baseline::CentroidStatsMutationV1::Put(kv) => db.put_raw_v1(kv.key.as_bytes(), &kv.value)?,
+            crate::baseline::CentroidStatsMutationV1::Put(kv) => {
+                db.put_raw_v1(kv.key.as_bytes(), &kv.value)?
+            }
         }
     }
     Ok(())
@@ -5884,7 +6678,11 @@ fn update_active_spans_v1(
     offset_end: u64,
 ) {
     if let Some(last) = spans.last_mut() {
-        if last.file_rel == file.file_rel && last.file_key == file.file_key && last.inode == inode && last.is_gzip == file.is_gzip {
+        if last.file_rel == file.file_rel
+            && last.file_key == file.file_key
+            && last.inode == inode
+            && last.is_gzip == file.is_gzip
+        {
             last.offset_end = offset_end;
             return;
         }
@@ -5899,7 +6697,6 @@ fn update_active_spans_v1(
     });
 }
 
-
 fn update_active_source_stream_observation_v1(
     observations: &mut BTreeMap<String, SourceStreamActiveObservationV1>,
     device: &TenantDeviceV1,
@@ -5909,12 +6706,9 @@ fn update_active_source_stream_observation_v1(
     offset_end: u64,
     byte_len: u64,
 ) -> Result<(), String> {
-    let identity = source_stream_identity_from_path_v1(
-        &device.tenant_id,
-        &device.device_key,
-        &file.file_rel,
-    )
-    .map_err(|e| format!("source-stream identity failed: {:?}", e))?;
+    let identity =
+        source_stream_identity_from_path_v1(&device.tenant_id, &device.device_key, &file.file_rel)
+            .map_err(|e| format!("source-stream identity failed: {:?}", e))?;
     let subject = source_stream_subject_from_identity_v1(&identity);
     let entry = observations
         .entry(identity.source_stream_id.clone())

@@ -40,31 +40,53 @@ pub const METRIC_RECOVERY_SPOOL_WRITES_TOTAL_V1: &str = "recovery_spool_writes_t
 pub const METRIC_RECOVERY_SPOOL_REPLAYED_TOTAL_V1: &str = "recovery_spool_replayed_total";
 pub const METRIC_RECOVERY_SPOOL_REPLAY_FAIL_TOTAL_V1: &str = "recovery_spool_replay_fail_total";
 pub const METRIC_RECOVERY_SPOOL_DROP_TOTAL_V1: &str = "recovery_spool_drop_total";
-pub const METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str = "recovery_automated_replay_attempts_total";
-pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1: &str = "recovery_last_automated_replay_attempt_ts";
-pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1: &str = "recovery_last_automated_replay_replayed";
-pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1: &str = "recovery_last_automated_replay_failed";
+pub const METRIC_RECOVERY_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str =
+    "recovery_automated_replay_attempts_total";
+pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_ATTEMPT_TS_V1: &str =
+    "recovery_last_automated_replay_attempt_ts";
+pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_REPLAYED_V1: &str =
+    "recovery_last_automated_replay_replayed";
+pub const METRIC_RECOVERY_LAST_AUTOMATED_REPLAY_FAILED_V1: &str =
+    "recovery_last_automated_replay_failed";
 pub const METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1: &str = "recovery_previous_snapshot_ts";
-pub const METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1: &str = "recovery_previous_snapshot_backlog_files";
-pub const METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1: &str = "recovery_previous_snapshot_backlog_bytes";
+pub const METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_FILES_V1: &str =
+    "recovery_previous_snapshot_backlog_files";
+pub const METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1: &str =
+    "recovery_previous_snapshot_backlog_bytes";
 pub const METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1: &str = "recovery_last_snapshot_ts";
-pub const METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1: &str = "recovery_last_snapshot_backlog_files";
-pub const METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1: &str = "recovery_last_snapshot_backlog_bytes";
-pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1: &str = "recovery_previous_counter_snapshot_ts";
-pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str = "recovery_previous_counter_snapshot_spool_writes_total";
-pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str = "recovery_previous_counter_snapshot_spool_replayed_total";
-pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str = "recovery_previous_counter_snapshot_spool_replay_fail_total";
-pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str = "recovery_previous_counter_snapshot_automated_replay_attempts_total";
+pub const METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1: &str =
+    "recovery_last_snapshot_backlog_files";
+pub const METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1: &str =
+    "recovery_last_snapshot_backlog_bytes";
+pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1: &str =
+    "recovery_previous_counter_snapshot_ts";
+pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str =
+    "recovery_previous_counter_snapshot_spool_writes_total";
+pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str =
+    "recovery_previous_counter_snapshot_spool_replayed_total";
+pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str =
+    "recovery_previous_counter_snapshot_spool_replay_fail_total";
+pub const METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str =
+    "recovery_previous_counter_snapshot_automated_replay_attempts_total";
 pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1: &str = "recovery_last_counter_snapshot_ts";
-pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str = "recovery_last_counter_snapshot_spool_writes_total";
-pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str = "recovery_last_counter_snapshot_spool_replayed_total";
-pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str = "recovery_last_counter_snapshot_spool_replay_fail_total";
-pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str = "recovery_last_counter_snapshot_automated_replay_attempts_total";
-pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1: &str = "recovery_history_start_counter_snapshot_ts";
-pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str = "recovery_history_start_counter_snapshot_spool_writes_total";
-pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str = "recovery_history_start_counter_snapshot_spool_replayed_total";
-pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str = "recovery_history_start_counter_snapshot_spool_replay_fail_total";
-pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str = "recovery_history_start_counter_snapshot_automated_replay_attempts_total";
+pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str =
+    "recovery_last_counter_snapshot_spool_writes_total";
+pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str =
+    "recovery_last_counter_snapshot_spool_replayed_total";
+pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str =
+    "recovery_last_counter_snapshot_spool_replay_fail_total";
+pub const METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str =
+    "recovery_last_counter_snapshot_automated_replay_attempts_total";
+pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1: &str =
+    "recovery_history_start_counter_snapshot_ts";
+pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1: &str =
+    "recovery_history_start_counter_snapshot_spool_writes_total";
+pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1: &str =
+    "recovery_history_start_counter_snapshot_spool_replayed_total";
+pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1: &str =
+    "recovery_history_start_counter_snapshot_spool_replay_fail_total";
+pub const METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1: &str =
+    "recovery_history_start_counter_snapshot_automated_replay_attempts_total";
 pub const METRIC_VDROP_TRACKED_SUBJECTS_V1: &str = "vdrop_tracked_subjects";
 pub const METRIC_VDROP_OPEN_SILENCE_SUBJECTS_V1: &str = "vdrop_open_silence_subjects";
 pub const METRIC_VDROP_OPEN_DROP_SUBJECTS_V1: &str = "vdrop_open_drop_subjects";
@@ -73,14 +95,22 @@ pub const METRIC_VDROP_CANDIDATES_TOTAL_V1: &str = "vdrop_candidates_total";
 pub const METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1: &str = "vdrop_suppressed_candidates_total";
 pub const METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1: &str = "vdrop_alerts_emitted_total";
 pub const METRIC_VDROP_LAST_EVALUATION_TS_V1: &str = "vdrop_last_evaluation_ts";
-pub const METRIC_VDROP_SOURCE_STREAM_TRACKED_SUBJECTS_V1: &str = "vdrop_source_stream_tracked_subjects";
-pub const METRIC_VDROP_SOURCE_STREAM_OPEN_SILENCE_SUBJECTS_V1: &str = "vdrop_source_stream_open_silence_subjects";
-pub const METRIC_VDROP_SOURCE_STREAM_OPEN_DROP_SUBJECTS_V1: &str = "vdrop_source_stream_open_drop_subjects";
-pub const METRIC_VDROP_SOURCE_STREAM_EVALUATED_SUBJECTS_TOTAL_V1: &str = "vdrop_source_stream_evaluated_subjects_total";
-pub const METRIC_VDROP_SOURCE_STREAM_CANDIDATES_TOTAL_V1: &str = "vdrop_source_stream_candidates_total";
-pub const METRIC_VDROP_SOURCE_STREAM_SUPPRESSED_CANDIDATES_TOTAL_V1: &str = "vdrop_source_stream_suppressed_candidates_total";
-pub const METRIC_VDROP_SOURCE_STREAM_ALERTS_EMITTED_TOTAL_V1: &str = "vdrop_source_stream_alerts_emitted_total";
-pub const METRIC_VDROP_SOURCE_STREAM_LAST_EVALUATION_TS_V1: &str = "vdrop_source_stream_last_evaluation_ts";
+pub const METRIC_VDROP_SOURCE_STREAM_TRACKED_SUBJECTS_V1: &str =
+    "vdrop_source_stream_tracked_subjects";
+pub const METRIC_VDROP_SOURCE_STREAM_OPEN_SILENCE_SUBJECTS_V1: &str =
+    "vdrop_source_stream_open_silence_subjects";
+pub const METRIC_VDROP_SOURCE_STREAM_OPEN_DROP_SUBJECTS_V1: &str =
+    "vdrop_source_stream_open_drop_subjects";
+pub const METRIC_VDROP_SOURCE_STREAM_EVALUATED_SUBJECTS_TOTAL_V1: &str =
+    "vdrop_source_stream_evaluated_subjects_total";
+pub const METRIC_VDROP_SOURCE_STREAM_CANDIDATES_TOTAL_V1: &str =
+    "vdrop_source_stream_candidates_total";
+pub const METRIC_VDROP_SOURCE_STREAM_SUPPRESSED_CANDIDATES_TOTAL_V1: &str =
+    "vdrop_source_stream_suppressed_candidates_total";
+pub const METRIC_VDROP_SOURCE_STREAM_ALERTS_EMITTED_TOTAL_V1: &str =
+    "vdrop_source_stream_alerts_emitted_total";
+pub const METRIC_VDROP_SOURCE_STREAM_LAST_EVALUATION_TS_V1: &str =
+    "vdrop_source_stream_last_evaluation_ts";
 
 fn recovery_tenant_metric_name_v1(prefix: &str, tenant_id: &str) -> String {
     format!("{}__{}", prefix, tenant_id)
@@ -110,7 +140,6 @@ pub fn metric_recovery_tenant_last_snapshot_backlog_bytes_v1(tenant_id: &str) ->
     recovery_tenant_metric_name_v1("recovery_tenant_last_snapshot_backlog_bytes", tenant_id)
 }
 
-
 pub fn metric_recovery_tenant_spool_writes_total_v1(tenant_id: &str) -> String {
     recovery_tenant_metric_name_v1("recovery_tenant_spool_writes_total", tenant_id)
 }
@@ -131,60 +160,123 @@ pub fn metric_recovery_tenant_previous_counter_snapshot_ts_v1(tenant_id: &str) -
     recovery_tenant_metric_name_v1("recovery_tenant_previous_counter_snapshot_ts", tenant_id)
 }
 
-pub fn metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_previous_counter_snapshot_spool_writes_total", tenant_id)
+pub fn metric_recovery_tenant_previous_counter_snapshot_spool_writes_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_previous_counter_snapshot_spool_writes_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_previous_counter_snapshot_spool_replayed_total", tenant_id)
+pub fn metric_recovery_tenant_previous_counter_snapshot_spool_replayed_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_previous_counter_snapshot_spool_replayed_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_previous_counter_snapshot_spool_replay_fail_total", tenant_id)
+pub fn metric_recovery_tenant_previous_counter_snapshot_spool_replay_fail_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_previous_counter_snapshot_spool_replay_fail_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total", tenant_id)
+pub fn metric_recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total",
+        tenant_id,
+    )
 }
 
 pub fn metric_recovery_tenant_last_counter_snapshot_ts_v1(tenant_id: &str) -> String {
     recovery_tenant_metric_name_v1("recovery_tenant_last_counter_snapshot_ts", tenant_id)
 }
 
-pub fn metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_last_counter_snapshot_spool_writes_total", tenant_id)
+pub fn metric_recovery_tenant_last_counter_snapshot_spool_writes_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_last_counter_snapshot_spool_writes_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_last_counter_snapshot_spool_replayed_total", tenant_id)
+pub fn metric_recovery_tenant_last_counter_snapshot_spool_replayed_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_last_counter_snapshot_spool_replayed_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_last_counter_snapshot_spool_replay_fail_total", tenant_id)
+pub fn metric_recovery_tenant_last_counter_snapshot_spool_replay_fail_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_last_counter_snapshot_spool_replay_fail_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_last_counter_snapshot_automated_replay_attempts_total", tenant_id)
+pub fn metric_recovery_tenant_last_counter_snapshot_automated_replay_attempts_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_last_counter_snapshot_automated_replay_attempts_total",
+        tenant_id,
+    )
 }
 
 pub fn metric_recovery_tenant_history_start_counter_snapshot_ts_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_history_start_counter_snapshot_ts", tenant_id)
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_history_start_counter_snapshot_ts",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_writes_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_history_start_counter_snapshot_spool_writes_total", tenant_id)
+pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_writes_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_history_start_counter_snapshot_spool_writes_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_replayed_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_history_start_counter_snapshot_spool_replayed_total", tenant_id)
+pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_replayed_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_history_start_counter_snapshot_spool_replayed_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total", tenant_id)
+pub fn metric_recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total",
+        tenant_id,
+    )
 }
 
-pub fn metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1(tenant_id: &str) -> String {
-    recovery_tenant_metric_name_v1("recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total", tenant_id)
+pub fn metric_recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total_v1(
+    tenant_id: &str,
+) -> String {
+    recovery_tenant_metric_name_v1(
+        "recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total",
+        tenant_id,
+    )
 }
 
 pub fn metric_vdrop_tenant_tracked_subjects_v1(tenant_id: &str) -> String {
@@ -461,10 +553,15 @@ pub fn build_status_snapshot_from_parts_v1(
     let schema_state = global_db.read_schema_state_v1()?;
     let known_tenants = global_db.list_known_tenant_ids_v1()?;
     let active_tenants = global_db.list_active_tenants_v1()?;
-    let spool_backlog = spool_backlog_summary_v1(&cfg.sparx.data_root)
-        .map_err(|e| DbErrorV1::new_v1(format!("failed to read spool backlog summary: {}", e.msg)))?;
-    let spool_backlog_tenants = spool_backlog_per_tenant_v1(&cfg.sparx.data_root)
-        .map_err(|e| DbErrorV1::new_v1(format!("failed to read per-tenant spool backlog summary: {}", e.msg)))?;
+    let spool_backlog = spool_backlog_summary_v1(&cfg.sparx.data_root).map_err(|e| {
+        DbErrorV1::new_v1(format!("failed to read spool backlog summary: {}", e.msg))
+    })?;
+    let spool_backlog_tenants = spool_backlog_per_tenant_v1(&cfg.sparx.data_root).map_err(|e| {
+        DbErrorV1::new_v1(format!(
+            "failed to read per-tenant spool backlog summary: {}",
+            e.msg
+        ))
+    })?;
     let mapped_spool_backlog_tenants: Vec<StatusRecoveryTenantBacklogV1> = spool_backlog_tenants
         .into_iter()
         .map(|tenant| {
@@ -626,19 +723,26 @@ pub fn build_status_snapshot_from_parts_v1(
                     &metric_vdrop_tenant_open_drop_subjects_v1(tenant_id),
                 )?,
                 evaluated_subjects_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_evaluated_subjects_total_v1(tenant_id))?
+                    .read_metric_counter_v1(&metric_vdrop_tenant_evaluated_subjects_total_v1(
+                        tenant_id,
+                    ))?
                     .unwrap_or(0),
                 candidates_total: global_db
                     .read_metric_counter_v1(&metric_vdrop_tenant_candidates_total_v1(tenant_id))?
                     .unwrap_or(0),
                 suppressed_candidates_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_suppressed_candidates_total_v1(tenant_id))?
+                    .read_metric_counter_v1(&metric_vdrop_tenant_suppressed_candidates_total_v1(
+                        tenant_id,
+                    ))?
                     .unwrap_or(0),
                 alerts_emitted_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_alerts_emitted_total_v1(tenant_id))?
+                    .read_metric_counter_v1(&metric_vdrop_tenant_alerts_emitted_total_v1(
+                        tenant_id,
+                    ))?
                     .unwrap_or(0),
-                last_evaluation_ts: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_last_evaluation_ts_v1(tenant_id))?,
+                last_evaluation_ts: global_db.read_metric_counter_v1(
+                    &metric_vdrop_tenant_last_evaluation_ts_v1(tenant_id),
+                )?,
                 source_stream_tracked_subjects: read_u64_gauge_as_int_v1(
                     global_db,
                     &metric_vdrop_tenant_source_stream_tracked_subjects_v1(tenant_id),
@@ -652,43 +756,67 @@ pub fn build_status_snapshot_from_parts_v1(
                     &metric_vdrop_tenant_source_stream_open_drop_subjects_v1(tenant_id),
                 )?,
                 source_stream_evaluated_subjects_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_source_stream_evaluated_subjects_total_v1(tenant_id))?
+                    .read_metric_counter_v1(
+                        &metric_vdrop_tenant_source_stream_evaluated_subjects_total_v1(tenant_id),
+                    )?
                     .unwrap_or(0),
                 source_stream_candidates_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_source_stream_candidates_total_v1(tenant_id))?
+                    .read_metric_counter_v1(
+                        &metric_vdrop_tenant_source_stream_candidates_total_v1(tenant_id),
+                    )?
                     .unwrap_or(0),
                 source_stream_suppressed_candidates_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_source_stream_suppressed_candidates_total_v1(tenant_id))?
+                    .read_metric_counter_v1(
+                        &metric_vdrop_tenant_source_stream_suppressed_candidates_total_v1(
+                            tenant_id,
+                        ),
+                    )?
                     .unwrap_or(0),
                 source_stream_alerts_emitted_total: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_source_stream_alerts_emitted_total_v1(tenant_id))?
+                    .read_metric_counter_v1(
+                        &metric_vdrop_tenant_source_stream_alerts_emitted_total_v1(tenant_id),
+                    )?
                     .unwrap_or(0),
-                source_stream_last_evaluation_ts: global_db
-                    .read_metric_counter_v1(&metric_vdrop_tenant_source_stream_last_evaluation_ts_v1(tenant_id))?,
+                source_stream_last_evaluation_ts: global_db.read_metric_counter_v1(
+                    &metric_vdrop_tenant_source_stream_last_evaluation_ts_v1(tenant_id),
+                )?,
             })
         })
         .collect::<Result<Vec<_>, DbErrorV1>>()?;
-    let vdrop_tracked_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.tracked_subjects),
-    );
+    let vdrop_tracked_subjects =
+        sum_optional_u64_v1(vdrop_tenants.iter().map(|tenant| tenant.tracked_subjects));
     let vdrop_open_silence_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.open_silence_subjects),
+        vdrop_tenants
+            .iter()
+            .map(|tenant| tenant.open_silence_subjects),
     );
-    let vdrop_open_drop_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.open_drop_subjects),
-    );
+    let vdrop_open_drop_subjects =
+        sum_optional_u64_v1(vdrop_tenants.iter().map(|tenant| tenant.open_drop_subjects));
     let vdrop_source_stream_tracked_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.source_stream_tracked_subjects),
+        vdrop_tenants
+            .iter()
+            .map(|tenant| tenant.source_stream_tracked_subjects),
     );
     let vdrop_source_stream_open_silence_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.source_stream_open_silence_subjects),
+        vdrop_tenants
+            .iter()
+            .map(|tenant| tenant.source_stream_open_silence_subjects),
     );
     let vdrop_source_stream_open_drop_subjects = sum_optional_u64_v1(
-        vdrop_tenants.iter().map(|tenant| tenant.source_stream_open_drop_subjects),
+        vdrop_tenants
+            .iter()
+            .map(|tenant| tenant.source_stream_open_drop_subjects),
     );
-    let stale_backlog_tenants = mapped_spool_backlog_tenants.iter().filter(|tenant| tenant.stale).count() as u64;
-    let stale_backlog = stale_backlog_v1(spool_backlog.oldest_age_s, cfg.output.automated_replay_interval_s);
-    let previous_snapshot_ts = global_db.read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1)?;
+    let stale_backlog_tenants = mapped_spool_backlog_tenants
+        .iter()
+        .filter(|tenant| tenant.stale)
+        .count() as u64;
+    let stale_backlog = stale_backlog_v1(
+        spool_backlog.oldest_age_s,
+        cfg.output.automated_replay_interval_s,
+    );
+    let previous_snapshot_ts =
+        global_db.read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_SNAPSHOT_TS_V1)?;
     let last_snapshot_ts = global_db.read_metric_counter_v1(METRIC_RECOVERY_LAST_SNAPSHOT_TS_V1)?;
     let previous_snapshot_backlog_files = read_u64_gauge_as_int_v1(
         global_db,
@@ -698,50 +826,58 @@ pub fn build_status_snapshot_from_parts_v1(
         global_db,
         METRIC_RECOVERY_PREVIOUS_SNAPSHOT_BACKLOG_BYTES_V1,
     )?;
-    let last_snapshot_backlog_files = read_u64_gauge_as_int_v1(
-        global_db,
-        METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1,
-    )?;
-    let last_snapshot_backlog_bytes = read_u64_gauge_as_int_v1(
-        global_db,
-        METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1,
-    )?;
+    let last_snapshot_backlog_files =
+        read_u64_gauge_as_int_v1(global_db, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_FILES_V1)?;
+    let last_snapshot_backlog_bytes =
+        read_u64_gauge_as_int_v1(global_db, METRIC_RECOVERY_LAST_SNAPSHOT_BACKLOG_BYTES_V1)?;
     let snapshot_interval_s = diff_nonnegative_u64_v1(last_snapshot_ts, previous_snapshot_ts);
-    let backlog_files_trend_delta = diff_signed_u64_v1(last_snapshot_backlog_files, previous_snapshot_backlog_files);
-    let backlog_bytes_trend_delta = diff_signed_u64_v1(last_snapshot_backlog_bytes, previous_snapshot_backlog_bytes);
-    let backlog_trend_direction = recovery_trend_direction_v1(
-        backlog_files_trend_delta,
-        backlog_bytes_trend_delta,
-    )
-    .to_string();
-    let previous_counter_snapshot_ts = global_db.read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1)?;
-    let last_counter_snapshot_ts = global_db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1)?;
+    let backlog_files_trend_delta =
+        diff_signed_u64_v1(last_snapshot_backlog_files, previous_snapshot_backlog_files);
+    let backlog_bytes_trend_delta =
+        diff_signed_u64_v1(last_snapshot_backlog_bytes, previous_snapshot_backlog_bytes);
+    let backlog_trend_direction =
+        recovery_trend_direction_v1(backlog_files_trend_delta, backlog_bytes_trend_delta)
+            .to_string();
+    let previous_counter_snapshot_ts =
+        global_db.read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_TS_V1)?;
+    let last_counter_snapshot_ts =
+        global_db.read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_TS_V1)?;
     let previous_counter_snapshot_spool_writes_total = global_db
         .read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
-    let previous_counter_snapshot_spool_replayed_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
-    let previous_counter_snapshot_spool_replay_fail_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let previous_counter_snapshot_spool_replayed_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    )?;
+    let previous_counter_snapshot_spool_replay_fail_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    )?;
     let previous_counter_snapshot_automated_replay_attempts_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+        .read_metric_counter_v1(
+            METRIC_RECOVERY_PREVIOUS_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        )?;
     let last_counter_snapshot_spool_writes_total = global_db
         .read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
     let last_counter_snapshot_spool_replayed_total = global_db
         .read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
     let last_counter_snapshot_spool_replay_fail_total = global_db
         .read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
-    let last_counter_snapshot_automated_replay_attempts_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
-    let history_start_counter_snapshot_ts = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1)?;
-    let history_start_counter_snapshot_spool_writes_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1)?;
-    let history_start_counter_snapshot_spool_replayed_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1)?;
-    let history_start_counter_snapshot_spool_replay_fail_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1)?;
+    let last_counter_snapshot_automated_replay_attempts_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_LAST_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+    )?;
+    let history_start_counter_snapshot_ts =
+        global_db.read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_TS_V1)?;
+    let history_start_counter_snapshot_spool_writes_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_WRITES_TOTAL_V1,
+    )?;
+    let history_start_counter_snapshot_spool_replayed_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAYED_TOTAL_V1,
+    )?;
+    let history_start_counter_snapshot_spool_replay_fail_total = global_db.read_metric_counter_v1(
+        METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_SPOOL_REPLAY_FAIL_TOTAL_V1,
+    )?;
     let history_start_counter_snapshot_automated_replay_attempts_total = global_db
-        .read_metric_counter_v1(METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1)?;
+        .read_metric_counter_v1(
+            METRIC_RECOVERY_HISTORY_START_COUNTER_SNAPSHOT_AUTOMATED_REPLAY_ATTEMPTS_TOTAL_V1,
+        )?;
     let last_counter_snapshot = RecoveryCounterSnapshotViewV1 {
         ts: last_counter_snapshot_ts,
         spool_writes_total: last_counter_snapshot_spool_writes_total,
@@ -761,16 +897,13 @@ pub fn build_status_snapshot_from_parts_v1(
         spool_writes_total: history_start_counter_snapshot_spool_writes_total,
         spool_replayed_total: history_start_counter_snapshot_spool_replayed_total,
         spool_replay_fail_total: history_start_counter_snapshot_spool_replay_fail_total,
-        automated_replay_attempts_total: history_start_counter_snapshot_automated_replay_attempts_total,
+        automated_replay_attempts_total:
+            history_start_counter_snapshot_automated_replay_attempts_total,
     };
-    let counter_rate = recovery_counter_rate_view_v1(
-        previous_counter_snapshot,
-        last_counter_snapshot,
-    );
-    let history_counter_rate = recovery_counter_rate_view_v1(
-        history_start_counter_snapshot,
-        last_counter_snapshot,
-    );
+    let counter_rate =
+        recovery_counter_rate_view_v1(previous_counter_snapshot, last_counter_snapshot);
+    let history_counter_rate =
+        recovery_counter_rate_view_v1(history_start_counter_snapshot, last_counter_snapshot);
 
     Ok(StatusSnapshotV1 {
         version: "sparx 0.0.0".to_string(),
@@ -817,20 +950,53 @@ pub fn build_status_snapshot_from_parts_v1(
             ),
         },
         metrics: StatusRunMetricsV1 {
-            run_cycles_completed_total: global_db.read_metric_counter_v1(METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1)?.unwrap_or(0),
-            run_tenants_total: global_db.read_metric_counter_v1(METRIC_RUN_TENANTS_TOTAL_V1)?.unwrap_or(0),
-            run_tenants_processed_total: global_db.read_metric_counter_v1(METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1)?.unwrap_or(0),
-            run_tenants_skipped_total: global_db.read_metric_counter_v1(METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1)?.unwrap_or(0),
-            run_devices_processed_total: global_db.read_metric_counter_v1(METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1)?.unwrap_or(0),
-            run_devices_failed_total: global_db.read_metric_counter_v1(METRIC_RUN_DEVICES_FAILED_TOTAL_V1)?.unwrap_or(0),
-            run_alerts_emitted_total: global_db.read_metric_counter_v1(METRIC_RUN_ALERTS_EMITTED_TOTAL_V1)?.unwrap_or(0),
-            run_last_cycle_tenants_total: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_TENANTS_TOTAL_V1)?,
-            run_last_cycle_tenants_processed: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_TENANTS_PROCESSED_V1)?,
-            run_last_cycle_tenants_skipped: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_TENANTS_SKIPPED_V1)?,
-            run_last_cycle_devices_processed: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_DEVICES_PROCESSED_V1)?,
-            run_last_cycle_devices_failed: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_DEVICES_FAILED_V1)?,
-            run_last_cycle_alerts_emitted: read_u64_gauge_as_int_v1(global_db, METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1)?,
-            run_last_cycle_completed_ts: global_db.read_metric_counter_v1(METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1)?,
+            run_cycles_completed_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_CYCLES_COMPLETED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_tenants_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_TENANTS_TOTAL_V1)?
+                .unwrap_or(0),
+            run_tenants_processed_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_TENANTS_PROCESSED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_tenants_skipped_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_TENANTS_SKIPPED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_devices_processed_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_DEVICES_PROCESSED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_devices_failed_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_DEVICES_FAILED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_alerts_emitted_total: global_db
+                .read_metric_counter_v1(METRIC_RUN_ALERTS_EMITTED_TOTAL_V1)?
+                .unwrap_or(0),
+            run_last_cycle_tenants_total: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_TENANTS_TOTAL_V1,
+            )?,
+            run_last_cycle_tenants_processed: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_TENANTS_PROCESSED_V1,
+            )?,
+            run_last_cycle_tenants_skipped: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_TENANTS_SKIPPED_V1,
+            )?,
+            run_last_cycle_devices_processed: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_DEVICES_PROCESSED_V1,
+            )?,
+            run_last_cycle_devices_failed: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_DEVICES_FAILED_V1,
+            )?,
+            run_last_cycle_alerts_emitted: read_u64_gauge_as_int_v1(
+                global_db,
+                METRIC_RUN_LAST_CYCLE_ALERTS_EMITTED_V1,
+            )?,
+            run_last_cycle_completed_ts: global_db
+                .read_metric_counter_v1(METRIC_RUN_LAST_CYCLE_COMPLETED_TS_V1)?,
         },
         recovery: StatusRecoveryViewV1 {
             automated_replay_max_files_per_pass: cfg.output.automated_replay_max_files_per_pass,
@@ -882,7 +1048,8 @@ pub fn build_status_snapshot_from_parts_v1(
             history_spool_write_rate_per_s: history_counter_rate.spool_write_rate_per_s,
             history_spool_replayed_rate_per_s: history_counter_rate.spool_replayed_rate_per_s,
             history_spool_replay_fail_rate_per_s: history_counter_rate.spool_replay_fail_rate_per_s,
-            history_automated_replay_attempt_rate_per_s: history_counter_rate.automated_replay_attempt_rate_per_s,
+            history_automated_replay_attempt_rate_per_s: history_counter_rate
+                .automated_replay_attempt_rate_per_s,
             spool_write_rate_per_s: counter_rate.spool_write_rate_per_s,
             spool_replayed_rate_per_s: counter_rate.spool_replayed_rate_per_s,
             spool_replay_fail_rate_per_s: counter_rate.spool_replay_fail_rate_per_s,
@@ -899,11 +1066,20 @@ pub fn build_status_snapshot_from_parts_v1(
             tracked_subjects: vdrop_tracked_subjects,
             open_silence_subjects: vdrop_open_silence_subjects,
             open_drop_subjects: vdrop_open_drop_subjects,
-            evaluated_subjects_total: global_db.read_metric_counter_v1(METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1)?.unwrap_or(0),
-            candidates_total: global_db.read_metric_counter_v1(METRIC_VDROP_CANDIDATES_TOTAL_V1)?.unwrap_or(0),
-            suppressed_candidates_total: global_db.read_metric_counter_v1(METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1)?.unwrap_or(0),
-            alerts_emitted_total: global_db.read_metric_counter_v1(METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1)?.unwrap_or(0),
-            last_evaluation_ts: global_db.read_metric_counter_v1(METRIC_VDROP_LAST_EVALUATION_TS_V1)?,
+            evaluated_subjects_total: global_db
+                .read_metric_counter_v1(METRIC_VDROP_EVALUATED_SUBJECTS_TOTAL_V1)?
+                .unwrap_or(0),
+            candidates_total: global_db
+                .read_metric_counter_v1(METRIC_VDROP_CANDIDATES_TOTAL_V1)?
+                .unwrap_or(0),
+            suppressed_candidates_total: global_db
+                .read_metric_counter_v1(METRIC_VDROP_SUPPRESSED_CANDIDATES_TOTAL_V1)?
+                .unwrap_or(0),
+            alerts_emitted_total: global_db
+                .read_metric_counter_v1(METRIC_VDROP_ALERTS_EMITTED_TOTAL_V1)?
+                .unwrap_or(0),
+            last_evaluation_ts: global_db
+                .read_metric_counter_v1(METRIC_VDROP_LAST_EVALUATION_TS_V1)?,
             source_stream_tracked_subjects: vdrop_source_stream_tracked_subjects,
             source_stream_open_silence_subjects: vdrop_source_stream_open_silence_subjects,
             source_stream_open_drop_subjects: vdrop_source_stream_open_drop_subjects,
@@ -938,7 +1114,11 @@ where
             total = total.saturating_add(value);
         }
     }
-    if saw_any { Some(total) } else { None }
+    if saw_any {
+        Some(total)
+    } else {
+        None
+    }
 }
 
 fn read_u64_gauge_as_int_v1(global_db: &GlobalDbV1, name: &str) -> Result<Option<u64>, DbErrorV1> {
@@ -976,7 +1156,11 @@ fn diff_nonnegative_u64_v1(current: Option<u64>, previous: Option<u64>) -> Optio
     }
 }
 
-fn rate_per_second_v1(current: Option<u64>, previous: Option<u64>, interval_s: Option<u64>) -> Option<f64> {
+fn rate_per_second_v1(
+    current: Option<u64>,
+    previous: Option<u64>,
+    interval_s: Option<u64>,
+) -> Option<f64> {
     match (diff_nonnegative_u64_v1(current, previous), interval_s) {
         (Some(delta), Some(interval)) if interval > 0 => Some((delta as f64) / (interval as f64)),
         _ => None,
@@ -1031,7 +1215,10 @@ fn recovery_counter_rate_view_v1(
     }
 }
 
-fn recovery_trend_direction_v1(backlog_files_trend_delta: Option<i64>, backlog_bytes_trend_delta: Option<i64>) -> &'static str {
+fn recovery_trend_direction_v1(
+    backlog_files_trend_delta: Option<i64>,
+    backlog_bytes_trend_delta: Option<i64>,
+) -> &'static str {
     match (backlog_files_trend_delta, backlog_bytes_trend_delta) {
         (Some(files_delta), Some(bytes_delta)) => {
             if files_delta > 0 || bytes_delta > 0 {
@@ -1054,153 +1241,595 @@ pub fn format_status_text_v1(snapshot: &StatusSnapshotV1) -> String {
     out.push_str(&format!("window_size_s: {}\n", snapshot.window_size_s));
     out.push_str(&format!("sink: {}\n", snapshot.sink));
     out.push_str(&format!("roots.data_root: {}\n", snapshot.roots.data_root));
-    out.push_str(&format!("roots.tenant_root: {}\n", snapshot.roots.tenant_root));
-    out.push_str(&format!("roots.global_db_path: {}\n", snapshot.roots.global_db_path));
-    out.push_str(&format!("roots.tenant_db_root: {}\n", snapshot.roots.tenant_db_root));
-    out.push_str(&format!("roots.alert_out_root: {}\n", snapshot.roots.alert_out_root));
-    out.push_str(&format!("roots.spool_root: {}\n", snapshot.roots.spool_root));
-    out.push_str(&format!("tenants.known_count: {}\n", snapshot.tenants.known_count));
-    out.push_str(&format!("tenants.active_count: {}\n", snapshot.tenants.active_count));
-    out.push_str(&format!("process.last_run_start_ts: {}\n", format_option_i64_v1(snapshot.process.last_run_start_ts)));
-    out.push_str(&format!("process.last_run_end_ts: {}\n", format_option_i64_v1(snapshot.process.last_run_end_ts)));
-    out.push_str(&format!("process.last_run_exit_code: {}\n", format_option_i32_v1(snapshot.process.last_run_exit_code)));
-    out.push_str(&format!("process.last_run_host: {}\n", format_option_str_v1(snapshot.process.last_run_host.as_deref())));
-    out.push_str(&format!("runtime.global_schema_version: {}\n", format_option_u32_v1(snapshot.runtime.global_schema_version)));
-    out.push_str(&format!("runtime.global_schema_created_ts: {}\n", format_option_i64_v1(snapshot.runtime.global_schema_created_ts)));
-    out.push_str(&format!("runtime.global_schema_last_migrate_ts: {}\n", format_option_i64_v1(snapshot.runtime.global_schema_last_migrate_ts)));
-    out.push_str(&format!("observability.prometheus_enabled: {}\n", snapshot.observability.prometheus_enabled));
-    out.push_str(&format!("observability.prometheus_bind: {}\n", snapshot.observability.prometheus_bind));
-    out.push_str(&format!("observability.prometheus_url: {}\n", format_option_str_v1(snapshot.observability.prometheus_url.as_deref())));
-    out.push_str(&format!("observability.health_enabled: {}\n", snapshot.observability.health_enabled));
-    out.push_str(&format!("observability.health_bind: {}\n", snapshot.observability.health_bind));
-    out.push_str(&format!("observability.health_url: {}\n", format_option_str_v1(snapshot.observability.health_url.as_deref())));
-    out.push_str(&format!("metrics.run_cycles_completed_total: {}\n", snapshot.metrics.run_cycles_completed_total));
-    out.push_str(&format!("metrics.run_tenants_total: {}\n", snapshot.metrics.run_tenants_total));
-    out.push_str(&format!("metrics.run_tenants_processed_total: {}\n", snapshot.metrics.run_tenants_processed_total));
-    out.push_str(&format!("metrics.run_tenants_skipped_total: {}\n", snapshot.metrics.run_tenants_skipped_total));
-    out.push_str(&format!("metrics.run_devices_processed_total: {}\n", snapshot.metrics.run_devices_processed_total));
-    out.push_str(&format!("metrics.run_devices_failed_total: {}\n", snapshot.metrics.run_devices_failed_total));
-    out.push_str(&format!("metrics.run_alerts_emitted_total: {}\n", snapshot.metrics.run_alerts_emitted_total));
-    out.push_str(&format!("metrics.run_last_cycle_tenants_total: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_total)));
-    out.push_str(&format!("metrics.run_last_cycle_tenants_processed: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_processed)));
-    out.push_str(&format!("metrics.run_last_cycle_tenants_skipped: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_skipped)));
-    out.push_str(&format!("metrics.run_last_cycle_devices_processed: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_devices_processed)));
-    out.push_str(&format!("metrics.run_last_cycle_devices_failed: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_devices_failed)));
-    out.push_str(&format!("metrics.run_last_cycle_alerts_emitted: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_alerts_emitted)));
-    out.push_str(&format!("metrics.run_last_cycle_completed_ts: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_completed_ts)));
+    out.push_str(&format!(
+        "roots.tenant_root: {}\n",
+        snapshot.roots.tenant_root
+    ));
+    out.push_str(&format!(
+        "roots.global_db_path: {}\n",
+        snapshot.roots.global_db_path
+    ));
+    out.push_str(&format!(
+        "roots.tenant_db_root: {}\n",
+        snapshot.roots.tenant_db_root
+    ));
+    out.push_str(&format!(
+        "roots.alert_out_root: {}\n",
+        snapshot.roots.alert_out_root
+    ));
+    out.push_str(&format!(
+        "roots.spool_root: {}\n",
+        snapshot.roots.spool_root
+    ));
+    out.push_str(&format!(
+        "tenants.known_count: {}\n",
+        snapshot.tenants.known_count
+    ));
+    out.push_str(&format!(
+        "tenants.active_count: {}\n",
+        snapshot.tenants.active_count
+    ));
+    out.push_str(&format!(
+        "process.last_run_start_ts: {}\n",
+        format_option_i64_v1(snapshot.process.last_run_start_ts)
+    ));
+    out.push_str(&format!(
+        "process.last_run_end_ts: {}\n",
+        format_option_i64_v1(snapshot.process.last_run_end_ts)
+    ));
+    out.push_str(&format!(
+        "process.last_run_exit_code: {}\n",
+        format_option_i32_v1(snapshot.process.last_run_exit_code)
+    ));
+    out.push_str(&format!(
+        "process.last_run_host: {}\n",
+        format_option_str_v1(snapshot.process.last_run_host.as_deref())
+    ));
+    out.push_str(&format!(
+        "runtime.global_schema_version: {}\n",
+        format_option_u32_v1(snapshot.runtime.global_schema_version)
+    ));
+    out.push_str(&format!(
+        "runtime.global_schema_created_ts: {}\n",
+        format_option_i64_v1(snapshot.runtime.global_schema_created_ts)
+    ));
+    out.push_str(&format!(
+        "runtime.global_schema_last_migrate_ts: {}\n",
+        format_option_i64_v1(snapshot.runtime.global_schema_last_migrate_ts)
+    ));
+    out.push_str(&format!(
+        "observability.prometheus_enabled: {}\n",
+        snapshot.observability.prometheus_enabled
+    ));
+    out.push_str(&format!(
+        "observability.prometheus_bind: {}\n",
+        snapshot.observability.prometheus_bind
+    ));
+    out.push_str(&format!(
+        "observability.prometheus_url: {}\n",
+        format_option_str_v1(snapshot.observability.prometheus_url.as_deref())
+    ));
+    out.push_str(&format!(
+        "observability.health_enabled: {}\n",
+        snapshot.observability.health_enabled
+    ));
+    out.push_str(&format!(
+        "observability.health_bind: {}\n",
+        snapshot.observability.health_bind
+    ));
+    out.push_str(&format!(
+        "observability.health_url: {}\n",
+        format_option_str_v1(snapshot.observability.health_url.as_deref())
+    ));
+    out.push_str(&format!(
+        "metrics.run_cycles_completed_total: {}\n",
+        snapshot.metrics.run_cycles_completed_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_tenants_total: {}\n",
+        snapshot.metrics.run_tenants_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_tenants_processed_total: {}\n",
+        snapshot.metrics.run_tenants_processed_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_tenants_skipped_total: {}\n",
+        snapshot.metrics.run_tenants_skipped_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_devices_processed_total: {}\n",
+        snapshot.metrics.run_devices_processed_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_devices_failed_total: {}\n",
+        snapshot.metrics.run_devices_failed_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_alerts_emitted_total: {}\n",
+        snapshot.metrics.run_alerts_emitted_total
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_tenants_total: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_total)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_tenants_processed: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_processed)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_tenants_skipped: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_tenants_skipped)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_devices_processed: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_devices_processed)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_devices_failed: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_devices_failed)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_alerts_emitted: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_alerts_emitted)
+    ));
+    out.push_str(&format!(
+        "metrics.run_last_cycle_completed_ts: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_completed_ts)
+    ));
     out.push_str(&format!("vdrop.enabled: {}\n", snapshot.vdrop.enabled));
-    out.push_str(&format!("vdrop.device_enabled: {}\n", snapshot.vdrop.device_enabled));
-    out.push_str(&format!("vdrop.tenant_enabled: {}\n", snapshot.vdrop.tenant_enabled));
-    out.push_str(&format!("vdrop.source_stream_enabled: {}\n", snapshot.vdrop.source_stream_enabled));
-    out.push_str(&format!("vdrop.min_expected_windows_missed: {}\n", snapshot.vdrop.min_expected_windows_missed));
-    out.push_str(&format!("vdrop.min_mature_windows: {}\n", format_option_u64_v1(snapshot.vdrop.min_mature_windows)));
-    out.push_str(&format!("vdrop.min_expected_lines: {}\n", format_option_u64_v1(snapshot.vdrop.min_expected_lines)));
-    out.push_str(&format!("vdrop.tracked_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.tracked_subjects)));
-    out.push_str(&format!("vdrop.open_silence_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.open_silence_subjects)));
-    out.push_str(&format!("vdrop.open_drop_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.open_drop_subjects)));
-    out.push_str(&format!("vdrop.evaluated_subjects_total: {}\n", snapshot.vdrop.evaluated_subjects_total));
-    out.push_str(&format!("vdrop.candidates_total: {}\n", snapshot.vdrop.candidates_total));
-    out.push_str(&format!("vdrop.suppressed_candidates_total: {}\n", snapshot.vdrop.suppressed_candidates_total));
-    out.push_str(&format!("vdrop.alerts_emitted_total: {}\n", snapshot.vdrop.alerts_emitted_total));
-    out.push_str(&format!("vdrop.last_evaluation_ts: {}\n", format_option_u64_v1(snapshot.vdrop.last_evaluation_ts)));
-    out.push_str(&format!("vdrop.source_stream_tracked_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_tracked_subjects)));
-    out.push_str(&format!("vdrop.source_stream_open_silence_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_open_silence_subjects)));
-    out.push_str(&format!("vdrop.source_stream_open_drop_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_open_drop_subjects)));
-    out.push_str(&format!("vdrop.source_stream_evaluated_subjects_total: {}\n", snapshot.vdrop.source_stream_evaluated_subjects_total));
-    out.push_str(&format!("vdrop.source_stream_candidates_total: {}\n", snapshot.vdrop.source_stream_candidates_total));
-    out.push_str(&format!("vdrop.source_stream_suppressed_candidates_total: {}\n", snapshot.vdrop.source_stream_suppressed_candidates_total));
-    out.push_str(&format!("vdrop.source_stream_alerts_emitted_total: {}\n", snapshot.vdrop.source_stream_alerts_emitted_total));
-    out.push_str(&format!("vdrop.source_stream_last_evaluation_ts: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_last_evaluation_ts)));
-    out.push_str(&format!("vdrop.tenants: {}\n", snapshot.vdrop.tenants.len()));
+    out.push_str(&format!(
+        "vdrop.device_enabled: {}\n",
+        snapshot.vdrop.device_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop.tenant_enabled: {}\n",
+        snapshot.vdrop.tenant_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_enabled: {}\n",
+        snapshot.vdrop.source_stream_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop.min_expected_windows_missed: {}\n",
+        snapshot.vdrop.min_expected_windows_missed
+    ));
+    out.push_str(&format!(
+        "vdrop.min_mature_windows: {}\n",
+        format_option_u64_v1(snapshot.vdrop.min_mature_windows)
+    ));
+    out.push_str(&format!(
+        "vdrop.min_expected_lines: {}\n",
+        format_option_u64_v1(snapshot.vdrop.min_expected_lines)
+    ));
+    out.push_str(&format!(
+        "vdrop.tracked_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.tracked_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.open_silence_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.open_silence_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.open_drop_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.open_drop_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.evaluated_subjects_total: {}\n",
+        snapshot.vdrop.evaluated_subjects_total
+    ));
+    out.push_str(&format!(
+        "vdrop.candidates_total: {}\n",
+        snapshot.vdrop.candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop.suppressed_candidates_total: {}\n",
+        snapshot.vdrop.suppressed_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop.alerts_emitted_total: {}\n",
+        snapshot.vdrop.alerts_emitted_total
+    ));
+    out.push_str(&format!(
+        "vdrop.last_evaluation_ts: {}\n",
+        format_option_u64_v1(snapshot.vdrop.last_evaluation_ts)
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_tracked_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_tracked_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_open_silence_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_open_silence_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_open_drop_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_open_drop_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_evaluated_subjects_total: {}\n",
+        snapshot.vdrop.source_stream_evaluated_subjects_total
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_candidates_total: {}\n",
+        snapshot.vdrop.source_stream_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_suppressed_candidates_total: {}\n",
+        snapshot.vdrop.source_stream_suppressed_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_alerts_emitted_total: {}\n",
+        snapshot.vdrop.source_stream_alerts_emitted_total
+    ));
+    out.push_str(&format!(
+        "vdrop.source_stream_last_evaluation_ts: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_last_evaluation_ts)
+    ));
+    out.push_str(&format!(
+        "vdrop.tenants: {}\n",
+        snapshot.vdrop.tenants.len()
+    ));
     for (idx, tenant) in snapshot.vdrop.tenants.iter().enumerate() {
-        out.push_str(&format!("vdrop.tenant[{}].tenant_id: {}\n", idx, tenant.tenant_id));
-        out.push_str(&format!("vdrop.tenant[{}].tracked_subjects: {}\n", idx, format_option_u64_v1(tenant.tracked_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].open_silence_subjects: {}\n", idx, format_option_u64_v1(tenant.open_silence_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].open_drop_subjects: {}\n", idx, format_option_u64_v1(tenant.open_drop_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].evaluated_subjects_total: {}\n", idx, tenant.evaluated_subjects_total));
-        out.push_str(&format!("vdrop.tenant[{}].candidates_total: {}\n", idx, tenant.candidates_total));
-        out.push_str(&format!("vdrop.tenant[{}].suppressed_candidates_total: {}\n", idx, tenant.suppressed_candidates_total));
-        out.push_str(&format!("vdrop.tenant[{}].alerts_emitted_total: {}\n", idx, tenant.alerts_emitted_total));
-        out.push_str(&format!("vdrop.tenant[{}].last_evaluation_ts: {}\n", idx, format_option_u64_v1(tenant.last_evaluation_ts)));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_tracked_subjects: {}\n", idx, format_option_u64_v1(tenant.source_stream_tracked_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_open_silence_subjects: {}\n", idx, format_option_u64_v1(tenant.source_stream_open_silence_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_open_drop_subjects: {}\n", idx, format_option_u64_v1(tenant.source_stream_open_drop_subjects)));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_evaluated_subjects_total: {}\n", idx, tenant.source_stream_evaluated_subjects_total));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_candidates_total: {}\n", idx, tenant.source_stream_candidates_total));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_suppressed_candidates_total: {}\n", idx, tenant.source_stream_suppressed_candidates_total));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_alerts_emitted_total: {}\n", idx, tenant.source_stream_alerts_emitted_total));
-        out.push_str(&format!("vdrop.tenant[{}].source_stream_last_evaluation_ts: {}\n", idx, format_option_u64_v1(tenant.source_stream_last_evaluation_ts)));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].tenant_id: {}\n",
+            idx, tenant.tenant_id
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].tracked_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.tracked_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].open_silence_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.open_silence_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].open_drop_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.open_drop_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].evaluated_subjects_total: {}\n",
+            idx, tenant.evaluated_subjects_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].candidates_total: {}\n",
+            idx, tenant.candidates_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].suppressed_candidates_total: {}\n",
+            idx, tenant.suppressed_candidates_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].alerts_emitted_total: {}\n",
+            idx, tenant.alerts_emitted_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].last_evaluation_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.last_evaluation_ts)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_tracked_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.source_stream_tracked_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_open_silence_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.source_stream_open_silence_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_open_drop_subjects: {}\n",
+            idx,
+            format_option_u64_v1(tenant.source_stream_open_drop_subjects)
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_evaluated_subjects_total: {}\n",
+            idx, tenant.source_stream_evaluated_subjects_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_candidates_total: {}\n",
+            idx, tenant.source_stream_candidates_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_suppressed_candidates_total: {}\n",
+            idx, tenant.source_stream_suppressed_candidates_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_alerts_emitted_total: {}\n",
+            idx, tenant.source_stream_alerts_emitted_total
+        ));
+        out.push_str(&format!(
+            "vdrop.tenant[{}].source_stream_last_evaluation_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.source_stream_last_evaluation_ts)
+        ));
     }
-    out.push_str(&format!("recovery.automated_replay_max_files_per_pass: {}\n", snapshot.recovery.automated_replay_max_files_per_pass));
-    out.push_str(&format!("recovery.automated_replay_interval_s: {}\n", snapshot.recovery.automated_replay_interval_s));
-    out.push_str(&format!("recovery.spool_max_mb: {}\n", snapshot.recovery.spool_max_mb));
-    out.push_str(&format!("recovery.spool_backlog_files: {}\n", snapshot.recovery.spool_backlog_files));
-    out.push_str(&format!("recovery.spool_backlog_bytes: {}\n", snapshot.recovery.spool_backlog_bytes));
-    out.push_str(&format!("recovery.spool_oldest_file_ts: {}\n", format_option_u64_v1(snapshot.recovery.spool_oldest_file_ts)));
-    out.push_str(&format!("recovery.spool_oldest_age_s: {}\n", format_option_u64_v1(snapshot.recovery.spool_oldest_age_s)));
-    out.push_str(&format!("recovery.stale_backlog: {}\n", snapshot.recovery.stale_backlog));
-    out.push_str(&format!("recovery.stale_backlog_tenants: {}\n", snapshot.recovery.stale_backlog_tenants));
-    out.push_str(&format!("recovery.spool_backlog_tenants: {}\n", snapshot.recovery.spool_backlog_tenants.len()));
+    out.push_str(&format!(
+        "recovery.automated_replay_max_files_per_pass: {}\n",
+        snapshot.recovery.automated_replay_max_files_per_pass
+    ));
+    out.push_str(&format!(
+        "recovery.automated_replay_interval_s: {}\n",
+        snapshot.recovery.automated_replay_interval_s
+    ));
+    out.push_str(&format!(
+        "recovery.spool_max_mb: {}\n",
+        snapshot.recovery.spool_max_mb
+    ));
+    out.push_str(&format!(
+        "recovery.spool_backlog_files: {}\n",
+        snapshot.recovery.spool_backlog_files
+    ));
+    out.push_str(&format!(
+        "recovery.spool_backlog_bytes: {}\n",
+        snapshot.recovery.spool_backlog_bytes
+    ));
+    out.push_str(&format!(
+        "recovery.spool_oldest_file_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.spool_oldest_file_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.spool_oldest_age_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.spool_oldest_age_s)
+    ));
+    out.push_str(&format!(
+        "recovery.stale_backlog: {}\n",
+        snapshot.recovery.stale_backlog
+    ));
+    out.push_str(&format!(
+        "recovery.stale_backlog_tenants: {}\n",
+        snapshot.recovery.stale_backlog_tenants
+    ));
+    out.push_str(&format!(
+        "recovery.spool_backlog_tenants: {}\n",
+        snapshot.recovery.spool_backlog_tenants.len()
+    ));
     for (idx, tenant) in snapshot.recovery.spool_backlog_tenants.iter().enumerate() {
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].tenant_id: {}\n", idx, tenant.tenant_id));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].files: {}\n", idx, tenant.files));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].bytes: {}\n", idx, tenant.bytes));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].oldest_file_ts: {}\n", idx, format_option_u64_v1(tenant.oldest_file_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].oldest_age_s: {}\n", idx, format_option_u64_v1(tenant.oldest_age_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].stale: {}\n", idx, tenant.stale));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].previous_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.previous_snapshot_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].last_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.last_snapshot_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.snapshot_interval_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].backlog_files_trend_delta: {}\n", idx, format_option_i64_v1(tenant.backlog_files_trend_delta)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].backlog_bytes_trend_delta: {}\n", idx, format_option_i64_v1(tenant.backlog_bytes_trend_delta)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].backlog_trend_direction: {}\n", idx, tenant.backlog_trend_direction));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].previous_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.previous_counter_snapshot_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].last_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.last_counter_snapshot_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].counter_snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.counter_snapshot_interval_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_start_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.history_start_counter_snapshot_ts)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_counter_snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.history_counter_snapshot_interval_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_spool_write_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_write_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_spool_replayed_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_replayed_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_spool_replay_fail_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_replay_fail_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].history_automated_replay_attempt_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_automated_replay_attempt_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].spool_write_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_write_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].spool_replayed_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_replayed_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].spool_replay_fail_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_replay_fail_rate_per_s)));
-        out.push_str(&format!("recovery.spool_backlog_tenant[{}].automated_replay_attempt_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.automated_replay_attempt_rate_per_s)));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].tenant_id: {}\n",
+            idx, tenant.tenant_id
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].files: {}\n",
+            idx, tenant.files
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].bytes: {}\n",
+            idx, tenant.bytes
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].oldest_file_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.oldest_file_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].oldest_age_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.oldest_age_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].stale: {}\n",
+            idx, tenant.stale
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].previous_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.previous_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].last_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.last_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].backlog_files_trend_delta: {}\n",
+            idx,
+            format_option_i64_v1(tenant.backlog_files_trend_delta)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].backlog_bytes_trend_delta: {}\n",
+            idx,
+            format_option_i64_v1(tenant.backlog_bytes_trend_delta)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].backlog_trend_direction: {}\n",
+            idx, tenant.backlog_trend_direction
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].previous_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.previous_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].last_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.last_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].counter_snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.counter_snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_start_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.history_start_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_counter_snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.history_counter_snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_spool_write_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_write_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_spool_replayed_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_replayed_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_spool_replay_fail_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_replay_fail_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].history_automated_replay_attempt_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_automated_replay_attempt_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].spool_write_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_write_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].spool_replayed_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_replayed_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].spool_replay_fail_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_replay_fail_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "recovery.spool_backlog_tenant[{}].automated_replay_attempt_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.automated_replay_attempt_rate_per_s)
+        ));
     }
-    out.push_str(&format!("recovery.spool_writes_total: {}\n", snapshot.recovery.spool_writes_total));
-    out.push_str(&format!("recovery.spool_replayed_total: {}\n", snapshot.recovery.spool_replayed_total));
-    out.push_str(&format!("recovery.spool_replay_fail_total: {}\n", snapshot.recovery.spool_replay_fail_total));
-    out.push_str(&format!("recovery.spool_drop_total: {}\n", snapshot.recovery.spool_drop_total));
-    out.push_str(&format!("recovery.automated_replay_attempts_total: {}\n", snapshot.recovery.automated_replay_attempts_total));
-    out.push_str(&format!("recovery.last_automated_replay_attempt_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_attempt_ts)));
-    out.push_str(&format!("recovery.last_automated_replay_replayed: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_replayed)));
-    out.push_str(&format!("recovery.last_automated_replay_failed: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_failed)));
-    out.push_str(&format!("recovery.previous_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.previous_snapshot_ts)));
-    out.push_str(&format!("recovery.last_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_snapshot_ts)));
-    out.push_str(&format!("recovery.snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.snapshot_interval_s)));
-    out.push_str(&format!("recovery.backlog_files_trend_delta: {}\n", format_option_i64_v1(snapshot.recovery.backlog_files_trend_delta)));
-    out.push_str(&format!("recovery.backlog_bytes_trend_delta: {}\n", format_option_i64_v1(snapshot.recovery.backlog_bytes_trend_delta)));
-    out.push_str(&format!("recovery.backlog_trend_direction: {}\n", snapshot.recovery.backlog_trend_direction));
-    out.push_str(&format!("recovery.previous_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.previous_counter_snapshot_ts)));
-    out.push_str(&format!("recovery.last_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_counter_snapshot_ts)));
-    out.push_str(&format!("recovery.counter_snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.counter_snapshot_interval_s)));
-    out.push_str(&format!("recovery.history_start_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.history_start_counter_snapshot_ts)));
-    out.push_str(&format!("recovery.history_counter_snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.history_counter_snapshot_interval_s)));
-    out.push_str(&format!("recovery.history_spool_write_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_write_rate_per_s)));
-    out.push_str(&format!("recovery.history_spool_replayed_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_replayed_rate_per_s)));
-    out.push_str(&format!("recovery.history_spool_replay_fail_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_replay_fail_rate_per_s)));
-    out.push_str(&format!("recovery.history_automated_replay_attempt_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_automated_replay_attempt_rate_per_s)));
-    out.push_str(&format!("recovery.spool_write_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_write_rate_per_s)));
-    out.push_str(&format!("recovery.spool_replayed_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_replayed_rate_per_s)));
-    out.push_str(&format!("recovery.spool_replay_fail_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_replay_fail_rate_per_s)));
-    out.push_str(&format!("recovery.automated_replay_attempt_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.automated_replay_attempt_rate_per_s)));
+    out.push_str(&format!(
+        "recovery.spool_writes_total: {}\n",
+        snapshot.recovery.spool_writes_total
+    ));
+    out.push_str(&format!(
+        "recovery.spool_replayed_total: {}\n",
+        snapshot.recovery.spool_replayed_total
+    ));
+    out.push_str(&format!(
+        "recovery.spool_replay_fail_total: {}\n",
+        snapshot.recovery.spool_replay_fail_total
+    ));
+    out.push_str(&format!(
+        "recovery.spool_drop_total: {}\n",
+        snapshot.recovery.spool_drop_total
+    ));
+    out.push_str(&format!(
+        "recovery.automated_replay_attempts_total: {}\n",
+        snapshot.recovery.automated_replay_attempts_total
+    ));
+    out.push_str(&format!(
+        "recovery.last_automated_replay_attempt_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_attempt_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.last_automated_replay_replayed: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_replayed)
+    ));
+    out.push_str(&format!(
+        "recovery.last_automated_replay_failed: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_failed)
+    ));
+    out.push_str(&format!(
+        "recovery.previous_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.previous_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.last_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "recovery.backlog_files_trend_delta: {}\n",
+        format_option_i64_v1(snapshot.recovery.backlog_files_trend_delta)
+    ));
+    out.push_str(&format!(
+        "recovery.backlog_bytes_trend_delta: {}\n",
+        format_option_i64_v1(snapshot.recovery.backlog_bytes_trend_delta)
+    ));
+    out.push_str(&format!(
+        "recovery.backlog_trend_direction: {}\n",
+        snapshot.recovery.backlog_trend_direction
+    ));
+    out.push_str(&format!(
+        "recovery.previous_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.previous_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.last_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.counter_snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.counter_snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "recovery.history_start_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.history_start_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "recovery.history_counter_snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.history_counter_snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "recovery.history_spool_write_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_write_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.history_spool_replayed_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_replayed_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.history_spool_replay_fail_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_replay_fail_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.history_automated_replay_attempt_rate_per_s: {}\n",
+        format_option_f64_v1(
+            snapshot
+                .recovery
+                .history_automated_replay_attempt_rate_per_s
+        )
+    ));
+    out.push_str(&format!(
+        "recovery.spool_write_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_write_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.spool_replayed_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_replayed_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.spool_replay_fail_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_replay_fail_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "recovery.automated_replay_attempt_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.automated_replay_attempt_rate_per_s)
+    ));
     out
 }
 
 pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
     let mut out = String::new();
-    out.push_str("# HELP sparx_status_info Static status metadata for the running Sparx instance.\n");
+    out.push_str(
+        "# HELP sparx_status_info Static status metadata for the running Sparx instance.\n",
+    );
     out.push_str("# TYPE sparx_status_info gauge\n");
     out.push_str(&format!(
         "sparx_status_info{{version=\"{}\",mode=\"{}\",sink=\"{}\"}} 1\n",
@@ -1209,78 +1838,257 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
         escape_prometheus_label_v1(&snapshot.sink),
     ));
     out.push_str("# TYPE sparx_status_window_size_seconds gauge\n");
-    out.push_str(&format!("sparx_status_window_size_seconds {}\n", snapshot.window_size_s));
+    out.push_str(&format!(
+        "sparx_status_window_size_seconds {}\n",
+        snapshot.window_size_s
+    ));
     out.push_str("# TYPE sparx_status_tenants_known_total gauge\n");
-    out.push_str(&format!("sparx_status_tenants_known_total {}\n", snapshot.tenants.known_count));
+    out.push_str(&format!(
+        "sparx_status_tenants_known_total {}\n",
+        snapshot.tenants.known_count
+    ));
     out.push_str("# TYPE sparx_status_tenants_active_total gauge\n");
-    out.push_str(&format!("sparx_status_tenants_active_total {}\n", snapshot.tenants.active_count));
+    out.push_str(&format!(
+        "sparx_status_tenants_active_total {}\n",
+        snapshot.tenants.active_count
+    ));
     out.push_str("# TYPE sparx_observability_prometheus_enabled gauge\n");
-    out.push_str(&format!("sparx_observability_prometheus_enabled {}\n", if snapshot.observability.prometheus_enabled { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_observability_prometheus_enabled {}\n",
+        if snapshot.observability.prometheus_enabled {
+            1
+        } else {
+            0
+        }
+    ));
     out.push_str("# TYPE sparx_observability_health_enabled gauge\n");
-    out.push_str(&format!("sparx_observability_health_enabled {}\n", if snapshot.observability.health_enabled { 1 } else { 0 }));
-    append_optional_i64_metric_v1(&mut out, "sparx_process_last_run_start_ts", snapshot.process.last_run_start_ts);
-    append_optional_i64_metric_v1(&mut out, "sparx_process_last_run_end_ts", snapshot.process.last_run_end_ts);
-    append_optional_i32_metric_v1(&mut out, "sparx_process_last_run_exit_code", snapshot.process.last_run_exit_code);
-    append_optional_u32_metric_v1(&mut out, "sparx_runtime_global_schema_version", snapshot.runtime.global_schema_version);
-    append_optional_i64_metric_v1(&mut out, "sparx_runtime_global_schema_created_ts", snapshot.runtime.global_schema_created_ts);
-    append_optional_i64_metric_v1(&mut out, "sparx_runtime_global_schema_last_migrate_ts", snapshot.runtime.global_schema_last_migrate_ts);
+    out.push_str(&format!(
+        "sparx_observability_health_enabled {}\n",
+        if snapshot.observability.health_enabled {
+            1
+        } else {
+            0
+        }
+    ));
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_process_last_run_start_ts",
+        snapshot.process.last_run_start_ts,
+    );
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_process_last_run_end_ts",
+        snapshot.process.last_run_end_ts,
+    );
+    append_optional_i32_metric_v1(
+        &mut out,
+        "sparx_process_last_run_exit_code",
+        snapshot.process.last_run_exit_code,
+    );
+    append_optional_u32_metric_v1(
+        &mut out,
+        "sparx_runtime_global_schema_version",
+        snapshot.runtime.global_schema_version,
+    );
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_runtime_global_schema_created_ts",
+        snapshot.runtime.global_schema_created_ts,
+    );
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_runtime_global_schema_last_migrate_ts",
+        snapshot.runtime.global_schema_last_migrate_ts,
+    );
     out.push_str("# TYPE sparx_run_cycles_completed_total counter\n");
-    out.push_str(&format!("sparx_run_cycles_completed_total {}\n", snapshot.metrics.run_cycles_completed_total));
+    out.push_str(&format!(
+        "sparx_run_cycles_completed_total {}\n",
+        snapshot.metrics.run_cycles_completed_total
+    ));
     out.push_str("# TYPE sparx_run_tenants_total counter\n");
-    out.push_str(&format!("sparx_run_tenants_total {}\n", snapshot.metrics.run_tenants_total));
+    out.push_str(&format!(
+        "sparx_run_tenants_total {}\n",
+        snapshot.metrics.run_tenants_total
+    ));
     out.push_str("# TYPE sparx_run_tenants_processed_total counter\n");
-    out.push_str(&format!("sparx_run_tenants_processed_total {}\n", snapshot.metrics.run_tenants_processed_total));
+    out.push_str(&format!(
+        "sparx_run_tenants_processed_total {}\n",
+        snapshot.metrics.run_tenants_processed_total
+    ));
     out.push_str("# TYPE sparx_run_tenants_skipped_total counter\n");
-    out.push_str(&format!("sparx_run_tenants_skipped_total {}\n", snapshot.metrics.run_tenants_skipped_total));
+    out.push_str(&format!(
+        "sparx_run_tenants_skipped_total {}\n",
+        snapshot.metrics.run_tenants_skipped_total
+    ));
     out.push_str("# TYPE sparx_run_devices_processed_total counter\n");
-    out.push_str(&format!("sparx_run_devices_processed_total {}\n", snapshot.metrics.run_devices_processed_total));
+    out.push_str(&format!(
+        "sparx_run_devices_processed_total {}\n",
+        snapshot.metrics.run_devices_processed_total
+    ));
     out.push_str("# TYPE sparx_run_devices_failed_total counter\n");
-    out.push_str(&format!("sparx_run_devices_failed_total {}\n", snapshot.metrics.run_devices_failed_total));
+    out.push_str(&format!(
+        "sparx_run_devices_failed_total {}\n",
+        snapshot.metrics.run_devices_failed_total
+    ));
     out.push_str("# TYPE sparx_run_alerts_emitted_total counter\n");
-    out.push_str(&format!("sparx_run_alerts_emitted_total {}\n", snapshot.metrics.run_alerts_emitted_total));
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_tenants_total", snapshot.metrics.run_last_cycle_tenants_total);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_tenants_processed", snapshot.metrics.run_last_cycle_tenants_processed);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_tenants_skipped", snapshot.metrics.run_last_cycle_tenants_skipped);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_devices_processed", snapshot.metrics.run_last_cycle_devices_processed);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_devices_failed", snapshot.metrics.run_last_cycle_devices_failed);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_alerts_emitted", snapshot.metrics.run_last_cycle_alerts_emitted);
-    append_optional_u64_metric_v1(&mut out, "sparx_run_last_cycle_completed_ts", snapshot.metrics.run_last_cycle_completed_ts);
+    out.push_str(&format!(
+        "sparx_run_alerts_emitted_total {}\n",
+        snapshot.metrics.run_alerts_emitted_total
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_tenants_total",
+        snapshot.metrics.run_last_cycle_tenants_total,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_tenants_processed",
+        snapshot.metrics.run_last_cycle_tenants_processed,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_tenants_skipped",
+        snapshot.metrics.run_last_cycle_tenants_skipped,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_devices_processed",
+        snapshot.metrics.run_last_cycle_devices_processed,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_devices_failed",
+        snapshot.metrics.run_last_cycle_devices_failed,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_alerts_emitted",
+        snapshot.metrics.run_last_cycle_alerts_emitted,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_run_last_cycle_completed_ts",
+        snapshot.metrics.run_last_cycle_completed_ts,
+    );
     out.push_str("# TYPE sparx_vdrop_enabled gauge\n");
-    out.push_str(&format!("sparx_vdrop_enabled {}\n", if snapshot.vdrop.enabled { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_vdrop_enabled {}\n",
+        if snapshot.vdrop.enabled { 1 } else { 0 }
+    ));
     out.push_str("# TYPE sparx_vdrop_device_enabled gauge\n");
-    out.push_str(&format!("sparx_vdrop_device_enabled {}\n", if snapshot.vdrop.device_enabled { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_vdrop_device_enabled {}\n",
+        if snapshot.vdrop.device_enabled { 1 } else { 0 }
+    ));
     out.push_str("# TYPE sparx_vdrop_tenant_enabled gauge\n");
-    out.push_str(&format!("sparx_vdrop_tenant_enabled {}\n", if snapshot.vdrop.tenant_enabled { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_vdrop_tenant_enabled {}\n",
+        if snapshot.vdrop.tenant_enabled { 1 } else { 0 }
+    ));
     out.push_str("# TYPE sparx_vdrop_source_stream_enabled gauge\n");
-    out.push_str(&format!("sparx_vdrop_source_stream_enabled {}\n", if snapshot.vdrop.source_stream_enabled { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_vdrop_source_stream_enabled {}\n",
+        if snapshot.vdrop.source_stream_enabled {
+            1
+        } else {
+            0
+        }
+    ));
     out.push_str("# TYPE sparx_vdrop_min_expected_windows_missed gauge\n");
-    out.push_str(&format!("sparx_vdrop_min_expected_windows_missed {}\n", snapshot.vdrop.min_expected_windows_missed));
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_min_mature_windows", snapshot.vdrop.min_mature_windows);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_min_expected_lines", snapshot.vdrop.min_expected_lines);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_tracked_subjects", snapshot.vdrop.tracked_subjects);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_open_silence_subjects", snapshot.vdrop.open_silence_subjects);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_open_drop_subjects", snapshot.vdrop.open_drop_subjects);
+    out.push_str(&format!(
+        "sparx_vdrop_min_expected_windows_missed {}\n",
+        snapshot.vdrop.min_expected_windows_missed
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_min_mature_windows",
+        snapshot.vdrop.min_mature_windows,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_min_expected_lines",
+        snapshot.vdrop.min_expected_lines,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_tracked_subjects",
+        snapshot.vdrop.tracked_subjects,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_open_silence_subjects",
+        snapshot.vdrop.open_silence_subjects,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_open_drop_subjects",
+        snapshot.vdrop.open_drop_subjects,
+    );
     out.push_str("# TYPE sparx_vdrop_evaluated_subjects_total counter\n");
-    out.push_str(&format!("sparx_vdrop_evaluated_subjects_total {}\n", snapshot.vdrop.evaluated_subjects_total));
+    out.push_str(&format!(
+        "sparx_vdrop_evaluated_subjects_total {}\n",
+        snapshot.vdrop.evaluated_subjects_total
+    ));
     out.push_str("# TYPE sparx_vdrop_candidates_total counter\n");
-    out.push_str(&format!("sparx_vdrop_candidates_total {}\n", snapshot.vdrop.candidates_total));
+    out.push_str(&format!(
+        "sparx_vdrop_candidates_total {}\n",
+        snapshot.vdrop.candidates_total
+    ));
     out.push_str("# TYPE sparx_vdrop_suppressed_candidates_total counter\n");
-    out.push_str(&format!("sparx_vdrop_suppressed_candidates_total {}\n", snapshot.vdrop.suppressed_candidates_total));
+    out.push_str(&format!(
+        "sparx_vdrop_suppressed_candidates_total {}\n",
+        snapshot.vdrop.suppressed_candidates_total
+    ));
     out.push_str("# TYPE sparx_vdrop_alerts_emitted_total counter\n");
-    out.push_str(&format!("sparx_vdrop_alerts_emitted_total {}\n", snapshot.vdrop.alerts_emitted_total));
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_last_evaluation_ts", snapshot.vdrop.last_evaluation_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_source_stream_tracked_subjects", snapshot.vdrop.source_stream_tracked_subjects);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_source_stream_open_silence_subjects", snapshot.vdrop.source_stream_open_silence_subjects);
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_source_stream_open_drop_subjects", snapshot.vdrop.source_stream_open_drop_subjects);
+    out.push_str(&format!(
+        "sparx_vdrop_alerts_emitted_total {}\n",
+        snapshot.vdrop.alerts_emitted_total
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_last_evaluation_ts",
+        snapshot.vdrop.last_evaluation_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_source_stream_tracked_subjects",
+        snapshot.vdrop.source_stream_tracked_subjects,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_source_stream_open_silence_subjects",
+        snapshot.vdrop.source_stream_open_silence_subjects,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_source_stream_open_drop_subjects",
+        snapshot.vdrop.source_stream_open_drop_subjects,
+    );
     out.push_str("# TYPE sparx_vdrop_source_stream_evaluated_subjects_total counter\n");
-    out.push_str(&format!("sparx_vdrop_source_stream_evaluated_subjects_total {}\n", snapshot.vdrop.source_stream_evaluated_subjects_total));
+    out.push_str(&format!(
+        "sparx_vdrop_source_stream_evaluated_subjects_total {}\n",
+        snapshot.vdrop.source_stream_evaluated_subjects_total
+    ));
     out.push_str("# TYPE sparx_vdrop_source_stream_candidates_total counter\n");
-    out.push_str(&format!("sparx_vdrop_source_stream_candidates_total {}\n", snapshot.vdrop.source_stream_candidates_total));
+    out.push_str(&format!(
+        "sparx_vdrop_source_stream_candidates_total {}\n",
+        snapshot.vdrop.source_stream_candidates_total
+    ));
     out.push_str("# TYPE sparx_vdrop_source_stream_suppressed_candidates_total counter\n");
-    out.push_str(&format!("sparx_vdrop_source_stream_suppressed_candidates_total {}\n", snapshot.vdrop.source_stream_suppressed_candidates_total));
+    out.push_str(&format!(
+        "sparx_vdrop_source_stream_suppressed_candidates_total {}\n",
+        snapshot.vdrop.source_stream_suppressed_candidates_total
+    ));
     out.push_str("# TYPE sparx_vdrop_source_stream_alerts_emitted_total counter\n");
-    out.push_str(&format!("sparx_vdrop_source_stream_alerts_emitted_total {}\n", snapshot.vdrop.source_stream_alerts_emitted_total));
-    append_optional_u64_metric_v1(&mut out, "sparx_vdrop_source_stream_last_evaluation_ts", snapshot.vdrop.source_stream_last_evaluation_ts);
+    out.push_str(&format!(
+        "sparx_vdrop_source_stream_alerts_emitted_total {}\n",
+        snapshot.vdrop.source_stream_alerts_emitted_total
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_vdrop_source_stream_last_evaluation_ts",
+        snapshot.vdrop.source_stream_last_evaluation_ts,
+    );
     out.push_str("# TYPE sparx_vdrop_tracked_subjects_by_tenant gauge\n");
     for tenant in &snapshot.vdrop.tenants {
         if let Some(value) = tenant.tracked_subjects {
@@ -1399,7 +2207,9 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
             tenant.source_stream_candidates_total
         ));
     }
-    out.push_str("# TYPE sparx_vdrop_source_stream_suppressed_candidates_total_by_tenant counter\n");
+    out.push_str(
+        "# TYPE sparx_vdrop_source_stream_suppressed_candidates_total_by_tenant counter\n",
+    );
     for tenant in &snapshot.vdrop.tenants {
         out.push_str(&format!(
             "sparx_vdrop_source_stream_suppressed_candidates_total_by_tenant{{tenant_id=\"{}\"}} {}\n",
@@ -1426,23 +2236,59 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
         }
     }
     out.push_str("# TYPE sparx_recovery_automated_replay_max_files_per_pass gauge\n");
-    out.push_str(&format!("sparx_recovery_automated_replay_max_files_per_pass {}\n", snapshot.recovery.automated_replay_max_files_per_pass));
+    out.push_str(&format!(
+        "sparx_recovery_automated_replay_max_files_per_pass {}\n",
+        snapshot.recovery.automated_replay_max_files_per_pass
+    ));
     out.push_str("# TYPE sparx_recovery_automated_replay_interval_seconds gauge\n");
-    out.push_str(&format!("sparx_recovery_automated_replay_interval_seconds {}\n", snapshot.recovery.automated_replay_interval_s));
+    out.push_str(&format!(
+        "sparx_recovery_automated_replay_interval_seconds {}\n",
+        snapshot.recovery.automated_replay_interval_s
+    ));
     out.push_str("# TYPE sparx_recovery_spool_max_megabytes gauge\n");
-    out.push_str(&format!("sparx_recovery_spool_max_megabytes {}\n", snapshot.recovery.spool_max_mb));
+    out.push_str(&format!(
+        "sparx_recovery_spool_max_megabytes {}\n",
+        snapshot.recovery.spool_max_mb
+    ));
     out.push_str("# TYPE sparx_recovery_spool_backlog_files gauge\n");
-    out.push_str(&format!("sparx_recovery_spool_backlog_files {}\n", snapshot.recovery.spool_backlog_files));
+    out.push_str(&format!(
+        "sparx_recovery_spool_backlog_files {}\n",
+        snapshot.recovery.spool_backlog_files
+    ));
     out.push_str("# TYPE sparx_recovery_spool_backlog_bytes gauge\n");
-    out.push_str(&format!("sparx_recovery_spool_backlog_bytes {}\n", snapshot.recovery.spool_backlog_bytes));
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_spool_oldest_file_ts", snapshot.recovery.spool_oldest_file_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_spool_oldest_age_seconds", snapshot.recovery.spool_oldest_age_s);
+    out.push_str(&format!(
+        "sparx_recovery_spool_backlog_bytes {}\n",
+        snapshot.recovery.spool_backlog_bytes
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_spool_oldest_file_ts",
+        snapshot.recovery.spool_oldest_file_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_spool_oldest_age_seconds",
+        snapshot.recovery.spool_oldest_age_s,
+    );
     out.push_str("# TYPE sparx_recovery_stale_backlog gauge\n");
-    out.push_str(&format!("sparx_recovery_stale_backlog {}\n", if snapshot.recovery.stale_backlog { 1 } else { 0 }));
+    out.push_str(&format!(
+        "sparx_recovery_stale_backlog {}\n",
+        if snapshot.recovery.stale_backlog {
+            1
+        } else {
+            0
+        }
+    ));
     out.push_str("# TYPE sparx_recovery_stale_backlog_tenants gauge\n");
-    out.push_str(&format!("sparx_recovery_stale_backlog_tenants {}\n", snapshot.recovery.stale_backlog_tenants));
+    out.push_str(&format!(
+        "sparx_recovery_stale_backlog_tenants {}\n",
+        snapshot.recovery.stale_backlog_tenants
+    ));
     out.push_str("# TYPE sparx_recovery_spool_backlog_tenants gauge\n");
-    out.push_str(&format!("sparx_recovery_spool_backlog_tenants {}\n", snapshot.recovery.spool_backlog_tenants.len()));
+    out.push_str(&format!(
+        "sparx_recovery_spool_backlog_tenants {}\n",
+        snapshot.recovery.spool_backlog_tenants.len()
+    ));
     out.push_str("# TYPE sparx_recovery_spool_backlog_files_by_tenant gauge\n");
     for tenant in &snapshot.recovery.spool_backlog_tenants {
         out.push_str(&format!(
@@ -1575,7 +2421,9 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
             ));
         }
     }
-    out.push_str("# TYPE sparx_recovery_history_counter_snapshot_interval_seconds_by_tenant gauge\n");
+    out.push_str(
+        "# TYPE sparx_recovery_history_counter_snapshot_interval_seconds_by_tenant gauge\n",
+    );
     for tenant in &snapshot.recovery.spool_backlog_tenants {
         if let Some(value) = tenant.history_counter_snapshot_interval_s {
             out.push_str(&format!(
@@ -1605,7 +2453,9 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
             ));
         }
     }
-    out.push_str("# TYPE sparx_recovery_history_spool_replay_fail_rate_per_second_by_tenant gauge\n");
+    out.push_str(
+        "# TYPE sparx_recovery_history_spool_replay_fail_rate_per_second_by_tenant gauge\n",
+    );
     for tenant in &snapshot.recovery.spool_backlog_tenants {
         if let Some(value) = tenant.history_spool_replay_fail_rate_per_s {
             out.push_str(&format!(
@@ -1615,7 +2465,9 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
             ));
         }
     }
-    out.push_str("# TYPE sparx_recovery_history_automated_replay_attempt_rate_per_second_by_tenant gauge\n");
+    out.push_str(
+        "# TYPE sparx_recovery_history_automated_replay_attempt_rate_per_second_by_tenant gauge\n",
+    );
     for tenant in &snapshot.recovery.spool_backlog_tenants {
         if let Some(value) = tenant.history_automated_replay_attempt_rate_per_s {
             out.push_str(&format!(
@@ -1655,7 +2507,9 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
             ));
         }
     }
-    out.push_str("# TYPE sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant gauge\n");
+    out.push_str(
+        "# TYPE sparx_recovery_automated_replay_attempt_rate_per_second_by_tenant gauge\n",
+    );
     for tenant in &snapshot.recovery.spool_backlog_tenants {
         if let Some(value) = tenant.automated_replay_attempt_rate_per_s {
             out.push_str(&format!(
@@ -1666,38 +2520,142 @@ pub fn format_prometheus_text_v1(snapshot: &StatusSnapshotV1) -> String {
         }
     }
     out.push_str("# TYPE sparx_recovery_spool_writes_total counter\n");
-    out.push_str(&format!("sparx_recovery_spool_writes_total {}\n", snapshot.recovery.spool_writes_total));
+    out.push_str(&format!(
+        "sparx_recovery_spool_writes_total {}\n",
+        snapshot.recovery.spool_writes_total
+    ));
     out.push_str("# TYPE sparx_recovery_spool_replayed_total counter\n");
-    out.push_str(&format!("sparx_recovery_spool_replayed_total {}\n", snapshot.recovery.spool_replayed_total));
+    out.push_str(&format!(
+        "sparx_recovery_spool_replayed_total {}\n",
+        snapshot.recovery.spool_replayed_total
+    ));
     out.push_str("# TYPE sparx_recovery_spool_replay_fail_total counter\n");
-    out.push_str(&format!("sparx_recovery_spool_replay_fail_total {}\n", snapshot.recovery.spool_replay_fail_total));
+    out.push_str(&format!(
+        "sparx_recovery_spool_replay_fail_total {}\n",
+        snapshot.recovery.spool_replay_fail_total
+    ));
     out.push_str("# TYPE sparx_recovery_spool_drop_total counter\n");
-    out.push_str(&format!("sparx_recovery_spool_drop_total {}\n", snapshot.recovery.spool_drop_total));
+    out.push_str(&format!(
+        "sparx_recovery_spool_drop_total {}\n",
+        snapshot.recovery.spool_drop_total
+    ));
     out.push_str("# TYPE sparx_recovery_automated_replay_attempts_total counter\n");
-    out.push_str(&format!("sparx_recovery_automated_replay_attempts_total {}\n", snapshot.recovery.automated_replay_attempts_total));
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_last_automated_replay_attempt_ts", snapshot.recovery.last_automated_replay_attempt_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_last_automated_replay_replayed", snapshot.recovery.last_automated_replay_replayed);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_last_automated_replay_failed", snapshot.recovery.last_automated_replay_failed);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_previous_snapshot_ts", snapshot.recovery.previous_snapshot_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_last_snapshot_ts", snapshot.recovery.last_snapshot_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_snapshot_interval_seconds", snapshot.recovery.snapshot_interval_s);
-    append_optional_i64_metric_v1(&mut out, "sparx_recovery_backlog_files_trend_delta", snapshot.recovery.backlog_files_trend_delta);
-    append_optional_i64_metric_v1(&mut out, "sparx_recovery_backlog_bytes_trend_delta", snapshot.recovery.backlog_bytes_trend_delta);
+    out.push_str(&format!(
+        "sparx_recovery_automated_replay_attempts_total {}\n",
+        snapshot.recovery.automated_replay_attempts_total
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_last_automated_replay_attempt_ts",
+        snapshot.recovery.last_automated_replay_attempt_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_last_automated_replay_replayed",
+        snapshot.recovery.last_automated_replay_replayed,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_last_automated_replay_failed",
+        snapshot.recovery.last_automated_replay_failed,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_previous_snapshot_ts",
+        snapshot.recovery.previous_snapshot_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_last_snapshot_ts",
+        snapshot.recovery.last_snapshot_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_snapshot_interval_seconds",
+        snapshot.recovery.snapshot_interval_s,
+    );
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_recovery_backlog_files_trend_delta",
+        snapshot.recovery.backlog_files_trend_delta,
+    );
+    append_optional_i64_metric_v1(
+        &mut out,
+        "sparx_recovery_backlog_bytes_trend_delta",
+        snapshot.recovery.backlog_bytes_trend_delta,
+    );
     out.push_str("# TYPE sparx_recovery_backlog_trend_direction gauge\n");
-    out.push_str(&format!("sparx_recovery_backlog_trend_direction {}\n", recovery_trend_direction_value_v1(&snapshot.recovery.backlog_trend_direction)));
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_previous_counter_snapshot_ts", snapshot.recovery.previous_counter_snapshot_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_last_counter_snapshot_ts", snapshot.recovery.last_counter_snapshot_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_counter_snapshot_interval_seconds", snapshot.recovery.counter_snapshot_interval_s);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_history_start_counter_snapshot_ts", snapshot.recovery.history_start_counter_snapshot_ts);
-    append_optional_u64_metric_v1(&mut out, "sparx_recovery_history_counter_snapshot_interval_seconds", snapshot.recovery.history_counter_snapshot_interval_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_history_spool_write_rate_per_second", snapshot.recovery.history_spool_write_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_history_spool_replayed_rate_per_second", snapshot.recovery.history_spool_replayed_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_history_spool_replay_fail_rate_per_second", snapshot.recovery.history_spool_replay_fail_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_history_automated_replay_attempt_rate_per_second", snapshot.recovery.history_automated_replay_attempt_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_spool_write_rate_per_second", snapshot.recovery.spool_write_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_spool_replayed_rate_per_second", snapshot.recovery.spool_replayed_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_spool_replay_fail_rate_per_second", snapshot.recovery.spool_replay_fail_rate_per_s);
-    append_optional_f64_metric_v1(&mut out, "sparx_recovery_automated_replay_attempt_rate_per_second", snapshot.recovery.automated_replay_attempt_rate_per_s);
+    out.push_str(&format!(
+        "sparx_recovery_backlog_trend_direction {}\n",
+        recovery_trend_direction_value_v1(&snapshot.recovery.backlog_trend_direction)
+    ));
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_previous_counter_snapshot_ts",
+        snapshot.recovery.previous_counter_snapshot_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_last_counter_snapshot_ts",
+        snapshot.recovery.last_counter_snapshot_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_counter_snapshot_interval_seconds",
+        snapshot.recovery.counter_snapshot_interval_s,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_start_counter_snapshot_ts",
+        snapshot.recovery.history_start_counter_snapshot_ts,
+    );
+    append_optional_u64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_counter_snapshot_interval_seconds",
+        snapshot.recovery.history_counter_snapshot_interval_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_spool_write_rate_per_second",
+        snapshot.recovery.history_spool_write_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_spool_replayed_rate_per_second",
+        snapshot.recovery.history_spool_replayed_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_spool_replay_fail_rate_per_second",
+        snapshot.recovery.history_spool_replay_fail_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_history_automated_replay_attempt_rate_per_second",
+        snapshot
+            .recovery
+            .history_automated_replay_attempt_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_spool_write_rate_per_second",
+        snapshot.recovery.spool_write_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_spool_replayed_rate_per_second",
+        snapshot.recovery.spool_replayed_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_spool_replay_fail_rate_per_second",
+        snapshot.recovery.spool_replay_fail_rate_per_s,
+    );
+    append_optional_f64_metric_v1(
+        &mut out,
+        "sparx_recovery_automated_replay_attempt_rate_per_second",
+        snapshot.recovery.automated_replay_attempt_rate_per_s,
+    );
     out
 }
 
@@ -1706,92 +2664,365 @@ pub fn format_health_text_v1(snapshot: &StatusSnapshotV1) -> String {
     out.push_str("status: ok\n");
     out.push_str(&format!("version: {}\n", snapshot.version));
     out.push_str(&format!("mode: {}\n", snapshot.mode));
-    out.push_str(&format!("run_cycles_completed_total: {}\n", snapshot.metrics.run_cycles_completed_total));
-    out.push_str(&format!("run_last_cycle_completed_ts: {}\n", format_option_u64_v1(snapshot.metrics.run_last_cycle_completed_ts)));
-    out.push_str(&format!("spool_backlog_files: {}\n", snapshot.recovery.spool_backlog_files));
-    out.push_str(&format!("spool_backlog_bytes: {}\n", snapshot.recovery.spool_backlog_bytes));
-    out.push_str(&format!("spool_oldest_file_ts: {}\n", format_option_u64_v1(snapshot.recovery.spool_oldest_file_ts)));
-    out.push_str(&format!("spool_oldest_age_s: {}\n", format_option_u64_v1(snapshot.recovery.spool_oldest_age_s)));
-    out.push_str(&format!("stale_backlog: {}\n", snapshot.recovery.stale_backlog));
-    out.push_str(&format!("stale_backlog_tenants: {}\n", snapshot.recovery.stale_backlog_tenants));
-    out.push_str(&format!("spool_backlog_tenants: {}\n", snapshot.recovery.spool_backlog_tenants.len()));
+    out.push_str(&format!(
+        "run_cycles_completed_total: {}\n",
+        snapshot.metrics.run_cycles_completed_total
+    ));
+    out.push_str(&format!(
+        "run_last_cycle_completed_ts: {}\n",
+        format_option_u64_v1(snapshot.metrics.run_last_cycle_completed_ts)
+    ));
+    out.push_str(&format!(
+        "spool_backlog_files: {}\n",
+        snapshot.recovery.spool_backlog_files
+    ));
+    out.push_str(&format!(
+        "spool_backlog_bytes: {}\n",
+        snapshot.recovery.spool_backlog_bytes
+    ));
+    out.push_str(&format!(
+        "spool_oldest_file_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.spool_oldest_file_ts)
+    ));
+    out.push_str(&format!(
+        "spool_oldest_age_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.spool_oldest_age_s)
+    ));
+    out.push_str(&format!(
+        "stale_backlog: {}\n",
+        snapshot.recovery.stale_backlog
+    ));
+    out.push_str(&format!(
+        "stale_backlog_tenants: {}\n",
+        snapshot.recovery.stale_backlog_tenants
+    ));
+    out.push_str(&format!(
+        "spool_backlog_tenants: {}\n",
+        snapshot.recovery.spool_backlog_tenants.len()
+    ));
     for (idx, tenant) in snapshot.recovery.spool_backlog_tenants.iter().enumerate() {
-        out.push_str(&format!("spool_backlog_tenant[{}].tenant_id: {}\n", idx, tenant.tenant_id));
-        out.push_str(&format!("spool_backlog_tenant[{}].files: {}\n", idx, tenant.files));
-        out.push_str(&format!("spool_backlog_tenant[{}].bytes: {}\n", idx, tenant.bytes));
-        out.push_str(&format!("spool_backlog_tenant[{}].oldest_file_ts: {}\n", idx, format_option_u64_v1(tenant.oldest_file_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].oldest_age_s: {}\n", idx, format_option_u64_v1(tenant.oldest_age_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].stale: {}\n", idx, tenant.stale));
-        out.push_str(&format!("spool_backlog_tenant[{}].previous_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.previous_snapshot_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].last_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.last_snapshot_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.snapshot_interval_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].backlog_files_trend_delta: {}\n", idx, format_option_i64_v1(tenant.backlog_files_trend_delta)));
-        out.push_str(&format!("spool_backlog_tenant[{}].backlog_bytes_trend_delta: {}\n", idx, format_option_i64_v1(tenant.backlog_bytes_trend_delta)));
-        out.push_str(&format!("spool_backlog_tenant[{}].backlog_trend_direction: {}\n", idx, tenant.backlog_trend_direction));
-        out.push_str(&format!("spool_backlog_tenant[{}].previous_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.previous_counter_snapshot_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].last_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.last_counter_snapshot_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].counter_snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.counter_snapshot_interval_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_start_counter_snapshot_ts: {}\n", idx, format_option_u64_v1(tenant.history_start_counter_snapshot_ts)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_counter_snapshot_interval_s: {}\n", idx, format_option_u64_v1(tenant.history_counter_snapshot_interval_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_spool_write_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_write_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_spool_replayed_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_replayed_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_spool_replay_fail_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_spool_replay_fail_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].history_automated_replay_attempt_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.history_automated_replay_attempt_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].spool_write_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_write_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].spool_replayed_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_replayed_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].spool_replay_fail_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.spool_replay_fail_rate_per_s)));
-        out.push_str(&format!("spool_backlog_tenant[{}].automated_replay_attempt_rate_per_s: {}\n", idx, format_option_f64_v1(tenant.automated_replay_attempt_rate_per_s)));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].tenant_id: {}\n",
+            idx, tenant.tenant_id
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].files: {}\n",
+            idx, tenant.files
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].bytes: {}\n",
+            idx, tenant.bytes
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].oldest_file_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.oldest_file_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].oldest_age_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.oldest_age_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].stale: {}\n",
+            idx, tenant.stale
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].previous_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.previous_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].last_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.last_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].backlog_files_trend_delta: {}\n",
+            idx,
+            format_option_i64_v1(tenant.backlog_files_trend_delta)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].backlog_bytes_trend_delta: {}\n",
+            idx,
+            format_option_i64_v1(tenant.backlog_bytes_trend_delta)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].backlog_trend_direction: {}\n",
+            idx, tenant.backlog_trend_direction
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].previous_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.previous_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].last_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.last_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].counter_snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.counter_snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_start_counter_snapshot_ts: {}\n",
+            idx,
+            format_option_u64_v1(tenant.history_start_counter_snapshot_ts)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_counter_snapshot_interval_s: {}\n",
+            idx,
+            format_option_u64_v1(tenant.history_counter_snapshot_interval_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_spool_write_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_write_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_spool_replayed_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_replayed_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_spool_replay_fail_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_spool_replay_fail_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].history_automated_replay_attempt_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.history_automated_replay_attempt_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].spool_write_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_write_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].spool_replayed_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_replayed_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].spool_replay_fail_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.spool_replay_fail_rate_per_s)
+        ));
+        out.push_str(&format!(
+            "spool_backlog_tenant[{}].automated_replay_attempt_rate_per_s: {}\n",
+            idx,
+            format_option_f64_v1(tenant.automated_replay_attempt_rate_per_s)
+        ));
     }
-    out.push_str(&format!("spool_writes_total: {}\n", snapshot.recovery.spool_writes_total));
-    out.push_str(&format!("spool_replayed_total: {}\n", snapshot.recovery.spool_replayed_total));
-    out.push_str(&format!("spool_replay_fail_total: {}\n", snapshot.recovery.spool_replay_fail_total));
-    out.push_str(&format!("spool_drop_total: {}\n", snapshot.recovery.spool_drop_total));
-    out.push_str(&format!("automated_replay_attempts_total: {}\n", snapshot.recovery.automated_replay_attempts_total));
-    out.push_str(&format!("last_automated_replay_attempt_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_attempt_ts)));
-    out.push_str(&format!("last_automated_replay_replayed: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_replayed)));
-    out.push_str(&format!("last_automated_replay_failed: {}\n", format_option_u64_v1(snapshot.recovery.last_automated_replay_failed)));
-    out.push_str(&format!("previous_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.previous_snapshot_ts)));
-    out.push_str(&format!("last_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_snapshot_ts)));
-    out.push_str(&format!("snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.snapshot_interval_s)));
-    out.push_str(&format!("backlog_files_trend_delta: {}\n", format_option_i64_v1(snapshot.recovery.backlog_files_trend_delta)));
-    out.push_str(&format!("backlog_bytes_trend_delta: {}\n", format_option_i64_v1(snapshot.recovery.backlog_bytes_trend_delta)));
-    out.push_str(&format!("backlog_trend_direction: {}\n", snapshot.recovery.backlog_trend_direction));
-    out.push_str(&format!("previous_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.previous_counter_snapshot_ts)));
-    out.push_str(&format!("last_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.last_counter_snapshot_ts)));
-    out.push_str(&format!("counter_snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.counter_snapshot_interval_s)));
-    out.push_str(&format!("history_start_counter_snapshot_ts: {}\n", format_option_u64_v1(snapshot.recovery.history_start_counter_snapshot_ts)));
-    out.push_str(&format!("history_counter_snapshot_interval_s: {}\n", format_option_u64_v1(snapshot.recovery.history_counter_snapshot_interval_s)));
-    out.push_str(&format!("history_spool_write_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_write_rate_per_s)));
-    out.push_str(&format!("history_spool_replayed_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_replayed_rate_per_s)));
-    out.push_str(&format!("history_spool_replay_fail_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_spool_replay_fail_rate_per_s)));
-    out.push_str(&format!("history_automated_replay_attempt_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.history_automated_replay_attempt_rate_per_s)));
-    out.push_str(&format!("spool_write_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_write_rate_per_s)));
-    out.push_str(&format!("spool_replayed_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_replayed_rate_per_s)));
-    out.push_str(&format!("spool_replay_fail_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.spool_replay_fail_rate_per_s)));
-    out.push_str(&format!("automated_replay_attempt_rate_per_s: {}\n", format_option_f64_v1(snapshot.recovery.automated_replay_attempt_rate_per_s)));
+    out.push_str(&format!(
+        "spool_writes_total: {}\n",
+        snapshot.recovery.spool_writes_total
+    ));
+    out.push_str(&format!(
+        "spool_replayed_total: {}\n",
+        snapshot.recovery.spool_replayed_total
+    ));
+    out.push_str(&format!(
+        "spool_replay_fail_total: {}\n",
+        snapshot.recovery.spool_replay_fail_total
+    ));
+    out.push_str(&format!(
+        "spool_drop_total: {}\n",
+        snapshot.recovery.spool_drop_total
+    ));
+    out.push_str(&format!(
+        "automated_replay_attempts_total: {}\n",
+        snapshot.recovery.automated_replay_attempts_total
+    ));
+    out.push_str(&format!(
+        "last_automated_replay_attempt_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_attempt_ts)
+    ));
+    out.push_str(&format!(
+        "last_automated_replay_replayed: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_replayed)
+    ));
+    out.push_str(&format!(
+        "last_automated_replay_failed: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_automated_replay_failed)
+    ));
+    out.push_str(&format!(
+        "previous_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.previous_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "last_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "backlog_files_trend_delta: {}\n",
+        format_option_i64_v1(snapshot.recovery.backlog_files_trend_delta)
+    ));
+    out.push_str(&format!(
+        "backlog_bytes_trend_delta: {}\n",
+        format_option_i64_v1(snapshot.recovery.backlog_bytes_trend_delta)
+    ));
+    out.push_str(&format!(
+        "backlog_trend_direction: {}\n",
+        snapshot.recovery.backlog_trend_direction
+    ));
+    out.push_str(&format!(
+        "previous_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.previous_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "last_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.last_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "counter_snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.counter_snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "history_start_counter_snapshot_ts: {}\n",
+        format_option_u64_v1(snapshot.recovery.history_start_counter_snapshot_ts)
+    ));
+    out.push_str(&format!(
+        "history_counter_snapshot_interval_s: {}\n",
+        format_option_u64_v1(snapshot.recovery.history_counter_snapshot_interval_s)
+    ));
+    out.push_str(&format!(
+        "history_spool_write_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_write_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "history_spool_replayed_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_replayed_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "history_spool_replay_fail_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.history_spool_replay_fail_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "history_automated_replay_attempt_rate_per_s: {}\n",
+        format_option_f64_v1(
+            snapshot
+                .recovery
+                .history_automated_replay_attempt_rate_per_s
+        )
+    ));
+    out.push_str(&format!(
+        "spool_write_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_write_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "spool_replayed_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_replayed_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "spool_replay_fail_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.spool_replay_fail_rate_per_s)
+    ));
+    out.push_str(&format!(
+        "automated_replay_attempt_rate_per_s: {}\n",
+        format_option_f64_v1(snapshot.recovery.automated_replay_attempt_rate_per_s)
+    ));
     out.push_str(&format!("vdrop_enabled: {}\n", snapshot.vdrop.enabled));
-    out.push_str(&format!("vdrop_device_enabled: {}\n", snapshot.vdrop.device_enabled));
-    out.push_str(&format!("vdrop_tenant_enabled: {}\n", snapshot.vdrop.tenant_enabled));
-    out.push_str(&format!("vdrop_source_stream_enabled: {}\n", snapshot.vdrop.source_stream_enabled));
-    out.push_str(&format!("vdrop_tracked_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.tracked_subjects)));
-    out.push_str(&format!("vdrop_open_silence_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.open_silence_subjects)));
-    out.push_str(&format!("vdrop_open_drop_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.open_drop_subjects)));
-    out.push_str(&format!("vdrop_evaluated_subjects_total: {}\n", snapshot.vdrop.evaluated_subjects_total));
-    out.push_str(&format!("vdrop_candidates_total: {}\n", snapshot.vdrop.candidates_total));
-    out.push_str(&format!("vdrop_suppressed_candidates_total: {}\n", snapshot.vdrop.suppressed_candidates_total));
-    out.push_str(&format!("vdrop_alerts_emitted_total: {}\n", snapshot.vdrop.alerts_emitted_total));
-    out.push_str(&format!("vdrop_last_evaluation_ts: {}\n", format_option_u64_v1(snapshot.vdrop.last_evaluation_ts)));
-    out.push_str(&format!("vdrop_source_stream_tracked_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_tracked_subjects)));
-    out.push_str(&format!("vdrop_source_stream_open_silence_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_open_silence_subjects)));
-    out.push_str(&format!("vdrop_source_stream_open_drop_subjects: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_open_drop_subjects)));
-    out.push_str(&format!("vdrop_source_stream_evaluated_subjects_total: {}\n", snapshot.vdrop.source_stream_evaluated_subjects_total));
-    out.push_str(&format!("vdrop_source_stream_candidates_total: {}\n", snapshot.vdrop.source_stream_candidates_total));
-    out.push_str(&format!("vdrop_source_stream_suppressed_candidates_total: {}\n", snapshot.vdrop.source_stream_suppressed_candidates_total));
-    out.push_str(&format!("vdrop_source_stream_alerts_emitted_total: {}\n", snapshot.vdrop.source_stream_alerts_emitted_total));
-    out.push_str(&format!("vdrop_source_stream_last_evaluation_ts: {}\n", format_option_u64_v1(snapshot.vdrop.source_stream_last_evaluation_ts)));
-    out.push_str(&format!("automated_replay_max_files_per_pass: {}\n", snapshot.recovery.automated_replay_max_files_per_pass));
-    out.push_str(&format!("automated_replay_interval_s: {}\n", snapshot.recovery.automated_replay_interval_s));
-    out.push_str(&format!("spool_max_mb: {}\n", snapshot.recovery.spool_max_mb));
+    out.push_str(&format!(
+        "vdrop_device_enabled: {}\n",
+        snapshot.vdrop.device_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop_tenant_enabled: {}\n",
+        snapshot.vdrop.tenant_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_enabled: {}\n",
+        snapshot.vdrop.source_stream_enabled
+    ));
+    out.push_str(&format!(
+        "vdrop_tracked_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.tracked_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_open_silence_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.open_silence_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_open_drop_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.open_drop_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_evaluated_subjects_total: {}\n",
+        snapshot.vdrop.evaluated_subjects_total
+    ));
+    out.push_str(&format!(
+        "vdrop_candidates_total: {}\n",
+        snapshot.vdrop.candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop_suppressed_candidates_total: {}\n",
+        snapshot.vdrop.suppressed_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop_alerts_emitted_total: {}\n",
+        snapshot.vdrop.alerts_emitted_total
+    ));
+    out.push_str(&format!(
+        "vdrop_last_evaluation_ts: {}\n",
+        format_option_u64_v1(snapshot.vdrop.last_evaluation_ts)
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_tracked_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_tracked_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_open_silence_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_open_silence_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_open_drop_subjects: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_open_drop_subjects)
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_evaluated_subjects_total: {}\n",
+        snapshot.vdrop.source_stream_evaluated_subjects_total
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_candidates_total: {}\n",
+        snapshot.vdrop.source_stream_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_suppressed_candidates_total: {}\n",
+        snapshot.vdrop.source_stream_suppressed_candidates_total
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_alerts_emitted_total: {}\n",
+        snapshot.vdrop.source_stream_alerts_emitted_total
+    ));
+    out.push_str(&format!(
+        "vdrop_source_stream_last_evaluation_ts: {}\n",
+        format_option_u64_v1(snapshot.vdrop.source_stream_last_evaluation_ts)
+    ));
+    out.push_str(&format!(
+        "automated_replay_max_files_per_pass: {}\n",
+        snapshot.recovery.automated_replay_max_files_per_pass
+    ));
+    out.push_str(&format!(
+        "automated_replay_interval_s: {}\n",
+        snapshot.recovery.automated_replay_interval_s
+    ));
+    out.push_str(&format!(
+        "spool_max_mb: {}\n",
+        snapshot.recovery.spool_max_mb
+    ));
     out
 }
 
@@ -1922,14 +3153,32 @@ impl ObservabilityServerV1 {
         layout: FilesystemLayoutV1,
         global_db: GlobalDbV1,
     ) -> Result<Self, String> {
-        let listener = TcpListener::bind(bind)
-            .map_err(|e| format!("failed to bind {} endpoint at {}: {}", endpoint_name_v1(kind), bind, e))?;
-        listener
-            .set_nonblocking(true)
-            .map_err(|e| format!("failed to set nonblocking {} endpoint at {}: {}", endpoint_name_v1(kind), bind, e))?;
+        let listener = TcpListener::bind(bind).map_err(|e| {
+            format!(
+                "failed to bind {} endpoint at {}: {}",
+                endpoint_name_v1(kind),
+                bind,
+                e
+            )
+        })?;
+        listener.set_nonblocking(true).map_err(|e| {
+            format!(
+                "failed to set nonblocking {} endpoint at {}: {}",
+                endpoint_name_v1(kind),
+                bind,
+                e
+            )
+        })?;
         let local_addr = listener
             .local_addr()
-            .map_err(|e| format!("failed to read local address for {} endpoint at {}: {}", endpoint_name_v1(kind), bind, e))?
+            .map_err(|e| {
+                format!(
+                    "failed to read local address for {} endpoint at {}: {}",
+                    endpoint_name_v1(kind),
+                    bind,
+                    e
+                )
+            })?
             .to_string();
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = Arc::clone(&stop);
@@ -1937,7 +3186,13 @@ impl ObservabilityServerV1 {
             while !stop_thread.load(Ordering::SeqCst) {
                 match listener.accept() {
                     Ok((mut stream, _addr)) => {
-                        let _ = handle_endpoint_request_v1(kind, &cfg, &layout, &global_db, &mut stream);
+                        let _ = handle_endpoint_request_v1(
+                            kind,
+                            &cfg,
+                            &layout,
+                            &global_db,
+                            &mut stream,
+                        );
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(25));
@@ -2055,13 +3310,20 @@ fn handle_endpoint_request_v1(
         .set_read_timeout(Some(Duration::from_millis(250)))
         .map_err(|e| format!("failed to set endpoint read timeout: {}", e))?;
     let mut buf = [0u8; 4096];
-    let read = stream.read(&mut buf).map_err(|e| format!("endpoint read failed: {}", e))?;
+    let read = stream
+        .read(&mut buf)
+        .map_err(|e| format!("endpoint read failed: {}", e))?;
     let request = String::from_utf8_lossy(&buf[..read]).to_string();
     let first_line = request.lines().next().unwrap_or("");
     let expected_path = endpoint_path_v1(kind);
 
     if !first_line.starts_with("GET ") {
-        write_http_response_v1(stream, 405, "text/plain; charset=utf-8", "method not allowed\n")?;
+        write_http_response_v1(
+            stream,
+            405,
+            "text/plain; charset=utf-8",
+            "method not allowed\n",
+        )?;
         return Ok(());
     }
 

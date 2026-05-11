@@ -11,16 +11,35 @@ use super::baseline_sketch::{DeviceStatsV1, WelfordF64V1};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SilenceStateErrorV1 {
-    InvalidLength { expected: usize, actual: usize },
-    MinimumLength { minimum: usize, actual: usize },
+    InvalidLength {
+        expected: usize,
+        actual: usize,
+    },
+    MinimumLength {
+        minimum: usize,
+        actual: usize,
+    },
     UnknownSchemaVersion(u16),
     InvalidSubjectKind(u8),
-    InvalidReservedField { field: &'static str, value: u64 },
-    TrailingBytes { remaining: usize },
-    InvalidAlertIdLength { declared: usize, remaining: usize },
+    InvalidReservedField {
+        field: &'static str,
+        value: u64,
+    },
+    TrailingBytes {
+        remaining: usize,
+    },
+    InvalidAlertIdLength {
+        declared: usize,
+        remaining: usize,
+    },
     InvalidAlertIdByte(u8),
-    InvalidWindowSize { value: u32 },
-    InvalidWindowBounds { window_start_ts: i64, window_end_ts: i64 },
+    InvalidWindowSize {
+        value: u32,
+    },
+    InvalidWindowBounds {
+        window_start_ts: i64,
+        window_end_ts: i64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -104,15 +123,40 @@ pub struct VDropCandidateV1 {
 pub enum VDropSuppressionReasonV1 {
     MissingExpectedSourceState,
     InvalidSubjectKind(u8),
-    InvalidEvaluationConfig { field: &'static str, value: u64 },
-    InvalidWindowSize { value: u32 },
-    InvalidWindowBounds { window_start_ts: i64, window_end_ts: i64 },
-    InvalidBucket { value: u8 },
-    CounterInversion { observed_windows_total: u64, mature_windows_total: u64 },
-    NotMature { mature_windows_total: u64, min_mature_windows: u64 },
-    NotSilent { eval_ts: i64, last_seen_ts: i64 },
-    NotEnoughMissedWindows { expected_windows_missed: u64, min_expected_windows_missed: u64 },
-    BelowExpectedLineFloor { expected_lines: u64, min_expected_lines: u64 },
+    InvalidEvaluationConfig {
+        field: &'static str,
+        value: u64,
+    },
+    InvalidWindowSize {
+        value: u32,
+    },
+    InvalidWindowBounds {
+        window_start_ts: i64,
+        window_end_ts: i64,
+    },
+    InvalidBucket {
+        value: u8,
+    },
+    CounterInversion {
+        observed_windows_total: u64,
+        mature_windows_total: u64,
+    },
+    NotMature {
+        mature_windows_total: u64,
+        min_mature_windows: u64,
+    },
+    NotSilent {
+        eval_ts: i64,
+        last_seen_ts: i64,
+    },
+    NotEnoughMissedWindows {
+        expected_windows_missed: u64,
+        min_expected_windows_missed: u64,
+    },
+    BelowExpectedLineFloor {
+        expected_lines: u64,
+        min_expected_lines: u64,
+    },
     OpenSilenceAlreadyExists,
 }
 
@@ -175,17 +219,44 @@ pub struct SharpDropCandidateV1 {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SharpDropSuppressionReasonV1 {
     InvalidSubjectKind(u8),
-    InvalidWindowBounds { window_start_ts: i64, window_end_ts: i64 },
-    InvalidBucket { value: u8 },
-    InvalidEvaluationConfig { field: &'static str },
-    InvalidExpectedVolume { field: &'static str },
-    NotMature { maturity_count: u32, min_maturity_count: u64 },
-    BelowExpectedLineFloor { expected_lines: f64, min_expected_lines: f64 },
+    InvalidWindowBounds {
+        window_start_ts: i64,
+        window_end_ts: i64,
+    },
+    InvalidBucket {
+        value: u8,
+    },
+    InvalidEvaluationConfig {
+        field: &'static str,
+    },
+    InvalidExpectedVolume {
+        field: &'static str,
+    },
+    NotMature {
+        maturity_count: u32,
+        min_maturity_count: u64,
+    },
+    BelowExpectedLineFloor {
+        expected_lines: f64,
+        min_expected_lines: f64,
+    },
     HardSilencePriority,
-    AbsoluteDropBelowFloor { absolute_drop_lines: f64, min_absolute_drop_lines: f64 },
-    ObservedRatioAboveThreshold { observed_expected_ratio: f32, max_observed_expected_ratio: f32 },
-    DropRatioBelowThreshold { drop_ratio: f32, min_drop_ratio: f32 },
-    VarianceGateNotMet { line_stddevs_below_mean: f32, min_line_stddevs_below_mean: f32 },
+    AbsoluteDropBelowFloor {
+        absolute_drop_lines: f64,
+        min_absolute_drop_lines: f64,
+    },
+    ObservedRatioAboveThreshold {
+        observed_expected_ratio: f32,
+        max_observed_expected_ratio: f32,
+    },
+    DropRatioBelowThreshold {
+        drop_ratio: f32,
+        min_drop_ratio: f32,
+    },
+    VarianceGateNotMet {
+        line_stddevs_below_mean: f32,
+        min_line_stddevs_below_mean: f32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -242,7 +313,9 @@ fn validate_schema_version(version: u16) -> Result<(), SilenceStateErrorV1> {
 
 fn validate_subject_kind(kind: u8) -> Result<(), SilenceStateErrorV1> {
     match kind {
-        SILENCE_SUBJECT_KIND_DEVICE_V1 | SILENCE_SUBJECT_KIND_TENANT_V1 | SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 => Ok(()),
+        SILENCE_SUBJECT_KIND_DEVICE_V1
+        | SILENCE_SUBJECT_KIND_TENANT_V1
+        | SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 => Ok(()),
         other => Err(SilenceStateErrorV1::InvalidSubjectKind(other)),
     }
 }
@@ -296,7 +369,9 @@ fn decode_i64_le(bytes: &[u8]) -> i64 {
     i64::from_le_bytes(raw)
 }
 
-fn validate_expected_source_update_v1(update: &ExpectedSourceStateUpdateV1) -> Result<(), SilenceStateErrorV1> {
+fn validate_expected_source_update_v1(
+    update: &ExpectedSourceStateUpdateV1,
+) -> Result<(), SilenceStateErrorV1> {
     validate_subject_kind(update.subject_kind_u8)?;
     if update.window_size_s_u32 == 0 {
         return Err(SilenceStateErrorV1::InvalidWindowSize {
@@ -525,9 +600,7 @@ pub fn encode_open_drop_state_v1(value: &OpenDropStateV1) -> Vec<u8> {
     out
 }
 
-pub fn decode_open_drop_state_v1(
-    bytes: &[u8],
-) -> Result<OpenDropStateV1, SilenceStateErrorV1> {
+pub fn decode_open_drop_state_v1(bytes: &[u8]) -> Result<OpenDropStateV1, SilenceStateErrorV1> {
     require_min_len(bytes, OPEN_DROP_STATE_V1_FIXED_LEN)?;
 
     let schema_version_u16 = decode_u16_le(&bytes[0..2]);
@@ -571,7 +644,10 @@ pub fn decode_open_drop_state_v1(
     })
 }
 
-pub fn open_drop_state_from_candidate_v1(candidate: &SharpDropCandidateV1, alert_id: &str) -> OpenDropStateV1 {
+pub fn open_drop_state_from_candidate_v1(
+    candidate: &SharpDropCandidateV1,
+    alert_id: &str,
+) -> OpenDropStateV1 {
     OpenDropStateV1 {
         schema_version_u16: SILENCE_SCHEMA_VERSION_V1,
         subject_kind_u8: candidate.subject_kind_u8,
@@ -596,13 +672,15 @@ pub fn open_drop_state_suppresses_candidate_v1(
 
 pub fn close_open_drop_state_by_recovery_v1(value: &OpenDropStateV1) -> OpenDropStateV1 {
     let mut out = value.clone();
-    out.state_flags_u8 = (out.state_flags_u8 & !OPEN_DROP_FLAG_OPEN_V1) | OPEN_DROP_FLAG_CLOSED_BY_RECOVERY_V1;
+    out.state_flags_u8 =
+        (out.state_flags_u8 & !OPEN_DROP_FLAG_OPEN_V1) | OPEN_DROP_FLAG_CLOSED_BY_RECOVERY_V1;
     out
 }
 
 pub fn close_open_drop_state_by_hard_silence_v1(value: &OpenDropStateV1) -> OpenDropStateV1 {
     let mut out = value.clone();
-    out.state_flags_u8 = (out.state_flags_u8 & !OPEN_DROP_FLAG_OPEN_V1) | OPEN_DROP_FLAG_CLOSED_BY_HARD_SILENCE_V1;
+    out.state_flags_u8 =
+        (out.state_flags_u8 & !OPEN_DROP_FLAG_OPEN_V1) | OPEN_DROP_FLAG_CLOSED_BY_HARD_SILENCE_V1;
     out
 }
 
@@ -615,10 +693,16 @@ pub fn evaluate_vdrop_candidate_v1(
 ) -> VDropEvaluationV1 {
     let state = match state {
         Some(value) => value,
-        None => return VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::MissingExpectedSourceState),
+        None => {
+            return VDropEvaluationV1::Suppressed(
+                VDropSuppressionReasonV1::MissingExpectedSourceState,
+            )
+        }
     };
 
-    if let Err(SilenceStateErrorV1::InvalidSubjectKind(kind)) = validate_subject_kind(state.subject_kind_u8) {
+    if let Err(SilenceStateErrorV1::InvalidSubjectKind(kind)) =
+        validate_subject_kind(state.subject_kind_u8)
+    {
         return VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::InvalidSubjectKind(kind));
     }
     if cfg.min_expected_windows_missed_u64 == 0 {
@@ -656,8 +740,12 @@ pub fn evaluate_vdrop_candidate_v1(
         });
     }
     if let Some(open) = open_silence {
-        if open.subject_kind_u8 == state.subject_kind_u8 && (open.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) != 0 {
-            return VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::OpenSilenceAlreadyExists);
+        if open.subject_kind_u8 == state.subject_kind_u8
+            && (open.state_flags_u8 & OPEN_SILENCE_FLAG_OPEN_V1) != 0
+        {
+            return VDropEvaluationV1::Suppressed(
+                VDropSuppressionReasonV1::OpenSilenceAlreadyExists,
+            );
         }
     }
     if cfg.eval_ts_i64 <= state.last_seen_window_end_ts_i64 {
@@ -668,7 +756,8 @@ pub fn evaluate_vdrop_candidate_v1(
     }
 
     let elapsed_s_i64 = cfg.eval_ts_i64 - state.last_seen_window_end_ts_i64;
-    let expected_windows_missed_u64 = u64::try_from(elapsed_s_i64 / i64::from(state.window_size_s_u32)).unwrap_or(0);
+    let expected_windows_missed_u64 =
+        u64::try_from(elapsed_s_i64 / i64::from(state.window_size_s_u32)).unwrap_or(0);
     if expected_windows_missed_u64 < cfg.min_expected_windows_missed_u64 {
         return VDropEvaluationV1::Suppressed(VDropSuppressionReasonV1::NotEnoughMissedWindows {
             expected_windows_missed: expected_windows_missed_u64,
@@ -690,21 +779,35 @@ pub fn evaluate_vdrop_candidate_v1(
         .unwrap_or(i64::MAX)
         .saturating_mul(i64::from(state.window_size_s_u32));
     let window_start_ts_i64 = state.last_seen_window_end_ts_i64;
-    let window_end_ts_i64 = state.last_seen_window_end_ts_i64.saturating_add(missed_seconds);
+    let window_end_ts_i64 = state
+        .last_seen_window_end_ts_i64
+        .saturating_add(missed_seconds);
     let observed_lines_u64 = 0;
     let drop_ratio_f32 = 1.0;
 
     let mut reason_details = vec![
-        ("subject_kind".to_string(), subject_kind_label_v1(state.subject_kind_u8).to_string()),
+        (
+            "subject_kind".to_string(),
+            subject_kind_label_v1(state.subject_kind_u8).to_string(),
+        ),
         ("tenant_id".to_string(), tenant_id.to_string()),
     ];
     if state.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
         reason_details.push(("device_key".to_string(), subject_key.to_string()));
     }
-    reason_details.push(("window_start_ts".to_string(), window_start_ts_i64.to_string()));
+    reason_details.push((
+        "window_start_ts".to_string(),
+        window_start_ts_i64.to_string(),
+    ));
     reason_details.push(("window_end_ts".to_string(), window_end_ts_i64.to_string()));
-    reason_details.push(("last_seen_ts".to_string(), state.last_seen_window_end_ts_i64.to_string()));
-    reason_details.push(("expected_windows_missed".to_string(), expected_windows_missed_u64.to_string()));
+    reason_details.push((
+        "last_seen_ts".to_string(),
+        state.last_seen_window_end_ts_i64.to_string(),
+    ));
+    reason_details.push((
+        "expected_windows_missed".to_string(),
+        expected_windows_missed_u64.to_string(),
+    ));
     reason_details.push(("expected_lines".to_string(), expected_lines_u64.to_string()));
     reason_details.push(("observed_lines".to_string(), observed_lines_u64.to_string()));
     reason_details.push(("drop_ratio".to_string(), format!("{:.6}", drop_ratio_f32)));
@@ -726,8 +829,9 @@ pub fn evaluate_vdrop_candidate_v1(
     })
 }
 
-
-pub fn sharp_drop_expected_volume_from_device_stats_v1(stats: &DeviceStatsV1) -> SharpDropExpectedVolumeV1 {
+pub fn sharp_drop_expected_volume_from_device_stats_v1(
+    stats: &DeviceStatsV1,
+) -> SharpDropExpectedVolumeV1 {
     SharpDropExpectedVolumeV1 {
         maturity_count_u32: stats.line_count.n,
         expected_lines_f64: stats.line_count.mean,
@@ -736,7 +840,9 @@ pub fn sharp_drop_expected_volume_from_device_stats_v1(stats: &DeviceStatsV1) ->
     }
 }
 
-pub fn sum_sharp_drop_expected_volumes_v1(parts: &[SharpDropExpectedVolumeV1]) -> SharpDropExpectedVolumeV1 {
+pub fn sum_sharp_drop_expected_volumes_v1(
+    parts: &[SharpDropExpectedVolumeV1],
+) -> SharpDropExpectedVolumeV1 {
     let mut expected_lines_f64 = 0.0;
     let mut expected_bytes_f64 = 0.0;
     let mut variance_sum_f64 = 0.0;
@@ -762,14 +868,20 @@ pub fn evaluate_sharp_drop_candidate_v1(
     expected: &SharpDropExpectedVolumeV1,
     cfg: &SharpDropEvaluationConfigV1,
 ) -> SharpDropEvaluationV1 {
-    if let Err(SilenceStateErrorV1::InvalidSubjectKind(kind)) = validate_subject_kind(current.subject_kind_u8) {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidSubjectKind(kind));
+    if let Err(SilenceStateErrorV1::InvalidSubjectKind(kind)) =
+        validate_subject_kind(current.subject_kind_u8)
+    {
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidSubjectKind(kind),
+        );
     }
     if current.window_end_ts_i64 <= current.window_start_ts_i64 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidWindowBounds {
-            window_start_ts: current.window_start_ts_i64,
-            window_end_ts: current.window_end_ts_i64,
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidWindowBounds {
+                window_start_ts: current.window_start_ts_i64,
+                window_end_ts: current.window_end_ts_i64,
+            },
+        );
     }
     if current.bucket_u8 > 47 {
         return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidBucket {
@@ -777,52 +889,73 @@ pub fn evaluate_sharp_drop_candidate_v1(
         });
     }
     if cfg.min_maturity_count_u64 == 0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "min_maturity_count_u64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "min_maturity_count_u64",
+            },
+        );
     }
     if !cfg.min_expected_lines_f64.is_finite() || cfg.min_expected_lines_f64 <= 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "min_expected_lines_f64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "min_expected_lines_f64",
+            },
+        );
     }
     if !cfg.min_absolute_drop_lines_f64.is_finite() || cfg.min_absolute_drop_lines_f64 < 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "min_absolute_drop_lines_f64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "min_absolute_drop_lines_f64",
+            },
+        );
     }
     if !cfg.max_observed_expected_ratio_f32.is_finite()
         || cfg.max_observed_expected_ratio_f32 < 0.0
         || cfg.max_observed_expected_ratio_f32 > 1.0
     {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "max_observed_expected_ratio_f32",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "max_observed_expected_ratio_f32",
+            },
+        );
     }
-    if !cfg.min_drop_ratio_f32.is_finite() || cfg.min_drop_ratio_f32 < 0.0 || cfg.min_drop_ratio_f32 > 1.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "min_drop_ratio_f32",
-        });
+    if !cfg.min_drop_ratio_f32.is_finite()
+        || cfg.min_drop_ratio_f32 < 0.0
+        || cfg.min_drop_ratio_f32 > 1.0
+    {
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "min_drop_ratio_f32",
+            },
+        );
     }
     if !cfg.variance_gate_stddevs_f32.is_finite() || cfg.variance_gate_stddevs_f32 < 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
-            field: "variance_gate_stddevs_f32",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidEvaluationConfig {
+                field: "variance_gate_stddevs_f32",
+            },
+        );
     }
     if !expected.expected_lines_f64.is_finite() || expected.expected_lines_f64 <= 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidExpectedVolume {
-            field: "expected_lines_f64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidExpectedVolume {
+                field: "expected_lines_f64",
+            },
+        );
     }
     if !expected.expected_bytes_f64.is_finite() || expected.expected_bytes_f64 < 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidExpectedVolume {
-            field: "expected_bytes_f64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidExpectedVolume {
+                field: "expected_bytes_f64",
+            },
+        );
     }
     if !expected.line_stddev_f64.is_finite() || expected.line_stddev_f64 < 0.0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::InvalidExpectedVolume {
-            field: "line_stddev_f64",
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::InvalidExpectedVolume {
+                field: "line_stddev_f64",
+            },
+        );
     }
     if u64::from(expected.maturity_count_u32) < cfg.min_maturity_count_u64 {
         return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::NotMature {
@@ -831,47 +964,62 @@ pub fn evaluate_sharp_drop_candidate_v1(
         });
     }
     if expected.expected_lines_f64 < cfg.min_expected_lines_f64 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::BelowExpectedLineFloor {
-            expected_lines: expected.expected_lines_f64,
-            min_expected_lines: cfg.min_expected_lines_f64,
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::BelowExpectedLineFloor {
+                expected_lines: expected.expected_lines_f64,
+                min_expected_lines: cfg.min_expected_lines_f64,
+            },
+        );
     }
     if current.observed_lines_u64 == 0 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::HardSilencePriority);
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::HardSilencePriority,
+        );
     }
 
     let absolute_drop_lines_f64 = expected.expected_lines_f64 - current.observed_lines_u64 as f64;
     if absolute_drop_lines_f64 < cfg.min_absolute_drop_lines_f64 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::AbsoluteDropBelowFloor {
-            absolute_drop_lines: absolute_drop_lines_f64,
-            min_absolute_drop_lines: cfg.min_absolute_drop_lines_f64,
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::AbsoluteDropBelowFloor {
+                absolute_drop_lines: absolute_drop_lines_f64,
+                min_absolute_drop_lines: cfg.min_absolute_drop_lines_f64,
+            },
+        );
     }
 
-    let observed_expected_ratio_f64 = (current.observed_lines_u64 as f64) / expected.expected_lines_f64;
+    let observed_expected_ratio_f64 =
+        (current.observed_lines_u64 as f64) / expected.expected_lines_f64;
     let observed_expected_ratio_f32 = observed_expected_ratio_f64 as f32;
     if observed_expected_ratio_f32 > cfg.max_observed_expected_ratio_f32 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::ObservedRatioAboveThreshold {
-            observed_expected_ratio: observed_expected_ratio_f32,
-            max_observed_expected_ratio: cfg.max_observed_expected_ratio_f32,
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::ObservedRatioAboveThreshold {
+                observed_expected_ratio: observed_expected_ratio_f32,
+                max_observed_expected_ratio: cfg.max_observed_expected_ratio_f32,
+            },
+        );
     }
 
     let drop_ratio_f32 = (1.0 - observed_expected_ratio_f64).clamp(0.0, 1.0) as f32;
     if drop_ratio_f32 < cfg.min_drop_ratio_f32 {
-        return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::DropRatioBelowThreshold {
-            drop_ratio: drop_ratio_f32,
-            min_drop_ratio: cfg.min_drop_ratio_f32,
-        });
+        return SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::DropRatioBelowThreshold {
+                drop_ratio: drop_ratio_f32,
+                min_drop_ratio: cfg.min_drop_ratio_f32,
+            },
+        );
     }
 
     let line_stddevs_below_mean_f32 = if expected.line_stddev_f64 > SHARP_DROP_EPSILON_F64_V1 {
-        let value = ((expected.expected_lines_f64 - current.observed_lines_u64 as f64) / expected.line_stddev_f64).max(0.0) as f32;
+        let value = ((expected.expected_lines_f64 - current.observed_lines_u64 as f64)
+            / expected.line_stddev_f64)
+            .max(0.0) as f32;
         if value < cfg.variance_gate_stddevs_f32 {
-            return SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::VarianceGateNotMet {
-                line_stddevs_below_mean: value,
-                min_line_stddevs_below_mean: cfg.variance_gate_stddevs_f32,
-            });
+            return SharpDropEvaluationV1::Suppressed(
+                SharpDropSuppressionReasonV1::VarianceGateNotMet {
+                    line_stddevs_below_mean: value,
+                    min_line_stddevs_below_mean: cfg.variance_gate_stddevs_f32,
+                },
+            );
         }
         Some(value)
     } else {
@@ -880,25 +1028,52 @@ pub fn evaluate_sharp_drop_candidate_v1(
 
     let mut reason_details = vec![
         ("drop_kind".to_string(), "sharp_drop".to_string()),
-        ("subject_kind".to_string(), subject_kind_label_v1(current.subject_kind_u8).to_string()),
+        (
+            "subject_kind".to_string(),
+            subject_kind_label_v1(current.subject_kind_u8).to_string(),
+        ),
         ("tenant_id".to_string(), current.tenant_id.clone()),
     ];
     if current.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
         reason_details.push(("device_key".to_string(), current.subject_key.clone()));
     }
-    reason_details.push(("window_start_ts".to_string(), current.window_start_ts_i64.to_string()));
-    reason_details.push(("window_end_ts".to_string(), current.window_end_ts_i64.to_string()));
+    reason_details.push((
+        "window_start_ts".to_string(),
+        current.window_start_ts_i64.to_string(),
+    ));
+    reason_details.push((
+        "window_end_ts".to_string(),
+        current.window_end_ts_i64.to_string(),
+    ));
     reason_details.push(("bucket".to_string(), current.bucket_u8.to_string()));
-    reason_details.push(("expected_lines".to_string(), format_f64_six_v1(expected.expected_lines_f64)));
-    reason_details.push(("observed_lines".to_string(), current.observed_lines_u64.to_string()));
+    reason_details.push((
+        "expected_lines".to_string(),
+        format_f64_six_v1(expected.expected_lines_f64),
+    ));
+    reason_details.push((
+        "observed_lines".to_string(),
+        current.observed_lines_u64.to_string(),
+    ));
     reason_details.push((
         "observed_expected_ratio".to_string(),
         format_f64_six_v1(f64::from(observed_expected_ratio_f32)),
     ));
-    reason_details.push(("drop_ratio".to_string(), format_f64_six_v1(f64::from(drop_ratio_f32))));
-    reason_details.push(("baseline_n".to_string(), expected.maturity_count_u32.to_string()));
-    reason_details.push(("baseline_mean_lines".to_string(), format_f64_six_v1(expected.expected_lines_f64)));
-    reason_details.push(("baseline_stddev_lines".to_string(), format_f64_six_v1(expected.line_stddev_f64)));
+    reason_details.push((
+        "drop_ratio".to_string(),
+        format_f64_six_v1(f64::from(drop_ratio_f32)),
+    ));
+    reason_details.push((
+        "baseline_n".to_string(),
+        expected.maturity_count_u32.to_string(),
+    ));
+    reason_details.push((
+        "baseline_mean_lines".to_string(),
+        format_f64_six_v1(expected.expected_lines_f64),
+    ));
+    reason_details.push((
+        "baseline_stddev_lines".to_string(),
+        format_f64_six_v1(expected.line_stddev_f64),
+    ));
     reason_details.push((
         "z_drop".to_string(),
         match line_stddevs_below_mean_f32 {
@@ -910,11 +1085,26 @@ pub fn evaluate_sharp_drop_candidate_v1(
         "max_observed_expected_ratio".to_string(),
         format_f64_six_v1(f64::from(cfg.max_observed_expected_ratio_f32)),
     ));
-    reason_details.push(("min_drop_ratio".to_string(), format_f64_six_v1(f64::from(cfg.min_drop_ratio_f32))));
-    reason_details.push(("min_absolute_drop_lines".to_string(), format_f64_six_v1(cfg.min_absolute_drop_lines_f64)));
-    reason_details.push(("expected_bytes".to_string(), format_f64_six_v1(expected.expected_bytes_f64)));
-    reason_details.push(("observed_bytes".to_string(), current.observed_bytes_u64.to_string()));
-    reason_details.push(("absolute_drop_lines".to_string(), format_f64_six_v1(absolute_drop_lines_f64)));
+    reason_details.push((
+        "min_drop_ratio".to_string(),
+        format_f64_six_v1(f64::from(cfg.min_drop_ratio_f32)),
+    ));
+    reason_details.push((
+        "min_absolute_drop_lines".to_string(),
+        format_f64_six_v1(cfg.min_absolute_drop_lines_f64),
+    ));
+    reason_details.push((
+        "expected_bytes".to_string(),
+        format_f64_six_v1(expected.expected_bytes_f64),
+    ));
+    reason_details.push((
+        "observed_bytes".to_string(),
+        current.observed_bytes_u64.to_string(),
+    ));
+    reason_details.push((
+        "absolute_drop_lines".to_string(),
+        format_f64_six_v1(absolute_drop_lines_f64),
+    ));
 
     SharpDropEvaluationV1::Candidate(SharpDropCandidateV1 {
         subject_kind_u8: current.subject_kind_u8,

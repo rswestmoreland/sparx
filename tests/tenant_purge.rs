@@ -5,8 +5,8 @@ use std::fs;
 
 use tempfile::tempdir;
 
-use sparx::cli::CommandV1;
 use sparx::cli::route::route_command_v1;
+use sparx::cli::CommandV1;
 use sparx::config::load::default_config_v1;
 use sparx::db::{GlobalTenantPurgeEntryV1, GlobalTenantRecordV1, TenantSchemaStateV1};
 use sparx::runtime::{SparxRuntimeV1, TenantPurgeOutcomeKindV1};
@@ -70,7 +70,10 @@ fn tenant_purge_empty_tenant_success_v1() -> Result<(), Box<dyn std::error::Erro
         result.journal_entries
     );
     assert!(runtime.list_active_tenants_v1()?.is_empty());
-    assert_eq!(Some(3), runtime.read_tenant_record_v1("tenant-a")?.map(|r| r.status));
+    assert_eq!(
+        Some(3),
+        runtime.read_tenant_record_v1("tenant-a")?.map(|r| r.status)
+    );
     assert_eq!(
         vec![
             GlobalTenantPurgeEntryV1 {
@@ -148,7 +151,10 @@ fn tenant_purge_populated_closes_handle_and_preserves_other_tenants_v1(
     assert!(std::path::Path::new(&paths_b.tenant_db_dir).exists());
     assert!(std::path::Path::new(&paths_b.alert_out_dir).exists());
     assert!(std::path::Path::new(&paths_b.spool_dir).exists());
-    assert_eq!(Some(2), runtime.read_tenant_record_v1("tenant-b")?.map(|r| r.status));
+    assert_eq!(
+        Some(2),
+        runtime.read_tenant_record_v1("tenant-b")?.map(|r| r.status)
+    );
     Ok(())
 }
 
@@ -195,10 +201,16 @@ fn tenant_purge_partial_and_route_exit_codes_v1() -> Result<(), Box<dyn std::err
     );
     assert_eq!(6, r.exit_code);
     assert!(r.msg_stdout.unwrap().contains("tenant purge partial"));
-    assert!(r.msg_stderr.unwrap().contains("exists but is not a directory"));
+    assert!(r
+        .msg_stderr
+        .unwrap()
+        .contains("exists but is not a directory"));
 
     let runtime = SparxRuntimeV1::open_from_config_v1(&cfg)?;
-    assert_eq!(Some(2), runtime.read_tenant_record_v1("tenant-a")?.map(|r| r.status));
+    assert_eq!(
+        Some(2),
+        runtime.read_tenant_record_v1("tenant-a")?.map(|r| r.status)
+    );
     assert!(!std::path::Path::new(&paths.tenant_db_dir).exists());
     assert!(!std::path::Path::new(&paths.alert_out_dir).exists());
     assert!(std::path::Path::new(&paths.spool_dir).exists());

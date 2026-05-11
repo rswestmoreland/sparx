@@ -150,7 +150,9 @@ fn encode_string_v1(value: &str, out: &mut Vec<u8>) {
 fn decode_string_v1_prefix(bytes: &[u8]) -> Result<(String, usize), OpenWindowErrorV1> {
     let (len_u32, used) = decode_varint_u32_prefix(bytes)?;
     let len = usize::try_from(len_u32).map_err(|_| OpenWindowErrorV1::VarintOverflow)?;
-    let end = used.checked_add(len).ok_or(OpenWindowErrorV1::VarintOverflow)?;
+    let end = used
+        .checked_add(len)
+        .ok_or(OpenWindowErrorV1::VarintOverflow)?;
     if end > bytes.len() {
         return Err(OpenWindowErrorV1::UnexpectedEof);
     }
@@ -215,7 +217,8 @@ pub fn encode_sparse_counts_v1(pairs: &[SparseCountPairV1]) -> Result<Vec<u8>, O
 
 pub fn decode_sparse_counts_v1(bytes: &[u8]) -> Result<Vec<SparseCountPairV1>, OpenWindowErrorV1> {
     let (pair_count_u32, mut offset) = decode_varint_u32_prefix(bytes)?;
-    let pair_count = usize::try_from(pair_count_u32).map_err(|_| OpenWindowErrorV1::VarintOverflow)?;
+    let pair_count =
+        usize::try_from(pair_count_u32).map_err(|_| OpenWindowErrorV1::VarintOverflow)?;
     let mut out = Vec::with_capacity(pair_count);
     let mut prev_feature_id: Option<u32> = None;
 
@@ -312,7 +315,8 @@ pub fn encode_topk_strings_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, 
 
 pub fn decode_topk_strings_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     let (entry_count_u32, mut offset) = decode_varint_u32_prefix(bytes)?;
-    let entry_count = usize::try_from(entry_count_u32).map_err(|_| OpenWindowErrorV1::VarintOverflow)?;
+    let entry_count =
+        usize::try_from(entry_count_u32).map_err(|_| OpenWindowErrorV1::VarintOverflow)?;
     let mut out = Vec::with_capacity(entry_count);
 
     for _ in 0..entry_count {
@@ -367,42 +371,62 @@ pub fn decode_win_row_meta_v1(bytes: &[u8]) -> Result<WinMetaV1, OpenWindowError
     decode_win_meta_v1(bytes)
 }
 
-pub fn encode_win_row_ent_srcip_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, OpenWindowErrorV1> {
+pub fn encode_win_row_ent_srcip_v1(
+    entries: &[TopKStringEntryV1],
+) -> Result<Vec<u8>, OpenWindowErrorV1> {
     encode_topk_strings_v1(entries)
 }
 
-pub fn decode_win_row_ent_srcip_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
+pub fn decode_win_row_ent_srcip_v1(
+    bytes: &[u8],
+) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     decode_topk_strings_v1(bytes)
 }
 
-pub fn encode_win_row_ent_dstip_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, OpenWindowErrorV1> {
+pub fn encode_win_row_ent_dstip_v1(
+    entries: &[TopKStringEntryV1],
+) -> Result<Vec<u8>, OpenWindowErrorV1> {
     encode_topk_strings_v1(entries)
 }
 
-pub fn decode_win_row_ent_dstip_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
+pub fn decode_win_row_ent_dstip_v1(
+    bytes: &[u8],
+) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     decode_topk_strings_v1(bytes)
 }
 
-pub fn encode_win_row_ent_userid_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, OpenWindowErrorV1> {
+pub fn encode_win_row_ent_userid_v1(
+    entries: &[TopKStringEntryV1],
+) -> Result<Vec<u8>, OpenWindowErrorV1> {
     encode_topk_strings_v1(entries)
 }
 
-pub fn decode_win_row_ent_userid_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
+pub fn decode_win_row_ent_userid_v1(
+    bytes: &[u8],
+) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     decode_topk_strings_v1(bytes)
 }
 
-pub fn encode_win_row_ent_domain_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, OpenWindowErrorV1> {
+pub fn encode_win_row_ent_domain_v1(
+    entries: &[TopKStringEntryV1],
+) -> Result<Vec<u8>, OpenWindowErrorV1> {
     encode_topk_strings_v1(entries)
 }
 
-pub fn decode_win_row_ent_domain_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
+pub fn decode_win_row_ent_domain_v1(
+    bytes: &[u8],
+) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     decode_topk_strings_v1(bytes)
 }
 
-pub fn encode_win_row_ent_host_v1(entries: &[TopKStringEntryV1]) -> Result<Vec<u8>, OpenWindowErrorV1> {
+pub fn encode_win_row_ent_host_v1(
+    entries: &[TopKStringEntryV1],
+) -> Result<Vec<u8>, OpenWindowErrorV1> {
     encode_topk_strings_v1(entries)
 }
 
-pub fn decode_win_row_ent_host_v1(bytes: &[u8]) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
+pub fn decode_win_row_ent_host_v1(
+    bytes: &[u8],
+) -> Result<Vec<TopKStringEntryV1>, OpenWindowErrorV1> {
     decode_topk_strings_v1(bytes)
 }

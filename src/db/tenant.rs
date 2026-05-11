@@ -21,39 +21,29 @@ use crate::db::baseline_sketch::{
 };
 use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1};
 use crate::db::keys::{
-    key_prefix_tenant_alert_v1, key_prefix_tenant_migrate_journal_v1, key_tenant_active_window_v1,
+    key_prefix_tenant_alert_v1, key_prefix_tenant_drop_open_device_v1,
+    key_prefix_tenant_drop_open_source_stream_v1, key_prefix_tenant_migrate_journal_v1,
+    key_prefix_tenant_silence_open_source_stream_v1, key_prefix_tenant_silence_open_v1,
+    key_prefix_tenant_silence_subject_device_v1,
+    key_prefix_tenant_silence_subject_source_stream_v1, key_prefix_tenant_source_stats_v1,
+    key_prefix_tenant_source_stream_device_v1, key_tenant_active_window_v1,
     key_tenant_alert_idx_cat_v1, key_tenant_alert_idx_ent_v1, key_tenant_alert_idx_time_v1,
     key_tenant_alert_v1, key_tenant_centroid_v1, key_tenant_cursor_inode_v1,
     key_tenant_cursor_is_gzip_v1, key_tenant_cursor_last_read_ts_v1, key_tenant_cursor_mtime_v1,
     key_tenant_cursor_offset_v1, key_tenant_cursor_size_v1, key_tenant_dfm_v1, key_tenant_dfn_v1,
-    key_tenant_migrate_journal_v1, key_tenant_schema_created_ts_v1,
-    key_tenant_schema_last_migrate_ts_v1, key_tenant_schema_version_v1, key_tenant_stats_v1,
-    key_tenant_source_stats_v1, key_tenant_source_stream_catalog_v1,
-    key_prefix_tenant_source_stream_device_v1, key_prefix_tenant_source_stats_v1,
+    key_tenant_drop_open_device_v1, key_tenant_drop_open_source_stream_v1,
+    key_tenant_drop_open_tenant_v1, key_tenant_migrate_journal_v1, key_tenant_schema_created_ts_v1,
+    key_tenant_schema_last_migrate_ts_v1, key_tenant_schema_version_v1,
+    key_tenant_silence_open_device_v1, key_tenant_silence_open_source_stream_v1,
+    key_tenant_silence_open_tenant_v1, key_tenant_silence_subject_device_state_v1,
+    key_tenant_silence_subject_source_stream_state_v1, key_tenant_silence_subject_tenant_state_v1,
+    key_tenant_source_stats_v1, key_tenant_source_stream_catalog_v1, key_tenant_stats_v1,
     key_tenant_window_row_ent_domain_v1, key_tenant_window_row_ent_dstip_v1,
     key_tenant_window_row_ent_host_v1, key_tenant_window_row_ent_srcip_v1,
     key_tenant_window_row_ent_userid_v1, key_tenant_window_row_feat_v1,
-    key_tenant_window_row_meta_v1, key_tenant_silence_open_device_v1,
-    key_tenant_silence_open_source_stream_v1, key_tenant_silence_open_tenant_v1,
-    key_prefix_tenant_silence_open_v1, key_prefix_tenant_silence_open_source_stream_v1,
-    key_tenant_drop_open_device_v1, key_tenant_drop_open_source_stream_v1,
-    key_tenant_drop_open_tenant_v1, key_prefix_tenant_drop_open_device_v1,
-    key_prefix_tenant_drop_open_source_stream_v1, key_prefix_tenant_silence_subject_device_v1,
-    key_prefix_tenant_silence_subject_source_stream_v1,
-    key_tenant_silence_subject_device_state_v1, key_tenant_silence_subject_tenant_state_v1,
-    key_tenant_silence_subject_source_stream_state_v1,
+    key_tenant_window_row_meta_v1,
 };
 use crate::db::layout::{filesystem_layout_v1, FilesystemLayoutV1};
-use crate::db::silence::{
-    decode_expected_source_state_v1, decode_open_drop_state_v1, decode_open_silence_state_v1,
-    encode_expected_source_state_v1, encode_open_drop_state_v1, encode_open_silence_state_v1,
-    update_expected_source_state_from_window_v1, ExpectedSourceStateUpdateV1, ExpectedSourceStateV1,
-    OpenDropStateV1, OpenSilenceStateV1,
-};
-use crate::db::source_stream::{
-    decode_source_stream_catalog_v1, decode_source_stream_stats_v1, encode_source_stream_catalog_v1,
-    encode_source_stream_stats_v1, SourceStreamCatalogV1, SourceStreamStatsV1,
-};
 use crate::db::open_window::{
     decode_win_active_v1, decode_win_row_ent_domain_v1, decode_win_row_ent_dstip_v1,
     decode_win_row_ent_host_v1, decode_win_row_ent_srcip_v1, decode_win_row_ent_userid_v1,
@@ -62,14 +52,25 @@ use crate::db::open_window::{
     encode_win_row_ent_srcip_v1, encode_win_row_ent_userid_v1, encode_win_row_feat_v1,
     encode_win_row_meta_v1, SparseCountPairV1, WinActiveV1, WinMetaV1,
 };
+use crate::db::silence::{
+    decode_expected_source_state_v1, decode_open_drop_state_v1, decode_open_silence_state_v1,
+    encode_expected_source_state_v1, encode_open_drop_state_v1, encode_open_silence_state_v1,
+    update_expected_source_state_from_window_v1, ExpectedSourceStateUpdateV1,
+    ExpectedSourceStateV1, OpenDropStateV1, OpenSilenceStateV1,
+};
+use crate::db::source_stream::{
+    decode_source_stream_catalog_v1, decode_source_stream_stats_v1,
+    encode_source_stream_catalog_v1, encode_source_stream_stats_v1, SourceStreamCatalogV1,
+    SourceStreamStatsV1,
+};
 use crate::db::tenant_values::{
     decode_cursor_inode_v1, decode_cursor_is_gzip_v1, decode_cursor_last_read_ts_v1,
     decode_cursor_mtime_v1, decode_cursor_offset_v1, decode_cursor_size_v1,
     decode_meta_schema_created_ts_v1, decode_meta_schema_last_migrate_ts_v1,
     decode_meta_schema_version_v1, encode_cursor_inode_v1, encode_cursor_is_gzip_v1,
     encode_cursor_last_read_ts_v1, encode_cursor_mtime_v1, encode_cursor_offset_v1,
-    encode_cursor_size_v1, encode_meta_schema_created_ts_v1,
-    encode_meta_schema_last_migrate_ts_v1, encode_meta_schema_version_v1,
+    encode_cursor_size_v1, encode_meta_schema_created_ts_v1, encode_meta_schema_last_migrate_ts_v1,
+    encode_meta_schema_version_v1,
 };
 use crate::db::DbErrorV1;
 use crate::features::EntitySketchSnapshotV1;
@@ -148,7 +149,10 @@ impl TenantDbV1 {
         })
     }
 
-    pub fn open_from_layout_v1(layout: &FilesystemLayoutV1, tenant_id: &str) -> Result<Self, DbErrorV1> {
+    pub fn open_from_layout_v1(
+        layout: &FilesystemLayoutV1,
+        tenant_id: &str,
+    ) -> Result<Self, DbErrorV1> {
         Self::open_at_v1(layout.tenant_db_dir_v1(tenant_id))
     }
 
@@ -221,18 +225,28 @@ impl TenantDbV1 {
             return Ok(None);
         }
 
-        let version = version.ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing version"))?;
-        let created_ts = created_ts.ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing created_ts"))?;
-        let last_migrate_ts =
-            last_migrate_ts.ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing last_migrate_ts"))?;
+        let version =
+            version.ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing version"))?;
+        let created_ts = created_ts
+            .ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing created_ts"))?;
+        let last_migrate_ts = last_migrate_ts
+            .ok_or_else(|| DbErrorV1::new_v1("tenant schema state missing last_migrate_ts"))?;
 
         Ok(Some(TenantSchemaStateV1 {
-            version: decode_meta_schema_version_v1(&version)
-                .map_err(|e| DbErrorV1::new_v1(format!("tenant schema version decode failed: {:?}", e)))?,
-            created_ts: decode_meta_schema_created_ts_v1(&created_ts)
-                .map_err(|e| DbErrorV1::new_v1(format!("tenant schema created_ts decode failed: {:?}", e)))?,
-            last_migrate_ts: decode_meta_schema_last_migrate_ts_v1(&last_migrate_ts)
-                .map_err(|e| DbErrorV1::new_v1(format!("tenant schema last_migrate_ts decode failed: {:?}", e)))?,
+            version: decode_meta_schema_version_v1(&version).map_err(|e| {
+                DbErrorV1::new_v1(format!("tenant schema version decode failed: {:?}", e))
+            })?,
+            created_ts: decode_meta_schema_created_ts_v1(&created_ts).map_err(|e| {
+                DbErrorV1::new_v1(format!("tenant schema created_ts decode failed: {:?}", e))
+            })?,
+            last_migrate_ts: decode_meta_schema_last_migrate_ts_v1(&last_migrate_ts).map_err(
+                |e| {
+                    DbErrorV1::new_v1(format!(
+                        "tenant schema last_migrate_ts decode failed: {:?}",
+                        e
+                    ))
+                },
+            )?,
         }))
     }
 
@@ -279,8 +293,10 @@ impl TenantDbV1 {
         let inode = self.get_raw_v1(key_tenant_cursor_inode_v1(device_key, file_key).as_bytes())?;
         let mtime = self.get_raw_v1(key_tenant_cursor_mtime_v1(device_key, file_key).as_bytes())?;
         let size = self.get_raw_v1(key_tenant_cursor_size_v1(device_key, file_key).as_bytes())?;
-        let offset = self.get_raw_v1(key_tenant_cursor_offset_v1(device_key, file_key).as_bytes())?;
-        let is_gzip = self.get_raw_v1(key_tenant_cursor_is_gzip_v1(device_key, file_key).as_bytes())?;
+        let offset =
+            self.get_raw_v1(key_tenant_cursor_offset_v1(device_key, file_key).as_bytes())?;
+        let is_gzip =
+            self.get_raw_v1(key_tenant_cursor_is_gzip_v1(device_key, file_key).as_bytes())?;
         let last_read_ts =
             self.get_raw_v1(key_tenant_cursor_last_read_ts_v1(device_key, file_key).as_bytes())?;
 
@@ -295,12 +311,18 @@ impl TenantDbV1 {
         }
 
         Ok(Some(FileCursorV1 {
-            inode: decode_cursor_inode_v1(&inode.ok_or_else(|| DbErrorV1::new_v1("cursor missing inode"))?)
-                .map_err(|e| DbErrorV1::new_v1(format!("cursor inode decode failed: {:?}", e)))?,
-            mtime: decode_cursor_mtime_v1(&mtime.ok_or_else(|| DbErrorV1::new_v1("cursor missing mtime"))?)
-                .map_err(|e| DbErrorV1::new_v1(format!("cursor mtime decode failed: {:?}", e)))?,
-            size: decode_cursor_size_v1(&size.ok_or_else(|| DbErrorV1::new_v1("cursor missing size"))?)
-                .map_err(|e| DbErrorV1::new_v1(format!("cursor size decode failed: {:?}", e)))?,
+            inode: decode_cursor_inode_v1(
+                &inode.ok_or_else(|| DbErrorV1::new_v1("cursor missing inode"))?,
+            )
+            .map_err(|e| DbErrorV1::new_v1(format!("cursor inode decode failed: {:?}", e)))?,
+            mtime: decode_cursor_mtime_v1(
+                &mtime.ok_or_else(|| DbErrorV1::new_v1("cursor missing mtime"))?,
+            )
+            .map_err(|e| DbErrorV1::new_v1(format!("cursor mtime decode failed: {:?}", e)))?,
+            size: decode_cursor_size_v1(
+                &size.ok_or_else(|| DbErrorV1::new_v1("cursor missing size"))?,
+            )
+            .map_err(|e| DbErrorV1::new_v1(format!("cursor size decode failed: {:?}", e)))?,
             offset: decode_cursor_offset_v1(
                 &offset.ok_or_else(|| DbErrorV1::new_v1("cursor missing offset"))?,
             )
@@ -312,49 +334,88 @@ impl TenantDbV1 {
             last_read_ts: decode_cursor_last_read_ts_v1(
                 &last_read_ts.ok_or_else(|| DbErrorV1::new_v1("cursor missing last_read_ts"))?,
             )
-            .map_err(|e| DbErrorV1::new_v1(format!("cursor last_read_ts decode failed: {:?}", e)))?,
+            .map_err(|e| {
+                DbErrorV1::new_v1(format!("cursor last_read_ts decode failed: {:?}", e))
+            })?,
         }))
     }
 
-    pub fn write_open_window_state_v1(&self, state: &TenantOpenWindowStateV1) -> Result<(), DbErrorV1> {
+    pub fn write_open_window_state_v1(
+        &self,
+        state: &TenantOpenWindowStateV1,
+    ) -> Result<(), DbErrorV1> {
         let ops = vec![
             KvWriteOpV1::Put {
                 key: key_tenant_active_window_v1(&state.device_key).bytes,
                 value: encode_win_active_v1(&state.active),
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_feat_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_feat_v1(&state.sparse_counts)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window feat encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_feat_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_feat_v1(&state.sparse_counts).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window feat encode failed: {:?}", e))
+                })?,
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_meta_v1(&state.device_key, state.active.active_window_id).bytes,
+                key: key_tenant_window_row_meta_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
                 value: encode_win_row_meta_v1(&state.meta),
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_ent_srcip_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_ent_srcip_v1(&state.entity_snapshot.srcips)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window srcip encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_ent_srcip_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_ent_srcip_v1(&state.entity_snapshot.srcips).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window srcip encode failed: {:?}", e))
+                })?,
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_ent_dstip_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_ent_dstip_v1(&state.entity_snapshot.dstips)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window dstip encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_ent_dstip_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_ent_dstip_v1(&state.entity_snapshot.dstips).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window dstip encode failed: {:?}", e))
+                })?,
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_ent_userid_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_ent_userid_v1(&state.entity_snapshot.userids)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window userid encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_ent_userid_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_ent_userid_v1(&state.entity_snapshot.userids).map_err(
+                    |e| DbErrorV1::new_v1(format!("open-window userid encode failed: {:?}", e)),
+                )?,
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_ent_domain_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_ent_domain_v1(&state.entity_snapshot.domains)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window domain encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_ent_domain_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_ent_domain_v1(&state.entity_snapshot.domains).map_err(
+                    |e| DbErrorV1::new_v1(format!("open-window domain encode failed: {:?}", e)),
+                )?,
             },
             KvWriteOpV1::Put {
-                key: key_tenant_window_row_ent_host_v1(&state.device_key, state.active.active_window_id).bytes,
-                value: encode_win_row_ent_host_v1(&state.entity_snapshot.hosts)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window host encode failed: {:?}", e)))?,
+                key: key_tenant_window_row_ent_host_v1(
+                    &state.device_key,
+                    state.active.active_window_id,
+                )
+                .bytes,
+                value: encode_win_row_ent_host_v1(&state.entity_snapshot.hosts).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window host encode failed: {:?}", e))
+                })?,
             },
         ];
         self.write_batch_raw_v1(&ops)
@@ -404,26 +465,37 @@ impl TenantDbV1 {
         Ok(Some(TenantOpenWindowStateV1 {
             device_key: device_key.to_string(),
             active,
-            sparse_counts: decode_win_row_feat_v1(&feat)
-                .map_err(|e| DbErrorV1::new_v1(format!("open-window feat decode failed: {:?}", e)))?,
-            meta: decode_win_row_meta_v1(&meta)
-                .map_err(|e| DbErrorV1::new_v1(format!("open-window meta decode failed: {:?}", e)))?,
+            sparse_counts: decode_win_row_feat_v1(&feat).map_err(|e| {
+                DbErrorV1::new_v1(format!("open-window feat decode failed: {:?}", e))
+            })?,
+            meta: decode_win_row_meta_v1(&meta).map_err(|e| {
+                DbErrorV1::new_v1(format!("open-window meta decode failed: {:?}", e))
+            })?,
             entity_snapshot: EntitySketchSnapshotV1 {
-                srcips: decode_win_row_ent_srcip_v1(&srcips)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window srcip decode failed: {:?}", e)))?,
-                dstips: decode_win_row_ent_dstip_v1(&dstips)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window dstip decode failed: {:?}", e)))?,
-                userids: decode_win_row_ent_userid_v1(&userids)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window userid decode failed: {:?}", e)))?,
-                domains: decode_win_row_ent_domain_v1(&domains)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window domain decode failed: {:?}", e)))?,
-                hosts: decode_win_row_ent_host_v1(&hosts)
-                    .map_err(|e| DbErrorV1::new_v1(format!("open-window host decode failed: {:?}", e)))?,
+                srcips: decode_win_row_ent_srcip_v1(&srcips).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window srcip decode failed: {:?}", e))
+                })?,
+                dstips: decode_win_row_ent_dstip_v1(&dstips).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window dstip decode failed: {:?}", e))
+                })?,
+                userids: decode_win_row_ent_userid_v1(&userids).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window userid decode failed: {:?}", e))
+                })?,
+                domains: decode_win_row_ent_domain_v1(&domains).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window domain decode failed: {:?}", e))
+                })?,
+                hosts: decode_win_row_ent_host_v1(&hosts).map_err(|e| {
+                    DbErrorV1::new_v1(format!("open-window host decode failed: {:?}", e))
+                })?,
             },
         }))
     }
 
-    pub fn delete_open_window_state_v1(&self, device_key: &str, window_id: u64) -> Result<(), DbErrorV1> {
+    pub fn delete_open_window_state_v1(
+        &self,
+        device_key: &str,
+        window_id: u64,
+    ) -> Result<(), DbErrorV1> {
         let ops = vec![
             KvWriteOpV1::Delete {
                 key: key_tenant_active_window_v1(device_key).bytes,
@@ -453,7 +525,10 @@ impl TenantDbV1 {
         self.write_batch_raw_v1(&ops)
     }
 
-    pub fn write_df_slot_bucket_state_v1(&self, state: &TenantDfSlotBucketStateV1) -> Result<(), DbErrorV1> {
+    pub fn write_df_slot_bucket_state_v1(
+        &self,
+        state: &TenantDfSlotBucketStateV1,
+    ) -> Result<(), DbErrorV1> {
         let ops = vec![
             KvWriteOpV1::Put {
                 key: key_tenant_dfn_v1(state.slot, state.bucket).bytes,
@@ -461,8 +536,9 @@ impl TenantDbV1 {
             },
             KvWriteOpV1::Put {
                 key: key_tenant_dfm_v1(state.slot, state.bucket).bytes,
-                value: encode_dfm_v1(&state.df_pairs)
-                    .map_err(|e| DbErrorV1::new_v1(format!("df slot bucket encode failed: {:?}", e)))?,
+                value: encode_dfm_v1(&state.df_pairs).map_err(|e| {
+                    DbErrorV1::new_v1(format!("df slot bucket encode failed: {:?}", e))
+                })?,
             },
         ];
         self.write_batch_raw_v1(&ops)
@@ -485,10 +561,12 @@ impl TenantDbV1 {
         Ok(Some(TenantDfSlotBucketStateV1 {
             slot,
             bucket,
-            window_count: decode_dfn_v1(&dfn)
-                .map_err(|e| DbErrorV1::new_v1(format!("df slot bucket dfn decode failed: {:?}", e)))?,
-            df_pairs: decode_dfm_v1(&dfm)
-                .map_err(|e| DbErrorV1::new_v1(format!("df slot bucket dfm decode failed: {:?}", e)))?,
+            window_count: decode_dfn_v1(&dfn).map_err(|e| {
+                DbErrorV1::new_v1(format!("df slot bucket dfn decode failed: {:?}", e))
+            })?,
+            df_pairs: decode_dfm_v1(&dfm).map_err(|e| {
+                DbErrorV1::new_v1(format!("df slot bucket dfm decode failed: {:?}", e))
+            })?,
         }))
     }
 
@@ -497,10 +575,14 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_silence_subject_device_state_v1(device_key).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_expected_source_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_expected_source_state_v1(&bytes).map_err(
+                |e| {
+                    DbErrorV1::new_v1(format!(
+                        "device expected-source state decode failed: {:?}",
+                        e
+                    ))
+                },
+            )?)),
             None => Ok(None),
         }
     }
@@ -522,45 +604,64 @@ impl TenantDbV1 {
         update: &ExpectedSourceStateUpdateV1,
     ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
         let previous = self.read_device_expected_source_state_v1(device_key)?;
-        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
-            .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state update failed: {:?}", e)))?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update).map_err(
+            |e| {
+                DbErrorV1::new_v1(format!(
+                    "device expected-source state update failed: {:?}",
+                    e
+                ))
+            },
+        )?;
         self.write_device_expected_source_state_v1(device_key, &next)?;
         Ok(next)
     }
 
-
-    pub fn list_device_expected_source_states_v1(&self) -> Result<Vec<(String, ExpectedSourceStateV1)>, DbErrorV1> {
+    pub fn list_device_expected_source_states_v1(
+        &self,
+    ) -> Result<Vec<(String, ExpectedSourceStateV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_silence_subject_device_v1("");
         let prefix_bytes = prefix.as_bytes();
-        let prefix_text = std::str::from_utf8(prefix_bytes)
-            .map_err(|e| DbErrorV1::new_v1(format!("device expected-source prefix utf8 failed: {}", e)))?;
+        let prefix_text = std::str::from_utf8(prefix_bytes).map_err(|e| {
+            DbErrorV1::new_v1(format!("device expected-source prefix utf8 failed: {}", e))
+        })?;
         let entries = self.scan_prefix_raw_v1(prefix_bytes)?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("device expected-source key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("device expected-source key utf8 failed: {}", e))
+            })?;
             let suffix = key_text
                 .strip_prefix(prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("device expected-source key missing prefix"))?;
-            let device_key = suffix
-                .strip_suffix("/state")
-                .ok_or_else(|| DbErrorV1::new_v1("device expected-source key missing state suffix"))?;
+            let device_key = suffix.strip_suffix("/state").ok_or_else(|| {
+                DbErrorV1::new_v1("device expected-source key missing state suffix")
+            })?;
             out.push((
                 device_key.to_string(),
-                decode_expected_source_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device expected-source state decode failed: {:?}", e)))?,
+                decode_expected_source_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "device expected-source state decode failed: {:?}",
+                        e
+                    ))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(out)
     }
 
-    pub fn read_tenant_expected_source_state_v1(&self) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
+    pub fn read_tenant_expected_source_state_v1(
+        &self,
+    ) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_silence_subject_tenant_state_v1().as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_expected_source_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("tenant expected-source state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_expected_source_state_v1(&bytes).map_err(
+                |e| {
+                    DbErrorV1::new_v1(format!(
+                        "tenant expected-source state decode failed: {:?}",
+                        e
+                    ))
+                },
+            )?)),
             None => Ok(None),
         }
     }
@@ -580,8 +681,14 @@ impl TenantDbV1 {
         update: &ExpectedSourceStateUpdateV1,
     ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
         let previous = self.read_tenant_expected_source_state_v1()?;
-        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
-            .map_err(|e| DbErrorV1::new_v1(format!("tenant expected-source state update failed: {:?}", e)))?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update).map_err(
+            |e| {
+                DbErrorV1::new_v1(format!(
+                    "tenant expected-source state update failed: {:?}",
+                    e
+                ))
+            },
+        )?;
         self.write_tenant_expected_source_state_v1(&next)?;
         Ok(next)
     }
@@ -591,10 +698,9 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_silence_open_device_v1(device_key).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_silence_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_open_silence_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -610,34 +716,44 @@ impl TenantDbV1 {
         )
     }
 
-    pub fn list_device_open_silence_states_v1(&self) -> Result<Vec<(String, OpenSilenceStateV1)>, DbErrorV1> {
+    pub fn list_device_open_silence_states_v1(
+        &self,
+    ) -> Result<Vec<(String, OpenSilenceStateV1)>, DbErrorV1> {
         let base = key_prefix_tenant_silence_open_v1();
-        let prefix_text = format!("{}/device/", std::str::from_utf8(base.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("device open-silence prefix utf8 failed: {}", e)))?);
+        let prefix_text = format!(
+            "{}/device/",
+            std::str::from_utf8(base.as_bytes()).map_err(|e| DbErrorV1::new_v1(format!(
+                "device open-silence prefix utf8 failed: {}",
+                e
+            )))?
+        );
         let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("device open-silence key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("device open-silence key utf8 failed: {}", e))
+            })?;
             let device_key = key_text
                 .strip_prefix(&prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("device open-silence key missing prefix"))?;
             out.push((
                 device_key.to_string(),
-                decode_open_silence_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e)))?,
+                decode_open_silence_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!("device open-silence state decode failed: {:?}", e))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(out)
     }
 
-    pub fn read_tenant_open_silence_state_v1(&self) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
+    pub fn read_tenant_open_silence_state_v1(
+        &self,
+    ) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_silence_open_tenant_v1().as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_silence_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("tenant open-silence state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_open_silence_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("tenant open-silence state decode failed: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -657,10 +773,9 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_drop_open_device_v1(device_key).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_drop_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_open_drop_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -676,22 +791,27 @@ impl TenantDbV1 {
         )
     }
 
-    pub fn list_device_open_drop_states_v1(&self) -> Result<Vec<(String, OpenDropStateV1)>, DbErrorV1> {
+    pub fn list_device_open_drop_states_v1(
+        &self,
+    ) -> Result<Vec<(String, OpenDropStateV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_drop_open_device_v1("");
-        let prefix_text = std::str::from_utf8(prefix.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("device open-drop prefix utf8 failed: {}", e)))?;
+        let prefix_text = std::str::from_utf8(prefix.as_bytes()).map_err(|e| {
+            DbErrorV1::new_v1(format!("device open-drop prefix utf8 failed: {}", e))
+        })?;
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("device open-drop key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("device open-drop key utf8 failed: {}", e))
+            })?;
             let device_key = key_text
                 .strip_prefix(prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("device open-drop key missing prefix"))?;
             out.push((
                 device_key.to_string(),
-                decode_open_drop_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e)))?,
+                decode_open_drop_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!("device open-drop state decode failed: {:?}", e))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -700,10 +820,9 @@ impl TenantDbV1 {
 
     pub fn read_tenant_open_drop_state_v1(&self) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_drop_open_tenant_v1().as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_drop_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("tenant open-drop state decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_open_drop_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("tenant open-drop state decode failed: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -718,17 +837,20 @@ impl TenantDbV1 {
         )
     }
 
-
     pub fn read_source_stream_open_silence_state_v1(
         &self,
         device_key: &str,
         source_stream_id: &str,
     ) -> Result<Option<OpenSilenceStateV1>, DbErrorV1> {
-        match self.get_raw_v1(key_tenant_silence_open_source_stream_v1(device_key, source_stream_id).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_silence_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence state decode failed: {:?}", e)))?,
-            )),
+        match self.get_raw_v1(
+            key_tenant_silence_open_source_stream_v1(device_key, source_stream_id).as_bytes(),
+        )? {
+            Some(bytes) => Ok(Some(decode_open_silence_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream open-silence state decode failed: {:?}",
+                    e
+                ))
+            })?)),
             None => Ok(None),
         }
     }
@@ -750,20 +872,29 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Vec<(String, OpenSilenceStateV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_silence_open_source_stream_v1(device_key, "");
-        let prefix_text = std::str::from_utf8(prefix.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence prefix utf8 failed: {}", e)))?;
+        let prefix_text = std::str::from_utf8(prefix.as_bytes()).map_err(|e| {
+            DbErrorV1::new_v1(format!(
+                "source-stream open-silence prefix utf8 failed: {}",
+                e
+            ))
+        })?;
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence key utf8 failed: {}", e)))?;
-            let source_stream_id = key_text
-                .strip_prefix(prefix_text)
-                .ok_or_else(|| DbErrorV1::new_v1("source-stream open-silence key missing prefix"))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream open-silence key utf8 failed: {}", e))
+            })?;
+            let source_stream_id = key_text.strip_prefix(prefix_text).ok_or_else(|| {
+                DbErrorV1::new_v1("source-stream open-silence key missing prefix")
+            })?;
             out.push((
                 source_stream_id.to_string(),
-                decode_open_silence_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-silence state decode failed: {:?}", e)))?,
+                decode_open_silence_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream open-silence state decode failed: {:?}",
+                        e
+                    ))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -775,11 +906,15 @@ impl TenantDbV1 {
         device_key: &str,
         source_stream_id: &str,
     ) -> Result<Option<OpenDropStateV1>, DbErrorV1> {
-        match self.get_raw_v1(key_tenant_drop_open_source_stream_v1(device_key, source_stream_id).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_open_drop_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop state decode failed: {:?}", e)))?,
-            )),
+        match self.get_raw_v1(
+            key_tenant_drop_open_source_stream_v1(device_key, source_stream_id).as_bytes(),
+        )? {
+            Some(bytes) => Ok(Some(decode_open_drop_state_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream open-drop state decode failed: {:?}",
+                    e
+                ))
+            })?)),
             None => Ok(None),
         }
     }
@@ -801,37 +936,43 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Vec<(String, OpenDropStateV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_drop_open_source_stream_v1(device_key, "");
-        let prefix_text = std::str::from_utf8(prefix.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop prefix utf8 failed: {}", e)))?;
+        let prefix_text = std::str::from_utf8(prefix.as_bytes()).map_err(|e| {
+            DbErrorV1::new_v1(format!("source-stream open-drop prefix utf8 failed: {}", e))
+        })?;
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream open-drop key utf8 failed: {}", e))
+            })?;
             let source_stream_id = key_text
                 .strip_prefix(prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("source-stream open-drop key missing prefix"))?;
             out.push((
                 source_stream_id.to_string(),
-                decode_open_drop_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream open-drop state decode failed: {:?}", e)))?,
+                decode_open_drop_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream open-drop state decode failed: {:?}",
+                        e
+                    ))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(out)
     }
 
-
     pub fn read_source_stream_catalog_v1(
         &self,
         device_key: &str,
         source_stream_id: &str,
     ) -> Result<Option<SourceStreamCatalogV1>, DbErrorV1> {
-        match self.get_raw_v1(key_tenant_source_stream_catalog_v1(device_key, source_stream_id).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_source_stream_catalog_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e)))?,
-            )),
+        match self.get_raw_v1(
+            key_tenant_source_stream_catalog_v1(device_key, source_stream_id).as_bytes(),
+        )? {
+            Some(bytes) => Ok(Some(decode_source_stream_catalog_v1(&bytes).map_err(
+                |e| DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e)),
+            )?)),
             None => Ok(None),
         }
     }
@@ -841,9 +982,11 @@ impl TenantDbV1 {
         catalog: &SourceStreamCatalogV1,
     ) -> Result<(), DbErrorV1> {
         self.put_raw_v1(
-            key_tenant_source_stream_catalog_v1(&catalog.device_key, &catalog.source_stream_id).as_bytes(),
-            &encode_source_stream_catalog_v1(catalog)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog encode failed: {:?}", e)))?,
+            key_tenant_source_stream_catalog_v1(&catalog.device_key, &catalog.source_stream_id)
+                .as_bytes(),
+            &encode_source_stream_catalog_v1(catalog).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream catalog encode failed: {:?}", e))
+            })?,
         )
     }
 
@@ -852,23 +995,32 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Vec<SourceStreamCatalogV1>, DbErrorV1> {
         let base = key_prefix_tenant_source_stream_device_v1(device_key);
-        let prefix_text = format!("{}/", std::str::from_utf8(base.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog prefix utf8 failed: {}", e)))?);
+        let prefix_text = format!(
+            "{}/",
+            std::str::from_utf8(base.as_bytes()).map_err(|e| DbErrorV1::new_v1(format!(
+                "source-stream catalog prefix utf8 failed: {}",
+                e
+            )))?
+        );
         let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream catalog key utf8 failed: {}", e))
+            })?;
             let suffix = key_text
                 .strip_prefix(&prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("source-stream catalog key missing prefix"))?;
-            let source_stream_id = suffix
-                .strip_suffix("/catalog")
-                .ok_or_else(|| DbErrorV1::new_v1("source-stream catalog key missing catalog suffix"))?;
-            let catalog = decode_source_stream_catalog_v1(&value)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e)))?;
+            let source_stream_id = suffix.strip_suffix("/catalog").ok_or_else(|| {
+                DbErrorV1::new_v1("source-stream catalog key missing catalog suffix")
+            })?;
+            let catalog = decode_source_stream_catalog_v1(&value).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream catalog decode failed: {:?}", e))
+            })?;
             if catalog.device_key != device_key || catalog.source_stream_id != source_stream_id {
-                return Err(DbErrorV1::new_v1("source-stream catalog key/value mismatch"));
+                return Err(DbErrorV1::new_v1(
+                    "source-stream catalog key/value mismatch",
+                ));
             }
             out.push(catalog);
         }
@@ -887,11 +1039,12 @@ impl TenantDbV1 {
         source_stream_id: &str,
         bucket: u8,
     ) -> Result<Option<SourceStreamStatsV1>, DbErrorV1> {
-        match self.get_raw_v1(key_tenant_source_stats_v1(device_key, source_stream_id, bucket).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_source_stream_stats_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e)))?,
-            )),
+        match self.get_raw_v1(
+            key_tenant_source_stats_v1(device_key, source_stream_id, bucket).as_bytes(),
+        )? {
+            Some(bytes) => Ok(Some(decode_source_stream_stats_v1(&bytes).map_err(
+                |e| DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e)),
+            )?)),
             None => Ok(None),
         }
     }
@@ -905,8 +1058,9 @@ impl TenantDbV1 {
     ) -> Result<(), DbErrorV1> {
         self.put_raw_v1(
             key_tenant_source_stats_v1(device_key, source_stream_id, bucket).as_bytes(),
-            &encode_source_stream_stats_v1(stats)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats encode failed: {:?}", e)))?,
+            &encode_source_stream_stats_v1(stats).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream stats encode failed: {:?}", e))
+            })?,
         )
     }
 
@@ -916,23 +1070,30 @@ impl TenantDbV1 {
         source_stream_id: &str,
     ) -> Result<Vec<(u8, SourceStreamStatsV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_source_stats_v1(device_key, source_stream_id);
-        let prefix_text = format!("{}/", std::str::from_utf8(prefix.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats prefix utf8 failed: {}", e)))?);
+        let prefix_text = format!(
+            "{}/",
+            std::str::from_utf8(prefix.as_bytes()).map_err(|e| DbErrorV1::new_v1(format!(
+                "source-stream stats prefix utf8 failed: {}",
+                e
+            )))?
+        );
         let entries = self.scan_prefix_raw_v1(prefix_text.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats key utf8 failed: {}", e)))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream stats key utf8 failed: {}", e))
+            })?;
             let bucket_text = key_text
                 .strip_prefix(&prefix_text)
                 .ok_or_else(|| DbErrorV1::new_v1("source-stream stats key missing prefix"))?;
-            let bucket = bucket_text
-                .parse::<u8>()
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats bucket parse failed: {}", e)))?;
+            let bucket = bucket_text.parse::<u8>().map_err(|e| {
+                DbErrorV1::new_v1(format!("source-stream stats bucket parse failed: {}", e))
+            })?;
             out.push((
                 bucket,
-                decode_source_stream_stats_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e)))?,
+                decode_source_stream_stats_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!("source-stream stats decode failed: {:?}", e))
+                })?,
             ));
         }
         out.sort_by_key(|(bucket, _)| *bucket);
@@ -944,11 +1105,18 @@ impl TenantDbV1 {
         device_key: &str,
         source_stream_id: &str,
     ) -> Result<Option<ExpectedSourceStateV1>, DbErrorV1> {
-        match self.get_raw_v1(key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_expected_source_state_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state decode failed: {:?}", e)))?,
-            )),
+        match self.get_raw_v1(
+            key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id)
+                .as_bytes(),
+        )? {
+            Some(bytes) => Ok(Some(decode_expected_source_state_v1(&bytes).map_err(
+                |e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream expected-source state decode failed: {:?}",
+                        e
+                    ))
+                },
+            )?)),
             None => Ok(None),
         }
     }
@@ -960,7 +1128,8 @@ impl TenantDbV1 {
         state: &ExpectedSourceStateV1,
     ) -> Result<(), DbErrorV1> {
         self.put_raw_v1(
-            key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id).as_bytes(),
+            key_tenant_silence_subject_source_stream_state_v1(device_key, source_stream_id)
+                .as_bytes(),
             &encode_expected_source_state_v1(state),
         )
     }
@@ -971,9 +1140,16 @@ impl TenantDbV1 {
         source_stream_id: &str,
         update: &ExpectedSourceStateUpdateV1,
     ) -> Result<ExpectedSourceStateV1, DbErrorV1> {
-        let previous = self.read_source_stream_expected_source_state_v1(device_key, source_stream_id)?;
-        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update)
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state update failed: {:?}", e)))?;
+        let previous =
+            self.read_source_stream_expected_source_state_v1(device_key, source_stream_id)?;
+        let next = update_expected_source_state_from_window_v1(previous.as_ref(), update).map_err(
+            |e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream expected-source state update failed: {:?}",
+                    e
+                ))
+            },
+        )?;
         self.write_source_stream_expected_source_state_v1(device_key, source_stream_id, &next)?;
         Ok(next)
     }
@@ -983,29 +1159,40 @@ impl TenantDbV1 {
         device_key: &str,
     ) -> Result<Vec<(String, ExpectedSourceStateV1)>, DbErrorV1> {
         let prefix = key_prefix_tenant_silence_subject_source_stream_v1(device_key, "");
-        let prefix_text = std::str::from_utf8(prefix.as_bytes())
-            .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source prefix utf8 failed: {}", e)))?;
+        let prefix_text = std::str::from_utf8(prefix.as_bytes()).map_err(|e| {
+            DbErrorV1::new_v1(format!(
+                "source-stream expected-source prefix utf8 failed: {}",
+                e
+            ))
+        })?;
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let key_text = String::from_utf8(key)
-                .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source key utf8 failed: {}", e)))?;
-            let suffix = key_text
-                .strip_prefix(prefix_text)
-                .ok_or_else(|| DbErrorV1::new_v1("source-stream expected-source key missing prefix"))?;
-            let source_stream_id = suffix
-                .strip_suffix("/state")
-                .ok_or_else(|| DbErrorV1::new_v1("source-stream expected-source key missing state suffix"))?;
+            let key_text = String::from_utf8(key).map_err(|e| {
+                DbErrorV1::new_v1(format!(
+                    "source-stream expected-source key utf8 failed: {}",
+                    e
+                ))
+            })?;
+            let suffix = key_text.strip_prefix(prefix_text).ok_or_else(|| {
+                DbErrorV1::new_v1("source-stream expected-source key missing prefix")
+            })?;
+            let source_stream_id = suffix.strip_suffix("/state").ok_or_else(|| {
+                DbErrorV1::new_v1("source-stream expected-source key missing state suffix")
+            })?;
             out.push((
                 source_stream_id.to_string(),
-                decode_expected_source_state_v1(&value)
-                    .map_err(|e| DbErrorV1::new_v1(format!("source-stream expected-source state decode failed: {:?}", e)))?,
+                decode_expected_source_state_v1(&value).map_err(|e| {
+                    DbErrorV1::new_v1(format!(
+                        "source-stream expected-source state decode failed: {:?}",
+                        e
+                    ))
+                })?,
             ));
         }
         out.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(out)
     }
-
 
     pub fn write_device_baseline_state_v1(
         &self,
@@ -1013,8 +1200,9 @@ impl TenantDbV1 {
     ) -> Result<(), DbErrorV1> {
         let mut ops = vec![KvWriteOpV1::Put {
             key: key_tenant_centroid_v1(&state.device_key, state.bucket).bytes,
-            value: encode_centroid_v1(&state.centroid)
-                .map_err(|e| DbErrorV1::new_v1(format!("device baseline centroid encode failed: {:?}", e)))?,
+            value: encode_centroid_v1(&state.centroid).map_err(|e| {
+                DbErrorV1::new_v1(format!("device baseline centroid encode failed: {:?}", e))
+            })?,
         }];
         match &state.stats {
             Some(stats) => ops.push(KvWriteOpV1::Put {
@@ -1040,19 +1228,20 @@ impl TenantDbV1 {
             return Ok(None);
         }
 
-        let centroid = centroid.ok_or_else(|| DbErrorV1::new_v1("device baseline missing centroid"))?;
+        let centroid =
+            centroid.ok_or_else(|| DbErrorV1::new_v1("device baseline missing centroid"))?;
         let stats = match stats {
-            Some(bytes) => Some(
-                decode_stats_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("device baseline stats decode failed: {:?}", e)))?,
-            ),
+            Some(bytes) => Some(decode_stats_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("device baseline stats decode failed: {:?}", e))
+            })?),
             None => None,
         };
         Ok(Some(TenantDeviceBaselineStateV1 {
             device_key: device_key.to_string(),
             bucket,
-            centroid: decode_centroid_v1(&centroid)
-                .map_err(|e| DbErrorV1::new_v1(format!("device baseline centroid decode failed: {:?}", e)))?,
+            centroid: decode_centroid_v1(&centroid).map_err(|e| {
+                DbErrorV1::new_v1(format!("device baseline centroid decode failed: {:?}", e))
+            })?,
             stats,
         }))
     }
@@ -1075,10 +1264,9 @@ impl TenantDbV1 {
 
     pub fn read_primary_alert_v1(&self, alert_id: &str) -> Result<Option<AlertV1>, DbErrorV1> {
         match self.get_raw_v1(key_tenant_alert_v1(alert_id).as_bytes())? {
-            Some(bytes) => Ok(Some(
-                decode_alert_v1(&bytes)
-                    .map_err(|e| DbErrorV1::new_v1(format!("alert decode failed: {:?}", e)))?,
-            )),
+            Some(bytes) => Ok(Some(decode_alert_v1(&bytes).map_err(|e| {
+                DbErrorV1::new_v1(format!("alert decode failed: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -1088,12 +1276,18 @@ impl TenantDbV1 {
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, _) in entries {
-            out.push(parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "tenant alert key")?);
+            out.push(parse_suffix_after_prefix_v1(
+                &key,
+                prefix.as_bytes(),
+                "tenant alert key",
+            )?);
         }
         Ok(out)
     }
 
-    pub fn list_time_index_entries_v1(&self) -> Result<Vec<TenantAlertTimeIndexEntryV1>, DbErrorV1> {
+    pub fn list_time_index_entries_v1(
+        &self,
+    ) -> Result<Vec<TenantAlertTimeIndexEntryV1>, DbErrorV1> {
         let entries = self.scan_prefix_raw_v1(b"alert_idx_time/v1")?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, _) in entries {
@@ -1102,7 +1296,9 @@ impl TenantDbV1 {
         Ok(out)
     }
 
-    pub fn list_category_index_entries_v1(&self) -> Result<Vec<TenantAlertCategoryIndexEntryV1>, DbErrorV1> {
+    pub fn list_category_index_entries_v1(
+        &self,
+    ) -> Result<Vec<TenantAlertCategoryIndexEntryV1>, DbErrorV1> {
         let entries = self.scan_prefix_raw_v1(b"alert_idx_cat/v1")?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, _) in entries {
@@ -1111,7 +1307,9 @@ impl TenantDbV1 {
         Ok(out)
     }
 
-    pub fn list_entity_index_entries_v1(&self) -> Result<Vec<TenantAlertEntityIndexEntryV1>, DbErrorV1> {
+    pub fn list_entity_index_entries_v1(
+        &self,
+    ) -> Result<Vec<TenantAlertEntityIndexEntryV1>, DbErrorV1> {
         let entries = self.scan_prefix_raw_v1(b"alert_idx_ent/v1")?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, _) in entries {
@@ -1258,12 +1456,15 @@ impl TenantDbV1 {
         self.put_raw_v1(key_tenant_migrate_journal_v1(ts, name).as_bytes(), payload)
     }
 
-    pub fn scan_migrate_journal_entries_v1(&self) -> Result<Vec<TenantMigrateJournalEntryV1>, DbErrorV1> {
+    pub fn scan_migrate_journal_entries_v1(
+        &self,
+    ) -> Result<Vec<TenantMigrateJournalEntryV1>, DbErrorV1> {
         let prefix = key_prefix_tenant_migrate_journal_v1();
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, payload) in entries {
-            let suffix = parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "tenant migration journal")?;
+            let suffix =
+                parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "tenant migration journal")?;
             let (ts_text, name) = split_once_v1(&suffix, '/', "tenant migration journal key")?;
             out.push(TenantMigrateJournalEntryV1 {
                 ts: parse_i64_ascii_v1(ts_text, "tenant migration journal ts")?,
@@ -1296,16 +1497,32 @@ impl TenantDbV1 {
 
 fn append_alert_secondary_index_put_ops_v1(ops: &mut Vec<KvWriteOpV1>, alert: &AlertV1) {
     ops.push(KvWriteOpV1::Put {
-        key: key_tenant_alert_idx_time_v1(&alert.device_key, alert.window_start_ts, &alert.alert_id).bytes,
+        key: key_tenant_alert_idx_time_v1(
+            &alert.device_key,
+            alert.window_start_ts,
+            &alert.alert_id,
+        )
+        .bytes,
         value: Vec::new(),
     });
     ops.push(KvWriteOpV1::Put {
-        key: key_tenant_alert_idx_cat_v1(alert_label_category_v1(alert), alert.window_start_ts, &alert.alert_id).bytes,
+        key: key_tenant_alert_idx_cat_v1(
+            alert_label_category_v1(alert),
+            alert.window_start_ts,
+            &alert.alert_id,
+        )
+        .bytes,
         value: Vec::new(),
     });
     for (entity_kind, entity_value) in collect_alert_entity_index_parts_v1(alert) {
         ops.push(KvWriteOpV1::Put {
-            key: key_tenant_alert_idx_ent_v1(&entity_kind, &entity_value, alert.window_start_ts, &alert.alert_id).bytes,
+            key: key_tenant_alert_idx_ent_v1(
+                &entity_kind,
+                &entity_value,
+                alert.window_start_ts,
+                &alert.alert_id,
+            )
+            .bytes,
             value: Vec::new(),
         });
     }
@@ -1313,14 +1530,30 @@ fn append_alert_secondary_index_put_ops_v1(ops: &mut Vec<KvWriteOpV1>, alert: &A
 
 fn append_alert_secondary_index_delete_ops_v1(ops: &mut Vec<KvWriteOpV1>, alert: &AlertV1) {
     ops.push(KvWriteOpV1::Delete {
-        key: key_tenant_alert_idx_time_v1(&alert.device_key, alert.window_start_ts, &alert.alert_id).bytes,
+        key: key_tenant_alert_idx_time_v1(
+            &alert.device_key,
+            alert.window_start_ts,
+            &alert.alert_id,
+        )
+        .bytes,
     });
     ops.push(KvWriteOpV1::Delete {
-        key: key_tenant_alert_idx_cat_v1(alert_label_category_v1(alert), alert.window_start_ts, &alert.alert_id).bytes,
+        key: key_tenant_alert_idx_cat_v1(
+            alert_label_category_v1(alert),
+            alert.window_start_ts,
+            &alert.alert_id,
+        )
+        .bytes,
     });
     for (entity_kind, entity_value) in collect_alert_entity_index_parts_v1(alert) {
         ops.push(KvWriteOpV1::Delete {
-            key: key_tenant_alert_idx_ent_v1(&entity_kind, &entity_value, alert.window_start_ts, &alert.alert_id).bytes,
+            key: key_tenant_alert_idx_ent_v1(
+                &entity_kind,
+                &entity_value,
+                alert.window_start_ts,
+                &alert.alert_id,
+            )
+            .bytes,
         });
     }
 }
@@ -1369,43 +1602,68 @@ fn decode_string_v1(bytes: &[u8], label: &str) -> Result<String, DbErrorV1> {
 }
 
 fn parse_alert_time_index_entry_v1(key: &[u8]) -> Result<TenantAlertTimeIndexEntryV1, DbErrorV1> {
-    let suffix = parse_suffix_after_prefix_v1(key, b"alert_idx_time/v1", "tenant alert time index key")?;
+    let suffix =
+        parse_suffix_after_prefix_v1(key, b"alert_idx_time/v1", "tenant alert time index key")?;
     let (device_key, rest) = split_once_v1(&suffix, '/', "tenant alert time index key")?;
     let (window_start_ts_text, alert_id) = split_once_v1(rest, '/', "tenant alert time index key")?;
     Ok(TenantAlertTimeIndexEntryV1 {
         device_key: device_key.to_string(),
-        window_start_ts: parse_i64_ascii_v1(window_start_ts_text, "tenant alert time index window_start_ts")?,
+        window_start_ts: parse_i64_ascii_v1(
+            window_start_ts_text,
+            "tenant alert time index window_start_ts",
+        )?,
         alert_id: alert_id.to_string(),
     })
 }
 
-fn parse_alert_category_index_entry_v1(key: &[u8]) -> Result<TenantAlertCategoryIndexEntryV1, DbErrorV1> {
-    let suffix = parse_suffix_after_prefix_v1(key, b"alert_idx_cat/v1", "tenant alert category index key")?;
+fn parse_alert_category_index_entry_v1(
+    key: &[u8],
+) -> Result<TenantAlertCategoryIndexEntryV1, DbErrorV1> {
+    let suffix =
+        parse_suffix_after_prefix_v1(key, b"alert_idx_cat/v1", "tenant alert category index key")?;
     let (category, rest) = split_once_v1(&suffix, '/', "tenant alert category index key")?;
-    let (window_start_ts_text, alert_id) = split_once_v1(rest, '/', "tenant alert category index key")?;
+    let (window_start_ts_text, alert_id) =
+        split_once_v1(rest, '/', "tenant alert category index key")?;
     Ok(TenantAlertCategoryIndexEntryV1 {
         category: category.to_string(),
-        window_start_ts: parse_i64_ascii_v1(window_start_ts_text, "tenant alert category index window_start_ts")?,
+        window_start_ts: parse_i64_ascii_v1(
+            window_start_ts_text,
+            "tenant alert category index window_start_ts",
+        )?,
         alert_id: alert_id.to_string(),
     })
 }
 
-fn parse_alert_entity_index_entry_v1(key: &[u8]) -> Result<TenantAlertEntityIndexEntryV1, DbErrorV1> {
-    let suffix = parse_suffix_after_prefix_v1(key, b"alert_idx_ent/v1", "tenant alert entity index key")?;
+fn parse_alert_entity_index_entry_v1(
+    key: &[u8],
+) -> Result<TenantAlertEntityIndexEntryV1, DbErrorV1> {
+    let suffix =
+        parse_suffix_after_prefix_v1(key, b"alert_idx_ent/v1", "tenant alert entity index key")?;
     let (entity_kind, rest) = split_once_v1(&suffix, '/', "tenant alert entity index key")?;
     let (entity_value, rest) = split_once_v1(rest, '/', "tenant alert entity index key")?;
-    let (window_start_ts_text, alert_id) = split_once_v1(rest, '/', "tenant alert entity index key")?;
+    let (window_start_ts_text, alert_id) =
+        split_once_v1(rest, '/', "tenant alert entity index key")?;
     Ok(TenantAlertEntityIndexEntryV1 {
         entity_kind: entity_kind.to_string(),
         entity_value: entity_value.to_string(),
-        window_start_ts: parse_i64_ascii_v1(window_start_ts_text, "tenant alert entity index window_start_ts")?,
+        window_start_ts: parse_i64_ascii_v1(
+            window_start_ts_text,
+            "tenant alert entity index window_start_ts",
+        )?,
         alert_id: alert_id.to_string(),
     })
 }
 
-fn parse_suffix_after_prefix_v1(key: &[u8], prefix: &[u8], label: &str) -> Result<String, DbErrorV1> {
+fn parse_suffix_after_prefix_v1(
+    key: &[u8],
+    prefix: &[u8],
+    label: &str,
+) -> Result<String, DbErrorV1> {
     if !key.starts_with(prefix) {
-        return Err(DbErrorV1::new_v1(format!("{} key does not match expected prefix", label)));
+        return Err(DbErrorV1::new_v1(format!(
+            "{} key does not match expected prefix",
+            label
+        )));
     }
     let suffix = if key.len() == prefix.len() {
         &[][..]
@@ -1420,7 +1678,11 @@ fn parse_suffix_after_prefix_v1(key: &[u8], prefix: &[u8], label: &str) -> Resul
     decode_string_v1(suffix, label)
 }
 
-fn split_once_v1<'a>(text: &'a str, delim: char, label: &str) -> Result<(&'a str, &'a str), DbErrorV1> {
+fn split_once_v1<'a>(
+    text: &'a str,
+    delim: char,
+    label: &str,
+) -> Result<(&'a str, &'a str), DbErrorV1> {
     text.split_once(delim)
         .ok_or_else(|| DbErrorV1::new_v1(format!("{} is missing separator '{}'", label, delim)))
 }

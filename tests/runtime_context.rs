@@ -89,7 +89,10 @@ fn runtime_repo_helpers_and_tenant_access_v1() -> Result<(), Box<dyn std::error:
     runtime.upsert_tenant_record_v1(&record)?;
     runtime.set_tenant_active_index_v1("tenant-a", true)?;
     assert_eq!(Some(record), runtime.read_tenant_record_v1("tenant-a")?);
-    assert_eq!(vec!["tenant-a".to_string()], runtime.list_active_tenants_v1()?);
+    assert_eq!(
+        vec!["tenant-a".to_string()],
+        runtime.list_active_tenants_v1()?
+    );
 
     runtime.with_tenant_db_v1("tenant-a", 1_700_002_200, |db| {
         db.write_schema_state_v1(&TenantSchemaStateV1 {
@@ -107,7 +110,10 @@ fn runtime_repo_helpers_and_tenant_access_v1() -> Result<(), Box<dyn std::error:
             .unwrap_or_else(|| Err(sparx::db::DbErrorV1::new_v1("missing tenant schema state")))
     })?;
     assert_eq!(7, tenant_version);
-    assert_eq!(vec!["tenant-a".to_string()], runtime.list_open_tenant_ids_v1());
+    assert_eq!(
+        vec!["tenant-a".to_string()],
+        runtime.list_open_tenant_ids_v1()
+    );
 
     let closed = runtime.close_idle_tenants_v1(1_700_002_240);
     assert_eq!(vec!["tenant-a".to_string()], closed);

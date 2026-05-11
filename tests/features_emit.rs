@@ -106,8 +106,14 @@ fn exact_identities_are_metadata_only_not_sparse_features() {
 
     assert!(!features.contains(&"SourceIp@10.2.3.4".to_string()));
     assert!(!features.contains(&"UserRaw@alice@example.com".to_string()));
-    assert_eq!(metadata_values(&result, MetadataIdentityKindV1::SourceIp), vec!["10.2.3.4".to_string()]);
-    assert_eq!(metadata_values(&result, MetadataIdentityKindV1::UserRaw), vec!["alice@example.com".to_string()]);
+    assert_eq!(
+        metadata_values(&result, MetadataIdentityKindV1::SourceIp),
+        vec!["10.2.3.4".to_string()]
+    );
+    assert_eq!(
+        metadata_values(&result, MetadataIdentityKindV1::UserRaw),
+        vec!["alice@example.com".to_string()]
+    );
 }
 
 #[test]
@@ -124,8 +130,14 @@ fn canonical_userid_and_domain_are_extracted_for_upn_and_windows_forms() {
     ];
 
     let result = emit_line_features_v1(&SyslogEnvelopeV1::default(), &events);
-    assert_eq!(metadata_values(&result, MetadataIdentityKindV1::UserId), vec!["alice".to_string(), "bob".to_string()]);
-    assert_eq!(metadata_values(&result, MetadataIdentityKindV1::Domain), vec!["example.com".to_string(), "contoso".to_string()]);
+    assert_eq!(
+        metadata_values(&result, MetadataIdentityKindV1::UserId),
+        vec!["alice".to_string(), "bob".to_string()]
+    );
+    assert_eq!(
+        metadata_values(&result, MetadataIdentityKindV1::Domain),
+        vec!["example.com".to_string(), "contoso".to_string()]
+    );
 }
 
 #[test]
@@ -150,7 +162,9 @@ fn plaintext_only_emits_limited_ip_shapes() {
     assert!(features.contains(&"w=failed".to_string()));
     assert!(features.contains(&"shape=<IPV4>".to_string()));
     assert!(features.contains(&"shape=<IPV6>".to_string()));
-    assert!(!features.iter().any(|f| f.contains("UUID") || f.contains("HEX") || f.contains("B64")));
+    assert!(!features
+        .iter()
+        .any(|f| f.contains("UUID") || f.contains("HEX") || f.contains("B64")));
 }
 
 #[test]

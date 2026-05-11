@@ -12,25 +12,24 @@ use sparx::db::keys::{
     key_tenant_alert_v1, key_tenant_drop_open_device_v1, key_tenant_drop_open_source_stream_v1,
     key_tenant_drop_open_tenant_v1, key_tenant_silence_open_device_v1,
     key_tenant_silence_open_source_stream_v1, key_tenant_silence_open_tenant_v1,
-    key_tenant_silence_subject_device_state_v1, key_tenant_silence_subject_tenant_state_v1,
-    key_tenant_silence_subject_source_stream_state_v1, key_tenant_source_stats_v1,
+    key_tenant_silence_subject_device_state_v1, key_tenant_silence_subject_source_stream_state_v1,
+    key_tenant_silence_subject_tenant_state_v1, key_tenant_source_stats_v1,
     key_tenant_source_stream_catalog_v1,
 };
 use sparx::db::open_window::{SparseCountPairV1, TopKStringEntryV1, WinActiveV1, WinMetaV1};
-use sparx::db::{
-    ExpectedSourceStateUpdateV1, SourceStreamStatsV1, TenantDbV1, TenantDeviceBaselineStateV1,
-    TenantDfSlotBucketStateV1, TenantMigrateJournalEntryV1, TenantOpenWindowStateV1,
-    TenantSchemaStateV1,
-};
 use sparx::db::silence::{
     OpenDropStateV1, OpenSilenceStateV1, OPEN_DROP_FLAG_OPEN_V1, OPEN_SILENCE_FLAG_OPEN_V1,
-    SILENCE_SCHEMA_VERSION_V1,
-    SILENCE_SUBJECT_KIND_DEVICE_V1, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1,
-    SILENCE_SUBJECT_KIND_TENANT_V1,
+    SILENCE_SCHEMA_VERSION_V1, SILENCE_SUBJECT_KIND_DEVICE_V1,
+    SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1, SILENCE_SUBJECT_KIND_TENANT_V1,
 };
 use sparx::db::source_stream::{
     source_stream_catalog_from_identity_v1, source_stream_identity_from_path_v1,
     update_source_stream_stats_from_observation_v1,
+};
+use sparx::db::{
+    ExpectedSourceStateUpdateV1, SourceStreamStatsV1, TenantDbV1, TenantDeviceBaselineStateV1,
+    TenantDfSlotBucketStateV1, TenantMigrateJournalEntryV1, TenantOpenWindowStateV1,
+    TenantSchemaStateV1,
 };
 use sparx::features::EntitySketchSnapshotV1;
 use sparx::ingest::FileCursorV1;
@@ -251,7 +250,10 @@ fn complete_time_index_returns_filtered_alert_ids_v1() -> Result<(), Box<dyn std
     );
     assert_eq!(
         Some(vec!["alert-b".to_string()]),
-        db.select_alert_ids_via_time_index_if_complete_v1(Some(1_700_100_600), Some(1_700_101_200))?
+        db.select_alert_ids_via_time_index_if_complete_v1(
+            Some(1_700_100_600),
+            Some(1_700_101_200)
+        )?
     );
     Ok(())
 }
@@ -266,16 +268,20 @@ fn incomplete_time_index_forces_fallback_v1() -> Result<(), Box<dyn std::error::
     let mut legacy = sample_alert_v1("alert-legacy");
     legacy.window_start_ts = 1_700_100_600;
     legacy.window_end_ts = 1_700_101_200;
-    let encoded = encode_alert_v1(&legacy)
-        .map_err(|e| format!("legacy alert encode failed: {:?}", e))?;
+    let encoded =
+        encode_alert_v1(&legacy).map_err(|e| format!("legacy alert encode failed: {:?}", e))?;
     db.put_raw_v1(key_tenant_alert_v1(&legacy.alert_id).as_bytes(), &encoded)?;
 
-    assert_eq!(None, db.select_alert_ids_via_time_index_if_complete_v1(None, None)?);
+    assert_eq!(
+        None,
+        db.select_alert_ids_via_time_index_if_complete_v1(None, None)?
+    );
     Ok(())
 }
 
 #[test]
-fn complete_category_index_returns_filtered_alert_ids_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn complete_category_index_returns_filtered_alert_ids_v1() -> Result<(), Box<dyn std::error::Error>>
+{
     let db = open_temp_tenant_db_v1()?;
 
     let mut alert_a = sample_alert_v1("alert-a");
@@ -326,7 +332,12 @@ fn complete_entity_index_returns_filtered_alert_ids_v1() -> Result<(), Box<dyn s
     );
     assert_eq!(
         Some(vec!["alert-b".to_string()]),
-        db.select_alert_ids_via_entity_index_if_complete_v1("userid", "bob", Some(1_700_100_600), None)?
+        db.select_alert_ids_via_entity_index_if_complete_v1(
+            "userid",
+            "bob",
+            Some(1_700_100_600),
+            None
+        )?
     );
     Ok(())
 }
@@ -341,8 +352,8 @@ fn incomplete_entity_index_forces_fallback_v1() -> Result<(), Box<dyn std::error
     let mut legacy = sample_alert_v1("alert-legacy");
     legacy.window_start_ts = 1_700_100_600;
     legacy.window_end_ts = 1_700_101_200;
-    let encoded = encode_alert_v1(&legacy)
-        .map_err(|e| format!("legacy alert encode failed: {:?}", e))?;
+    let encoded =
+        encode_alert_v1(&legacy).map_err(|e| format!("legacy alert encode failed: {:?}", e))?;
     db.put_raw_v1(key_tenant_alert_v1(&legacy.alert_id).as_bytes(), &encoded)?;
 
     assert_eq!(
@@ -417,7 +428,10 @@ fn cursor_open_window_and_baseline_roundtrip_v1() -> Result<(), Box<dyn std::err
         },
     };
     db.write_open_window_state_v1(&open_window)?;
-    assert_eq!(Some(open_window.clone()), db.read_open_window_state_v1("device-001")?);
+    assert_eq!(
+        Some(open_window.clone()),
+        db.read_open_window_state_v1("device-001")?
+    );
     db.delete_open_window_state_v1("device-001", open_window.active.active_window_id)?;
     assert_eq!(None, db.read_open_window_state_v1("device-001")?);
 
@@ -544,8 +558,14 @@ fn tenant_db_updates_expected_source_state_records_v1() -> Result<(), Box<dyn st
     assert!(db
         .get_raw_v1(key_tenant_silence_subject_tenant_state_v1().as_bytes())?
         .is_some());
-    assert_eq!(db.read_device_expected_source_state_v1("device-001")?, Some(device_state.clone()));
-    assert_eq!(db.read_tenant_expected_source_state_v1()?, Some(tenant_state));
+    assert_eq!(
+        db.read_device_expected_source_state_v1("device-001")?,
+        Some(device_state.clone())
+    );
+    assert_eq!(
+        db.read_tenant_expected_source_state_v1()?,
+        Some(tenant_state)
+    );
     assert_eq!(
         db.list_device_expected_source_states_v1()?,
         vec![("device-001".to_string(), device_state)]
@@ -553,35 +573,57 @@ fn tenant_db_updates_expected_source_state_records_v1() -> Result<(), Box<dyn st
     Ok(())
 }
 
-
 #[test]
-fn tenant_db_roundtrips_source_stream_catalog_stats_and_state_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn tenant_db_roundtrips_source_stream_catalog_stats_and_state_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
     let db = open_temp_tenant_db_v1()?;
-    let identity = source_stream_identity_from_path_v1("tenant-a", "device-001", "var/log/auth.log")?;
+    let identity =
+        source_stream_identity_from_path_v1("tenant-a", "device-001", "var/log/auth.log")?;
     let catalog = source_stream_catalog_from_identity_v1(&identity, 1_700_000_000, 1_700_000_060)?;
 
     db.write_source_stream_catalog_v1(&catalog)?;
     assert!(db
-        .get_raw_v1(key_tenant_source_stream_catalog_v1("device-001", &identity.source_stream_id).as_bytes())?
+        .get_raw_v1(
+            key_tenant_source_stream_catalog_v1("device-001", &identity.source_stream_id)
+                .as_bytes()
+        )?
         .is_some());
     assert_eq!(
         db.read_source_stream_catalog_v1("device-001", &identity.source_stream_id)?,
         Some(catalog.clone())
     );
-    assert_eq!(db.list_source_stream_catalogs_for_device_v1("device-001")?, vec![catalog]);
+    assert_eq!(
+        db.list_source_stream_catalogs_for_device_v1("device-001")?,
+        vec![catalog]
+    );
 
     let stats = update_source_stream_stats_from_observation_v1(None, 12, 1200, 1_700_000_060)?;
-    let stats = update_source_stream_stats_from_observation_v1(Some(&stats), 18, 2400, 1_700_000_120)?;
+    let stats =
+        update_source_stream_stats_from_observation_v1(Some(&stats), 18, 2400, 1_700_000_120)?;
     db.write_source_stream_stats_v1("device-001", &identity.source_stream_id, 17, &stats)?;
     assert!(db
-        .get_raw_v1(key_tenant_source_stats_v1("device-001", &identity.source_stream_id, 17).as_bytes())?
+        .get_raw_v1(
+            key_tenant_source_stats_v1("device-001", &identity.source_stream_id, 17).as_bytes()
+        )?
         .is_some());
     assert_eq!(
         db.read_source_stream_stats_v1("device-001", &identity.source_stream_id, 17)?,
         Some(SourceStreamStatsV1 {
-            line_count: WelfordF64V1 { n: 2, mean: 15.0, m2: 18.0 },
-            byte_count: WelfordF64V1 { n: 2, mean: 1800.0, m2: 720000.0 },
-            score_total: WelfordF64V1 { n: 0, mean: 0.0, m2: 0.0 },
+            line_count: WelfordF64V1 {
+                n: 2,
+                mean: 15.0,
+                m2: 18.0
+            },
+            byte_count: WelfordF64V1 {
+                n: 2,
+                mean: 1800.0,
+                m2: 720000.0
+            },
+            score_total: WelfordF64V1 {
+                n: 0,
+                mean: 0.0,
+                m2: 0.0
+            },
             last_update_ts: 1_700_000_120,
         })
     );
@@ -601,10 +643,20 @@ fn tenant_db_roundtrips_source_stream_catalog_stats_and_state_v1() -> Result<(),
         update_ts_i64: 1_700_000_060,
         min_lines_per_window_u32: 10,
     };
-    let state = db.update_source_stream_expected_source_state_v1("device-001", &identity.source_stream_id, &update)?;
+    let state = db.update_source_stream_expected_source_state_v1(
+        "device-001",
+        &identity.source_stream_id,
+        &update,
+    )?;
     assert_eq!(state.subject_kind_u8, SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1);
     assert!(db
-        .get_raw_v1(key_tenant_silence_subject_source_stream_state_v1("device-001", &identity.source_stream_id).as_bytes())?
+        .get_raw_v1(
+            key_tenant_silence_subject_source_stream_state_v1(
+                "device-001",
+                &identity.source_stream_id
+            )
+            .as_bytes()
+        )?
         .is_some());
     assert_eq!(
         db.read_source_stream_expected_source_state_v1("device-001", &identity.source_stream_id)?,
@@ -644,11 +696,13 @@ fn tenant_db_roundtrips_open_silence_dedup_state_v1() -> Result<(), Box<dyn std:
     assert!(db
         .get_raw_v1(key_tenant_silence_open_tenant_v1().as_bytes())?
         .is_some());
-    assert_eq!(db.read_device_open_silence_state_v1("device-001")?, Some(device_open));
+    assert_eq!(
+        db.read_device_open_silence_state_v1("device-001")?,
+        Some(device_open)
+    );
     assert_eq!(db.read_tenant_open_silence_state_v1()?, Some(tenant_open));
     Ok(())
 }
-
 
 #[test]
 fn tenant_db_roundtrips_open_drop_state_v1() -> Result<(), Box<dyn std::error::Error>> {
@@ -677,9 +731,15 @@ fn tenant_db_roundtrips_open_drop_state_v1() -> Result<(), Box<dyn std::error::E
     assert!(db
         .get_raw_v1(key_tenant_drop_open_tenant_v1().as_bytes())?
         .is_some());
-    assert_eq!(db.read_device_open_drop_state_v1("device-001")?, Some(device_open.clone()));
+    assert_eq!(
+        db.read_device_open_drop_state_v1("device-001")?,
+        Some(device_open.clone())
+    );
     assert_eq!(db.read_tenant_open_drop_state_v1()?, Some(tenant_open));
-    assert_eq!(db.list_device_open_drop_states_v1()?, vec![("device-001".to_string(), device_open)]);
+    assert_eq!(
+        db.list_device_open_drop_states_v1()?,
+        vec![("device-001".to_string(), device_open)]
+    );
     Ok(())
 }
 
@@ -721,10 +781,14 @@ fn tenant_db_roundtrips_source_stream_open_states_v1() -> Result<(), Box<dyn std
     db.write_source_stream_open_drop_state_v1("device-001", source_stream_id_a, &drop_a)?;
 
     assert!(db
-        .get_raw_v1(key_tenant_silence_open_source_stream_v1("device-001", source_stream_id_a).as_bytes())?
+        .get_raw_v1(
+            key_tenant_silence_open_source_stream_v1("device-001", source_stream_id_a).as_bytes()
+        )?
         .is_some());
     assert!(db
-        .get_raw_v1(key_tenant_drop_open_source_stream_v1("device-001", source_stream_id_a).as_bytes())?
+        .get_raw_v1(
+            key_tenant_drop_open_source_stream_v1("device-001", source_stream_id_a).as_bytes()
+        )?
         .is_some());
     assert_eq!(
         db.read_source_stream_open_silence_state_v1("device-001", source_stream_id_a)?,

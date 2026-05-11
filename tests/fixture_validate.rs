@@ -65,18 +65,12 @@ fn build_valid_fixture_root(root: &Path) {
         &root.join("golden/alerts_subset.json"),
         "{\"alerts\":[{\"alert_id\":\"a1\"}]}",
     );
-    write_text(
-        &root.join("golden/status.jsonl"),
-        "{\"status\":\"ok\"}\n",
-    );
+    write_text(&root.join("golden/status.jsonl"), "{\"status\":\"ok\"}\n");
     write_text(
         &root.join("gen/scenario.toml"),
         "seed = 7\nscenario = \"mixed\"\n",
     );
-    write_text(
-        &root.join("gen/manifest.json"),
-        "{\"ground_truth\":[]}",
-    );
+    write_text(&root.join("gen/manifest.json"), "{\"ground_truth\":[]}");
 }
 
 #[test]
@@ -138,5 +132,8 @@ fn validate_fixtures_route_reports_io_errors() {
         &cfg,
     );
     assert_eq!(r.exit_code, 3);
-    assert!(r.msg_stderr.unwrap().contains("fixture validation IO error"));
+    assert!(r
+        .msg_stderr
+        .unwrap()
+        .contains("fixture validation IO error"));
 }

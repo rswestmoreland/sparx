@@ -107,12 +107,18 @@ pub fn emit_line_features_v1(
 
     for event in events {
         match event {
-            TokenEventV1::Kv { key_norm, value_raw }
+            TokenEventV1::Kv {
+                key_norm,
+                value_raw,
+            }
             | TokenEventV1::JsonKv {
                 key_path_norm: key_norm,
                 value_raw,
             }
-            | TokenEventV1::CsvKv { key_norm, value_raw } => {
+            | TokenEventV1::CsvKv {
+                key_norm,
+                value_raw,
+            } => {
                 emit_structured_pair_v1(key_norm, value_raw, &mut features, &mut metadata);
             }
             TokenEventV1::Word { token_raw } => {
@@ -228,7 +234,9 @@ pub fn classify_key_v1(raw_key: &str) -> Option<SemanticMatchV1> {
     let has_url = parts.iter().any(|p| is_url_token_v1(p));
     let has_domain = parts.iter().any(|p| is_domain_token_v1(p));
     let has_hash = parts.iter().any(|p| is_hash_token_v1(p));
-    let has_timestamp = parts.iter().any(|p| matches!(*p, "timestamp" | "time" | "ts"));
+    let has_timestamp = parts
+        .iter()
+        .any(|p| matches!(*p, "timestamp" | "time" | "ts"));
 
     if has_src_dir && has_port {
         return Some(SemanticMatchV1 {
@@ -320,16 +328,18 @@ pub fn classify_key_v1(raw_key: &str) -> Option<SemanticMatchV1> {
 
 pub fn normalize_word_feature_v1(raw: &str) -> Option<String> {
     let trimmed = raw.trim_matches(|c: char| {
-        c.is_ascii_whitespace() || matches!(c, ',' | ';' | ')' | '(' | '[' | ']' | '{' | '}' | '"' | '\'')
+        c.is_ascii_whitespace()
+            || matches!(
+                c,
+                ',' | ';' | ')' | '(' | '[' | ']' | '{' | '}' | '"' | '\''
+            )
     });
     if trimmed.is_empty() {
         return None;
     }
     let mut out = String::with_capacity(trimmed.len());
     for ch in trimmed.chars() {
-        if ch.is_ascii_alphanumeric()
-            || matches!(ch, '_' | '.' | '-' | '/' | ':' | '@' | '\\')
-        {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-' | '/' | ':' | '@' | '\\') {
             out.push(ch.to_ascii_lowercase());
         }
     }
@@ -361,7 +371,13 @@ pub fn normalize_user_identity_v1(raw: &str) -> Option<UserIdentityV1> {
             UserKindV1::Win,
         )
     } else if let Some((left, right)) = trimmed.rsplit_once('@') {
-        if left.is_empty() || right.is_empty() || !right.contains('.') && !right.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        if left.is_empty()
+            || right.is_empty()
+            || !right.contains('.')
+                && !right
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
             return None;
         }
         (
@@ -380,7 +396,11 @@ pub fn normalize_user_identity_v1(raw: &str) -> Option<UserIdentityV1> {
 
     let domain = domain.and_then(|s| {
         let d = s.trim().to_ascii_lowercase();
-        if d.is_empty() { None } else { Some(d) }
+        if d.is_empty() {
+            None
+        } else {
+            Some(d)
+        }
     });
 
     Some(UserIdentityV1 {
@@ -479,10 +499,7 @@ fn emit_structured_pair_v1(
         }
         SemanticCategoryV1::User => {
             if let Some(user) = normalize_user_identity_v1(value_raw) {
-                features.push_v1(
-                    FeatureFamilyV1::Shape,
-                    format!("User={}", user.principal),
-                );
+                features.push_v1(FeatureFamilyV1::Shape, format!("User={}", user.principal));
                 metadata.push(MetadataIdentityV1 {
                     kind: MetadataIdentityKindV1::UserRaw,
                     value: user.raw,
@@ -501,10 +518,7 @@ fn emit_structured_pair_v1(
         }
         SemanticCategoryV1::Path => {
             if let Some(shape) = detect_path_shape_v1(value_raw) {
-                features.push_v1(
-                    FeatureFamilyV1::Shape,
-                    format!("Path={}", shape),
-                );
+                features.push_v1(FeatureFamilyV1::Shape, format!("Path={}", shape));
             }
         }
         SemanticCategoryV1::Url => {
@@ -566,7 +580,11 @@ fn emit_word_v1(raw_word: &str, structured_pairs_found: bool, features: &mut Fea
     }
 }
 
-fn emit_residual_text_v1(text_raw: &str, structured_pairs_found: bool, features: &mut FeatureAccumulatorV1) {
+fn emit_residual_text_v1(
+    text_raw: &str,
+    structured_pairs_found: bool,
+    features: &mut FeatureAccumulatorV1,
+) {
     for part in text_raw.split_ascii_whitespace() {
         emit_word_v1(part, structured_pairs_found, features);
     }
@@ -714,7 +732,11 @@ fn is_camel_boundary_v1(chars: &[char], idx: usize) -> bool {
     if prev.is_ascii_digit() && cur.is_ascii_alphabetic() {
         return true;
     }
-    if idx + 1 < chars.len() && prev.is_ascii_uppercase() && cur.is_ascii_uppercase() && chars[idx + 1].is_ascii_lowercase() {
+    if idx + 1 < chars.len()
+        && prev.is_ascii_uppercase()
+        && cur.is_ascii_uppercase()
+        && chars[idx + 1].is_ascii_lowercase()
+    {
         return true;
     }
     false
@@ -739,18 +761,33 @@ fn is_port_token_v1(part: &str) -> bool {
 }
 
 fn is_host_token_v1(part: &str) -> bool {
-    matches!(part, "host" | "hostname" | "computer" | "device" | "node" | "machine")
+    matches!(
+        part,
+        "host" | "hostname" | "computer" | "device" | "node" | "machine"
+    )
 }
 
 fn is_user_token_v1(part: &str) -> bool {
     matches!(
         part,
-        "user" | "username" | "account" | "acct" | "principal" | "subject" | "actor" | "login" | "logon" | "uid"
+        "user"
+            | "username"
+            | "account"
+            | "acct"
+            | "principal"
+            | "subject"
+            | "actor"
+            | "login"
+            | "logon"
+            | "uid"
     )
 }
 
 fn is_proc_token_v1(part: &str) -> bool {
-    matches!(part, "process" | "proc" | "image" | "exe" | "program" | "binary" | "app")
+    matches!(
+        part,
+        "process" | "proc" | "image" | "exe" | "program" | "binary" | "app"
+    )
 }
 
 fn is_cmd_token_v1(part: &str) -> bool {
@@ -758,7 +795,10 @@ fn is_cmd_token_v1(part: &str) -> bool {
 }
 
 fn is_path_token_v1(part: &str) -> bool {
-    matches!(part, "path" | "filepath" | "file" | "filename" | "directory" | "dir")
+    matches!(
+        part,
+        "path" | "filepath" | "file" | "filename" | "directory" | "dir"
+    )
 }
 
 fn is_url_token_v1(part: &str) -> bool {
@@ -766,11 +806,17 @@ fn is_url_token_v1(part: &str) -> bool {
 }
 
 fn is_domain_token_v1(part: &str) -> bool {
-    matches!(part, "domain" | "fqdn" | "hostdomain" | "dns" | "servername" | "sni")
+    matches!(
+        part,
+        "domain" | "fqdn" | "hostdomain" | "dns" | "servername" | "sni"
+    )
 }
 
 fn is_hash_token_v1(part: &str) -> bool {
-    matches!(part, "hash" | "sha256" | "sha1" | "md5" | "checksum" | "fingerprint")
+    matches!(
+        part,
+        "hash" | "sha256" | "sha1" | "md5" | "checksum" | "fingerprint"
+    )
 }
 
 #[cfg(test)]

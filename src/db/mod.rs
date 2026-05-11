@@ -57,12 +57,12 @@ pub use silence::{
     VDropCandidateV1, VDropEvaluationConfigV1, VDropEvaluationV1, VDropSuppressionReasonV1,
 };
 pub use source_stream::{
-    SourceStreamCatalogV1, SourceStreamCurrentWindowV1, SourceStreamErrorV1,
-    SourceStreamIdentityV1, SourceStreamStatsV1, SourceStreamSubjectV1,
     source_stream_open_drop_state_from_candidate_v1,
     source_stream_open_drop_state_suppresses_candidate_v1,
     source_stream_open_silence_state_from_candidate_v1,
-    source_stream_open_silence_state_suppresses_candidate_v1,
+    source_stream_open_silence_state_suppresses_candidate_v1, SourceStreamCatalogV1,
+    SourceStreamCurrentWindowV1, SourceStreamErrorV1, SourceStreamIdentityV1, SourceStreamStatsV1,
+    SourceStreamSubjectV1,
 };
 pub use tenant::{
     TenantDbV1, TenantDeviceBaselineStateV1, TenantDfSlotBucketStateV1,

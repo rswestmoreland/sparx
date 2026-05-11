@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sparx::ingest::{
-    device_key_v1, discover_device_files_at_v1, discover_device_inventory_v1, discover_tenant_devices_v1,
-    file_key_v1, has_allowed_suffix_v1, is_gzip_name_v1,
+    device_key_v1, discover_device_files_at_v1, discover_device_inventory_v1,
+    discover_tenant_devices_v1, file_key_v1, has_allowed_suffix_v1, is_gzip_name_v1,
 };
 use sparx::stable_hash::STABLE_HASH_HEX128_LEN_V1;
 
@@ -36,7 +36,9 @@ fn stable_device_and_file_keys_are_lowercase_hex_and_deterministic() {
 
     for v in [&dk1, &fk1] {
         assert_eq!(v.len(), STABLE_HASH_HEX128_LEN_V1);
-        assert!(v.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+        assert!(v
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
     }
 
     assert_eq!(dk1, dk2);
@@ -51,12 +53,21 @@ fn discover_tenant_devices_returns_deterministic_sorted_devices() {
     fs::create_dir_all(root.join("tenant-b").join("z-last")).unwrap();
     fs::create_dir_all(root.join("tenant-a").join("m-mid")).unwrap();
     fs::create_dir_all(root.join("tenant-a").join("a-first")).unwrap();
-    write_file(&root.join("tenant-a").join("README.txt"), "not a device dir");
+    write_file(
+        &root.join("tenant-a").join("README.txt"),
+        "not a device dir",
+    );
 
     let got = discover_tenant_devices_v1(&root, false).unwrap();
     let triples: Vec<(String, String, String)> = got
         .iter()
-        .map(|d| (d.tenant_id.clone(), d.device_dir_rel.clone(), d.device_key.clone()))
+        .map(|d| {
+            (
+                d.tenant_id.clone(),
+                d.device_dir_rel.clone(),
+                d.device_key.clone(),
+            )
+        })
         .collect();
 
     assert_eq!(
@@ -103,21 +114,9 @@ fn discover_device_files_filters_hidden_unsupported_and_non_files() {
     assert_eq!(
         pairs,
         vec![
-            (
-                "a.log".to_string(),
-                false,
-                file_key_v1("a.log"),
-            ),
-            (
-                "b.csv".to_string(),
-                false,
-                file_key_v1("b.csv"),
-            ),
-            (
-                "c.gz".to_string(),
-                true,
-                file_key_v1("c.gz"),
-            ),
+            ("a.log".to_string(), false, file_key_v1("a.log"),),
+            ("b.csv".to_string(), false, file_key_v1("b.csv"),),
+            ("c.gz".to_string(), true, file_key_v1("c.gz"),),
         ]
     );
 
@@ -169,7 +168,11 @@ fn symlinks_are_skipped_by_default_and_followed_when_enabled() {
     fs::create_dir_all(&real_device).unwrap();
     write_file(&real_device.join("events.log"), "one");
     unix_fs::symlink(&real_device, &link_device).unwrap();
-    unix_fs::symlink(real_device.join("events.log"), real_device.join("events-link.log")).unwrap();
+    unix_fs::symlink(
+        real_device.join("events.log"),
+        real_device.join("events-link.log"),
+    )
+    .unwrap();
 
     let devices_default = discover_tenant_devices_v1(&root, false).unwrap();
     assert_eq!(devices_default.len(), 1);

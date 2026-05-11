@@ -51,18 +51,27 @@ pub fn validate_fixture_root_v1(root: &Path) -> Result<FixtureValidationReportV1
 
     if report.errors.is_empty() {
         validate_tenants_dir_v1(&tenants_dir, &mut report)?;
-        report.golden_file_count = validate_support_tree_v1(&golden_dir, "golden", &mut report.errors)?;
+        report.golden_file_count =
+            validate_support_tree_v1(&golden_dir, "golden", &mut report.errors)?;
         report.gen_file_count = validate_support_tree_v1(&gen_dir, "gen", &mut report.errors)?;
     }
 
     Ok(report)
 }
 
-fn validate_required_dir_v1(path: &Path, label: &str, errors: &mut Vec<String>) -> Result<(), String> {
+fn validate_required_dir_v1(
+    path: &Path,
+    label: &str,
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
     match fs::metadata(path) {
         Ok(md) => {
             if !md.is_dir() {
-                errors.push(format!("{} path is not a directory: {}", label, path.display()));
+                errors.push(format!(
+                    "{} path is not a directory: {}",
+                    label,
+                    path.display()
+                ));
             }
             Ok(())
         }
@@ -74,18 +83,29 @@ fn validate_required_dir_v1(path: &Path, label: &str, errors: &mut Vec<String>) 
     }
 }
 
-fn validate_tenants_dir_v1(tenants_dir: &Path, report: &mut FixtureValidationReportV1) -> Result<(), String> {
+fn validate_tenants_dir_v1(
+    tenants_dir: &Path,
+    report: &mut FixtureValidationReportV1,
+) -> Result<(), String> {
     let tenant_entries = sorted_dir_entries_v1(tenants_dir)?;
     if tenant_entries.is_empty() {
-        report.errors.push(format!("no tenant fixture directories under {}", tenants_dir.display()));
+        report.errors.push(format!(
+            "no tenant fixture directories under {}",
+            tenants_dir.display()
+        ));
         return Ok(());
     }
 
     for entry in tenant_entries {
         let tenant_path = entry.path();
-        let file_type = entry.file_type().map_err(|e| format!("{} file_type failed: {}", tenant_path.display(), e))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("{} file_type failed: {}", tenant_path.display(), e))?;
         if !file_type.is_dir() {
-            report.errors.push(format!("non-directory entry under tenants: {}", tenant_path.display()));
+            report.errors.push(format!(
+                "non-directory entry under tenants: {}",
+                tenant_path.display()
+            ));
             continue;
         }
         report.tenant_count += 1;
@@ -94,12 +114,18 @@ fn validate_tenants_dir_v1(tenants_dir: &Path, report: &mut FixtureValidationRep
         match fs::metadata(&devices_dir) {
             Ok(md) => {
                 if !md.is_dir() {
-                    report.errors.push(format!("devices path is not a directory: {}", devices_dir.display()));
+                    report.errors.push(format!(
+                        "devices path is not a directory: {}",
+                        devices_dir.display()
+                    ));
                     continue;
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                report.errors.push(format!("missing devices directory: {}", devices_dir.display()));
+                report.errors.push(format!(
+                    "missing devices directory: {}",
+                    devices_dir.display()
+                ));
                 continue;
             }
             Err(e) => return Err(format!("{} metadata failed: {}", devices_dir.display(), e)),
@@ -107,31 +133,52 @@ fn validate_tenants_dir_v1(tenants_dir: &Path, report: &mut FixtureValidationRep
 
         let device_entries = sorted_dir_entries_v1(&devices_dir)?;
         if device_entries.is_empty() {
-            report.errors.push(format!("no fixture files under {}", devices_dir.display()));
+            report
+                .errors
+                .push(format!("no fixture files under {}", devices_dir.display()));
             continue;
         }
 
         for device_entry in device_entries {
             let path = device_entry.path();
-            let file_type = device_entry.file_type().map_err(|e| format!("{} file_type failed: {}", path.display(), e))?;
+            let file_type = device_entry
+                .file_type()
+                .map_err(|e| format!("{} file_type failed: {}", path.display(), e))?;
             if !file_type.is_file() {
-                report.errors.push(format!("non-file entry under devices: {}", path.display()));
+                report
+                    .errors
+                    .push(format!("non-file entry under devices: {}", path.display()));
                 continue;
             }
 
             let ext = match path.extension().and_then(|s| s.to_str()) {
                 Some(v) => v,
                 None => {
-                    report.errors.push(format!("fixture file missing supported extension: {}", path.display()));
+                    report.errors.push(format!(
+                        "fixture file missing supported extension: {}",
+                        path.display()
+                    ));
                     continue;
                 }
             };
             if !matches!(ext, "log" | "gz" | "jsonl" | "csv" | "cef") {
-                report.errors.push(format!("unsupported fixture extension .{}: {}", ext, path.display()));
+                report.errors.push(format!(
+                    "unsupported fixture extension .{}: {}",
+                    ext,
+                    path.display()
+                ));
                 continue;
             }
-            if path.file_stem().and_then(|s| s.to_str()).unwrap_or("").is_empty() {
-                report.errors.push(format!("fixture file has empty device name: {}", path.display()));
+            if path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .is_empty()
+            {
+                report.errors.push(format!(
+                    "fixture file has empty device name: {}",
+                    path.display()
+                ));
                 continue;
             }
 
@@ -143,8 +190,13 @@ fn validate_tenants_dir_v1(tenants_dir: &Path, report: &mut FixtureValidationRep
     Ok(())
 }
 
-fn validate_fixture_file_v1(path: &Path, ext: &str, errors: &mut Vec<String>) -> Result<(), String> {
-    let md = fs::metadata(path).map_err(|e| format!("{} metadata failed: {}", path.display(), e))?;
+fn validate_fixture_file_v1(
+    path: &Path,
+    ext: &str,
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
+    let md =
+        fs::metadata(path).map_err(|e| format!("{} metadata failed: {}", path.display(), e))?;
     if md.len() == 0 {
         errors.push(format!("empty fixture file: {}", path.display()));
         return Ok(());
@@ -152,11 +204,15 @@ fn validate_fixture_file_v1(path: &Path, ext: &str, errors: &mut Vec<String>) ->
 
     match ext {
         "gz" => {
-            let file = fs::File::open(path).map_err(|e| format!("{} open failed: {}", path.display(), e))?;
+            let file = fs::File::open(path)
+                .map_err(|e| format!("{} open failed: {}", path.display(), e))?;
             let mut decoder = flate2::read::GzDecoder::new(file);
             let mut buf = [0u8; 1];
             match decoder.read(&mut buf) {
-                Ok(0) => errors.push(format!("gzip fixture has empty payload: {}", path.display())),
+                Ok(0) => errors.push(format!(
+                    "gzip fixture has empty payload: {}",
+                    path.display()
+                )),
                 Ok(_) => {}
                 Err(e) => errors.push(format!("invalid gzip fixture: {}: {}", path.display(), e)),
             }
@@ -172,7 +228,8 @@ fn validate_fixture_file_v1(path: &Path, ext: &str, errors: &mut Vec<String>) ->
 }
 
 fn validate_jsonl_file_v1(path: &Path, errors: &mut Vec<String>) -> Result<(), String> {
-    let s = fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
+    let s =
+        fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
     let mut non_empty = 0usize;
     for (idx, line) in s.lines().enumerate() {
         let trimmed = line.trim();
@@ -181,11 +238,19 @@ fn validate_jsonl_file_v1(path: &Path, errors: &mut Vec<String>) -> Result<(), S
         }
         non_empty += 1;
         if let Err(e) = serde_json::from_str::<serde_json::Value>(trimmed) {
-            errors.push(format!("invalid jsonl at {} line {}: {}", path.display(), idx + 1, e));
+            errors.push(format!(
+                "invalid jsonl at {} line {}: {}",
+                path.display(),
+                idx + 1,
+                e
+            ));
         }
     }
     if non_empty == 0 {
-        errors.push(format!("jsonl fixture has no JSON records: {}", path.display()));
+        errors.push(format!(
+            "jsonl fixture has no JSON records: {}",
+            path.display()
+        ));
     }
     Ok(())
 }
@@ -201,7 +266,10 @@ fn validate_csv_file_v1(path: &Path, errors: &mut Vec<String>) -> Result<(), Str
         .map_err(|e| format!("{} csv headers failed: {}", path.display(), e))?
         .len();
     if header_len == 0 {
-        errors.push(format!("csv fixture missing header columns: {}", path.display()));
+        errors.push(format!(
+            "csv fixture missing header columns: {}",
+            path.display()
+        ));
         return Ok(());
     }
 
@@ -216,22 +284,33 @@ fn validate_csv_file_v1(path: &Path, errors: &mut Vec<String>) -> Result<(), Str
 }
 
 fn validate_cef_file_v1(path: &Path, errors: &mut Vec<String>) -> Result<(), String> {
-    let s = fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
+    let s =
+        fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
     let first = s.lines().find(|line| !line.trim().is_empty());
     match first {
         Some(line) if line.contains("CEF:") => Ok(()),
         Some(_) => {
-            errors.push(format!("cef fixture missing CEF: marker: {}", path.display()));
+            errors.push(format!(
+                "cef fixture missing CEF: marker: {}",
+                path.display()
+            ));
             Ok(())
         }
         None => {
-            errors.push(format!("cef fixture has no non-empty lines: {}", path.display()));
+            errors.push(format!(
+                "cef fixture has no non-empty lines: {}",
+                path.display()
+            ));
             Ok(())
         }
     }
 }
 
-fn validate_support_tree_v1(root: &Path, label: &str, errors: &mut Vec<String>) -> Result<usize, String> {
+fn validate_support_tree_v1(
+    root: &Path,
+    label: &str,
+    errors: &mut Vec<String>,
+) -> Result<usize, String> {
     let mut count = 0usize;
     validate_support_tree_inner_v1(root, label, errors, &mut count)?;
     Ok(count)
@@ -245,16 +324,23 @@ fn validate_support_tree_inner_v1(
 ) -> Result<(), String> {
     for entry in sorted_dir_entries_v1(dir)? {
         let path = entry.path();
-        let file_type = entry.file_type().map_err(|e| format!("{} file_type failed: {}", path.display(), e))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("{} file_type failed: {}", path.display(), e))?;
         if file_type.is_dir() {
             validate_support_tree_inner_v1(&path, label, errors, count)?;
             continue;
         }
         if !file_type.is_file() {
-            errors.push(format!("non-file entry under {} tree: {}", label, path.display()));
+            errors.push(format!(
+                "non-file entry under {} tree: {}",
+                label,
+                path.display()
+            ));
             continue;
         }
-        let md = fs::metadata(&path).map_err(|e| format!("{} metadata failed: {}", path.display(), e))?;
+        let md = fs::metadata(&path)
+            .map_err(|e| format!("{} metadata failed: {}", path.display(), e))?;
         if md.len() == 0 {
             errors.push(format!("empty {} file: {}", label, path.display()));
             continue;
@@ -265,20 +351,36 @@ fn validate_support_tree_inner_v1(
     Ok(())
 }
 
-fn validate_support_file_v1(path: &Path, label: &str, errors: &mut Vec<String>) -> Result<(), String> {
+fn validate_support_file_v1(
+    path: &Path,
+    label: &str,
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
     let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
     match ext {
         "json" => {
-            let s = fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
+            let s = fs::read_to_string(path)
+                .map_err(|e| format!("{} read failed: {}", path.display(), e))?;
             if let Err(e) = serde_json::from_str::<serde_json::Value>(&s) {
-                errors.push(format!("invalid {} json file {}: {}", label, path.display(), e));
+                errors.push(format!(
+                    "invalid {} json file {}: {}",
+                    label,
+                    path.display(),
+                    e
+                ));
             }
         }
         "jsonl" => validate_jsonl_file_v1(path, errors)?,
         "toml" => {
-            let s = fs::read_to_string(path).map_err(|e| format!("{} read failed: {}", path.display(), e))?;
+            let s = fs::read_to_string(path)
+                .map_err(|e| format!("{} read failed: {}", path.display(), e))?;
             if let Err(e) = toml::from_str::<toml::Value>(&s) {
-                errors.push(format!("invalid {} toml file {}: {}", label, path.display(), e));
+                errors.push(format!(
+                    "invalid {} toml file {}: {}",
+                    label,
+                    path.display(),
+                    e
+                ));
             }
         }
         _ => {

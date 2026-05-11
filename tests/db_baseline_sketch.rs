@@ -62,7 +62,10 @@ fn dfm_rejects_zero_counts_and_non_increasing_feature_ids() {
         feature_id: 7,
         df_count: 0,
     }];
-    assert_eq!(encode_dfm_v1(&zero_count).unwrap_err(), BaselineSketchErrorV1::ZeroCount);
+    assert_eq!(
+        encode_dfm_v1(&zero_count).unwrap_err(),
+        BaselineSketchErrorV1::ZeroCount
+    );
 
     let encoded = vec![2, 9, 1, 8, 2];
     assert_eq!(
@@ -254,7 +257,10 @@ fn n_bucket_equals_sum_of_dfn_across_slots() {
     let mut kv = BTreeMap::<String, Vec<u8>>::new();
 
     for slot in 0u8..7u8 {
-        kv.insert(s(key_tenant_dfn_v1(slot, bucket)), encode_dfn_v1(u32::from(slot) + 1));
+        kv.insert(
+            s(key_tenant_dfn_v1(slot, bucket)),
+            encode_dfn_v1(u32::from(slot) + 1),
+        );
     }
 
     let mut total = 0u32;

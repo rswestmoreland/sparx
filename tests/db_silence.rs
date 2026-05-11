@@ -62,21 +62,24 @@ fn expected_source_state_allows_source_stream_subject_kind() {
 
 #[test]
 fn expected_source_state_rejects_invalid_contract_fields() {
-    let mut encoded = encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
+    let mut encoded =
+        encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
     encoded[0..2].copy_from_slice(&2u16.to_le_bytes());
     assert_eq!(
         decode_expected_source_state_v1(&encoded).unwrap_err(),
         SilenceStateErrorV1::UnknownSchemaVersion(2)
     );
 
-    let mut encoded = encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
+    let mut encoded =
+        encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
     encoded[2] = 9;
     assert_eq!(
         decode_expected_source_state_v1(&encoded).unwrap_err(),
         SilenceStateErrorV1::InvalidSubjectKind(9)
     );
 
-    let mut encoded = encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
+    let mut encoded =
+        encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
     encoded[57] = 1;
     assert_eq!(
         decode_expected_source_state_v1(&encoded).unwrap_err(),
@@ -86,7 +89,8 @@ fn expected_source_state_rejects_invalid_contract_fields() {
         }
     );
 
-    let mut encoded = encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
+    let mut encoded =
+        encode_expected_source_state_v1(&sample_expected_state(SILENCE_SUBJECT_KIND_DEVICE_V1));
     encoded[58..60].copy_from_slice(&1u16.to_le_bytes());
     assert_eq!(
         decode_expected_source_state_v1(&encoded).unwrap_err(),
@@ -244,7 +248,12 @@ fn sample_expected_update(
 
 #[test]
 fn expected_source_update_initializes_and_tracks_maturity_floor() {
-    let cold = sample_expected_update(SILENCE_SUBJECT_KIND_DEVICE_V1, 1_700_000_000, 1_700_000_060, 4);
+    let cold = sample_expected_update(
+        SILENCE_SUBJECT_KIND_DEVICE_V1,
+        1_700_000_000,
+        1_700_000_060,
+        4,
+    );
     let state = update_expected_source_state_from_window_v1(None, &cold).unwrap();
 
     assert_eq!(state.schema_version_u16, SILENCE_SCHEMA_VERSION_V1);
@@ -259,7 +268,12 @@ fn expected_source_update_initializes_and_tracks_maturity_floor() {
     assert_eq!(state.last_bucket_u8, 7);
     assert_eq!(state.last_update_ts_i64, 1_700_000_060);
 
-    let mature = sample_expected_update(SILENCE_SUBJECT_KIND_DEVICE_V1, 1_700_000_060, 1_700_000_120, 10);
+    let mature = sample_expected_update(
+        SILENCE_SUBJECT_KIND_DEVICE_V1,
+        1_700_000_060,
+        1_700_000_120,
+        10,
+    );
     let state = update_expected_source_state_from_window_v1(Some(&state), &mature).unwrap();
     assert_eq!(state.observed_windows_total_u64, 2);
     assert_eq!(state.mature_windows_total_u64, 1);
@@ -271,9 +285,19 @@ fn expected_source_update_initializes_and_tracks_maturity_floor() {
 
 #[test]
 fn expected_source_update_does_not_regress_last_seen_on_older_replay() {
-    let first = sample_expected_update(SILENCE_SUBJECT_KIND_TENANT_V1, 1_700_000_060, 1_700_000_120, 20);
+    let first = sample_expected_update(
+        SILENCE_SUBJECT_KIND_TENANT_V1,
+        1_700_000_060,
+        1_700_000_120,
+        20,
+    );
     let state = update_expected_source_state_from_window_v1(None, &first).unwrap();
-    let older = sample_expected_update(SILENCE_SUBJECT_KIND_TENANT_V1, 1_700_000_000, 1_700_000_060, 30);
+    let older = sample_expected_update(
+        SILENCE_SUBJECT_KIND_TENANT_V1,
+        1_700_000_000,
+        1_700_000_060,
+        30,
+    );
     let state = update_expected_source_state_from_window_v1(Some(&state), &older).unwrap();
 
     assert_eq!(state.observed_windows_total_u64, 2);
@@ -382,7 +406,10 @@ fn vdrop_candidate_evaluator_emits_tenant_candidate_without_device_detail() {
         .reason_details
         .iter()
         .any(|(key, _)| key == "device_key"));
-    assert_eq!(candidate.reason_details[0], ("subject_kind".to_string(), "tenant".to_string()));
+    assert_eq!(
+        candidate.reason_details[0],
+        ("subject_kind".to_string(), "tenant".to_string())
+    );
 }
 
 #[test]
@@ -487,10 +514,14 @@ fn vdrop_candidate_evaluator_does_not_suppress_closed_open_silence_state() {
     };
     let cfg = sample_vdrop_config(1_700_000_240);
 
-    let eval = evaluate_vdrop_candidate_v1("tenant-a", "device-a", Some(&state), Some(&closed), &cfg);
+    let eval =
+        evaluate_vdrop_candidate_v1("tenant-a", "device-a", Some(&state), Some(&closed), &cfg);
     let candidate = match eval {
         VDropEvaluationV1::Candidate(candidate) => candidate,
-        other => panic!("expected closed silence state to allow new candidate, got {:?}", other),
+        other => panic!(
+            "expected closed silence state to allow new candidate, got {:?}",
+            other
+        ),
     };
 
     assert_eq!(candidate.subject_kind_u8, SILENCE_SUBJECT_KIND_DEVICE_V1);
@@ -498,7 +529,11 @@ fn vdrop_candidate_evaluator_does_not_suppress_closed_open_silence_state() {
     assert_eq!(candidate.expected_windows_missed_u64, 3);
 }
 
-fn sample_device_stats_for_sharp_drop(mean_lines: f64, line_stddev: f64, n: u32) -> sparx::db::baseline_sketch::DeviceStatsV1 {
+fn sample_device_stats_for_sharp_drop(
+    mean_lines: f64,
+    line_stddev: f64,
+    n: u32,
+) -> sparx::db::baseline_sketch::DeviceStatsV1 {
     sparx::db::baseline_sketch::DeviceStatsV1 {
         line_count: sparx::db::baseline_sketch::WelfordF64V1 {
             n,
@@ -519,7 +554,10 @@ fn sample_device_stats_for_sharp_drop(mean_lines: f64, line_stddev: f64, n: u32)
     }
 }
 
-fn sample_sharp_drop_current_window(subject_kind: u8, observed_lines: u64) -> SharpDropCurrentWindowV1 {
+fn sample_sharp_drop_current_window(
+    subject_kind: u8,
+    observed_lines: u64,
+) -> SharpDropCurrentWindowV1 {
     SharpDropCurrentWindowV1 {
         subject_kind_u8: subject_kind,
         subject_key: if subject_kind == SILENCE_SUBJECT_KIND_DEVICE_V1 {
@@ -548,11 +586,17 @@ fn sample_sharp_drop_config() -> SharpDropEvaluationConfigV1 {
 }
 
 fn assert_close_f32(actual: f32, expected: f32) {
-    assert!((actual - expected).abs() < 0.000_001, "actual={actual} expected={expected}");
+    assert!(
+        (actual - expected).abs() < 0.000_001,
+        "actual={actual} expected={expected}"
+    );
 }
 
 fn assert_close_f64(actual: f64, expected: f64) {
-    assert!((actual - expected).abs() < 0.000_001, "actual={actual} expected={expected}");
+    assert!(
+        (actual - expected).abs() < 0.000_001,
+        "actual={actual} expected={expected}"
+    );
 }
 
 #[test]
@@ -604,15 +648,24 @@ fn sharp_drop_evaluator_emits_device_candidate_for_reduced_nonzero_activity() {
             ("bucket".to_string(), "8".to_string()),
             ("expected_lines".to_string(), "100.000000".to_string()),
             ("observed_lines".to_string(), "20".to_string()),
-            ("observed_expected_ratio".to_string(), "0.200000".to_string()),
+            (
+                "observed_expected_ratio".to_string(),
+                "0.200000".to_string()
+            ),
             ("drop_ratio".to_string(), "0.800000".to_string()),
             ("baseline_n".to_string(), "12".to_string()),
             ("baseline_mean_lines".to_string(), "100.000000".to_string()),
             ("baseline_stddev_lines".to_string(), "10.000000".to_string()),
             ("z_drop".to_string(), "8.000000".to_string()),
-            ("max_observed_expected_ratio".to_string(), "0.250000".to_string()),
+            (
+                "max_observed_expected_ratio".to_string(),
+                "0.250000".to_string()
+            ),
             ("min_drop_ratio".to_string(), "0.750000".to_string()),
-            ("min_absolute_drop_lines".to_string(), "25.000000".to_string()),
+            (
+                "min_absolute_drop_lines".to_string(),
+                "25.000000".to_string()
+            ),
             ("expected_bytes".to_string(), "10000.000000".to_string()),
             ("observed_bytes".to_string(), "2000".to_string()),
             ("absolute_drop_lines".to_string(), "80.000000".to_string()),
@@ -666,10 +719,12 @@ fn sharp_drop_evaluator_suppresses_non_severe_ratio_or_variance_distance() {
     let cfg = sample_sharp_drop_config();
     let eval = evaluate_sharp_drop_candidate_v1(&current, &expected, &cfg);
     match eval {
-        SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::ObservedRatioAboveThreshold {
-            observed_expected_ratio,
-            max_observed_expected_ratio,
-        }) => {
+        SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::ObservedRatioAboveThreshold {
+                observed_expected_ratio,
+                max_observed_expected_ratio,
+            },
+        ) => {
             assert_close_f32(observed_expected_ratio, 0.3);
             assert_close_f32(max_observed_expected_ratio, 0.25);
         }
@@ -703,10 +758,12 @@ fn sharp_drop_evaluator_suppresses_small_absolute_drop_before_ratio_gate() {
 
     let eval = evaluate_sharp_drop_candidate_v1(&current, &expected, &cfg);
     match eval {
-        SharpDropEvaluationV1::Suppressed(SharpDropSuppressionReasonV1::AbsoluteDropBelowFloor {
-            absolute_drop_lines,
-            min_absolute_drop_lines,
-        }) => {
+        SharpDropEvaluationV1::Suppressed(
+            SharpDropSuppressionReasonV1::AbsoluteDropBelowFloor {
+                absolute_drop_lines,
+                min_absolute_drop_lines,
+            },
+        ) => {
             assert_close_f64(absolute_drop_lines, 20.0);
             assert_close_f64(min_absolute_drop_lines, 25.0);
         }
@@ -735,8 +792,12 @@ fn sharp_drop_evaluator_rejects_invalid_expected_volume() {
 
 #[test]
 fn sharp_drop_tenant_expected_volume_sums_mature_device_baselines() {
-    let device_a = sharp_drop_expected_volume_from_device_stats_v1(&sample_device_stats_for_sharp_drop(100.0, 10.0, 12));
-    let device_b = sharp_drop_expected_volume_from_device_stats_v1(&sample_device_stats_for_sharp_drop(80.0, 6.0, 8));
+    let device_a = sharp_drop_expected_volume_from_device_stats_v1(
+        &sample_device_stats_for_sharp_drop(100.0, 10.0, 12),
+    );
+    let device_b = sharp_drop_expected_volume_from_device_stats_v1(
+        &sample_device_stats_for_sharp_drop(80.0, 6.0, 8),
+    );
     let expected = sum_sharp_drop_expected_volumes_v1(&[device_a, device_b]);
 
     assert_eq!(expected.maturity_count_u32, 2);
@@ -830,21 +891,36 @@ fn open_drop_state_suppresses_only_matching_open_state() {
     let candidate = sample_sharp_drop_candidate_for_state();
     let state = open_drop_state_from_candidate_v1(&candidate, "0123456789abcdef0123456789abcdef");
 
-    assert!(open_drop_state_suppresses_candidate_v1(&candidate, Some(&state)));
+    assert!(open_drop_state_suppresses_candidate_v1(
+        &candidate,
+        Some(&state)
+    ));
     assert!(!open_drop_state_suppresses_candidate_v1(&candidate, None));
 
     let recovered = close_open_drop_state_by_recovery_v1(&state);
-    assert_eq!(recovered.state_flags_u8, OPEN_DROP_FLAG_CLOSED_BY_RECOVERY_V1);
-    assert!(!open_drop_state_suppresses_candidate_v1(&candidate, Some(&recovered)));
+    assert_eq!(
+        recovered.state_flags_u8,
+        OPEN_DROP_FLAG_CLOSED_BY_RECOVERY_V1
+    );
+    assert!(!open_drop_state_suppresses_candidate_v1(
+        &candidate,
+        Some(&recovered)
+    ));
 
     let superseded = close_open_drop_state_by_hard_silence_v1(&state);
     assert_eq!(
         superseded.state_flags_u8,
         OPEN_DROP_FLAG_CLOSED_BY_HARD_SILENCE_V1
     );
-    assert!(!open_drop_state_suppresses_candidate_v1(&candidate, Some(&superseded)));
+    assert!(!open_drop_state_suppresses_candidate_v1(
+        &candidate,
+        Some(&superseded)
+    ));
 
     let mut tenant_state = state.clone();
     tenant_state.subject_kind_u8 = SILENCE_SUBJECT_KIND_TENANT_V1;
-    assert!(!open_drop_state_suppresses_candidate_v1(&candidate, Some(&tenant_state)));
+    assert!(!open_drop_state_suppresses_candidate_v1(
+        &candidate,
+        Some(&tenant_state)
+    ));
 }

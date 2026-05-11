@@ -31,21 +31,44 @@ pub enum AlertEntityKindFilterV1 {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CommandV1 {
-    Run { migrate: MigrateModeV1 },
-    OneShot { tenant_id: String, since: Option<i64>, until: Option<i64>, device_path: Option<String>, migrate: MigrateModeV1 },
-    Status { json: bool },
+    Run {
+        migrate: MigrateModeV1,
+    },
+    OneShot {
+        tenant_id: String,
+        since: Option<i64>,
+        until: Option<i64>,
+        device_path: Option<String>,
+        migrate: MigrateModeV1,
+    },
+    Status {
+        json: bool,
+    },
     Version,
-    TenantPurge { tenant_id: String, force: bool },
+    TenantPurge {
+        tenant_id: String,
+        force: bool,
+    },
     ConfigCheck,
-    ReplaySpool { tenant_id: Option<String> },
-    ValidateFixtures { fixture_root: String },
+    ReplaySpool {
+        tenant_id: Option<String>,
+    },
+    ValidateFixtures {
+        fixture_root: String,
+    },
 
     // Additional subcommands (detailed behavior in their contracts):
-    TenantPolicyShow { tenant_id: String },
-    TenantPolicyCheck { tenant_id: String },
+    TenantPolicyShow {
+        tenant_id: String,
+    },
+    TenantPolicyCheck {
+        tenant_id: String,
+    },
 
     // Migrations
-    MigrateTenant { tenant_id: String },
+    MigrateTenant {
+        tenant_id: String,
+    },
     MigrateAll,
 
     // Alerts query/export
@@ -58,7 +81,11 @@ pub enum CommandV1 {
         entity_value: Option<String>,
         json: bool,
     },
-    AlertsShow { tenant_id: String, alert_id: String, json: bool },
+    AlertsShow {
+        tenant_id: String,
+        alert_id: String,
+        json: bool,
+    },
     AlertsSearch {
         tenant_id: String,
         since: Option<i64>,
@@ -78,8 +105,19 @@ pub enum CommandV1 {
     },
 
     // Drilldown
-    AlertExtract { tenant_id: String, alert_id: String, out_path: String, max_bytes: Option<u64>, max_lines: Option<u64> },
-    AlertDrill { tenant_id: String, alert_id: String, max_bytes: Option<u64>, max_lines: Option<u64> },
+    AlertExtract {
+        tenant_id: String,
+        alert_id: String,
+        out_path: String,
+        max_bytes: Option<u64>,
+        max_lines: Option<u64>,
+    },
+    AlertDrill {
+        tenant_id: String,
+        alert_id: String,
+        max_bytes: Option<u64>,
+        max_lines: Option<u64>,
+    },
 }
 
 pub mod parse;

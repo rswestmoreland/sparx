@@ -22,8 +22,8 @@ use crate::db::silence::{
 };
 use crate::db::source_stream::{
     source_stream_open_drop_state_from_candidate_v1,
-    source_stream_open_silence_state_from_candidate_v1,
-    validate_source_stream_subject_v1, SourceStreamSubjectV1,
+    source_stream_open_silence_state_from_candidate_v1, validate_source_stream_subject_v1,
+    SourceStreamSubjectV1,
 };
 use crate::features::{EntitySketchSnapshotV1, FeatureDictionaryV1};
 use crate::stable_hash::stable_hash_hex128_v1;
@@ -171,7 +171,10 @@ impl Default for AlertScoringConfigV1 {
             blob_ratio_high: BLOB_RATIO_HIGH_DEFAULT_V1,
             volume_z_max: VOLUME_Z_MAX_DEFAULT_V1,
             cold_start_days: COLD_START_DAYS_DEFAULT_V1,
-            cold_start_min_windows: compute_cold_start_min_windows_v1(COLD_START_DAYS_DEFAULT_V1, 60),
+            cold_start_min_windows: compute_cold_start_min_windows_v1(
+                COLD_START_DAYS_DEFAULT_V1,
+                60,
+            ),
             min_lines_per_window: MIN_LINES_PER_WINDOW_DEFAULT_V1,
             top_features_cap: TOP_FEATURES_CAP_DEFAULT_V1,
             include_debug_fields: false,
@@ -181,7 +184,8 @@ impl Default for AlertScoringConfigV1 {
 
 impl AlertScoringConfigV1 {
     pub fn from_sections_v1(value: &ScoringSectionV1, window_size_s: u32) -> Self {
-        let cold_start_min_windows = compute_cold_start_min_windows_v1(value.cold_start_days, window_size_s);
+        let cold_start_min_windows =
+            compute_cold_start_min_windows_v1(value.cold_start_days, window_size_s);
         Self {
             outlier_threshold: value.outlier_threshold,
             noise_threshold: value.noise_threshold,
@@ -289,11 +293,11 @@ pub fn build_alert_v1(
     let mut blob_mass = 0.0f64;
 
     for pair in &row.sparse_counts {
-        let feature_string = dict
-            .lookup_feature_string_v1(pair.feature_id)
-            .ok_or(AlertErrorV1::MissingFeatureString {
+        let feature_string = dict.lookup_feature_string_v1(pair.feature_id).ok_or(
+            AlertErrorV1::MissingFeatureString {
                 feature_id: pair.feature_id,
-            })?;
+            },
+        )?;
         let tf_w = f64::from(*weighted_map.get(&pair.feature_id).unwrap_or(&0.0f32));
         let df_count = *df_map.get(&pair.feature_id).unwrap_or(&0u32);
         let idf = ((f64::from(n_bucket) + 1.0) / (f64::from(df_count) + 1.0)).ln() + 1.0;
@@ -351,22 +355,47 @@ pub fn build_alert_v1(
         .collect::<Vec<TopFeatureV1>>();
     let entities = build_entities_v1(&row.entity_snapshot);
     let entity_focus = compute_entity_focus_v1(&top_features, &entities);
-    let scored_label = choose_label_v1(score_total, drift, volume, cold_start, entity_focus, blob_ratio, cfg);
+    let scored_label = choose_label_v1(
+        score_total,
+        drift,
+        volume,
+        cold_start,
+        entity_focus,
+        blob_ratio,
+        cfg,
+    );
     let label = if below_min_lines {
         ALERT_KIND_NONE_V1
     } else {
         scored_label
     };
-    let reasons = build_reasons_v1(&top_feature_scores, n_bucket, drift, volume, blob_ratio, entity_focus, scored_label);
+    let reasons = build_reasons_v1(
+        &top_feature_scores,
+        n_bucket,
+        drift,
+        volume,
+        blob_ratio,
+        entity_focus,
+        scored_label,
+    );
 
     let alert = if label == ALERT_KIND_NONE_V1 {
         None
     } else {
         let label_enum = label_from_kind_v1(label);
-        let confidence = choose_confidence_v1(label_enum, cold_start, score_total, reasons.len(), entity_focus, cfg);
+        let confidence = choose_confidence_v1(
+            label_enum,
+            cold_start,
+            score_total,
+            reasons.len(),
+            entity_focus,
+            cfg,
+        );
         let capped_provenance = cap_provenance_v1(provenance, PROVENANCE_CAP_DEFAULT_V1);
-        let summary_analyst = build_summary_analyst_v1(label_enum, score_total, &reasons, &top_features);
-        let summary_customer = build_summary_customer_v1(label_enum, &reasons, &top_features, &entities);
+        let summary_analyst =
+            build_summary_analyst_v1(label_enum, score_total, &reasons, &top_features);
+        let summary_customer =
+            build_summary_customer_v1(label_enum, &reasons, &top_features, &entities);
         let baseline_n_bucket = if cfg.include_debug_fields {
             Some(n_bucket)
         } else {
@@ -378,7 +407,12 @@ pub fn build_alert_v1(
             None
         };
         let signature = compute_alert_signature_v1(&top_features);
-        let alert_id = compute_alert_id_v1(tenant_id, &row.key.device_key, row.key.window_start_ts, &signature);
+        let alert_id = compute_alert_id_v1(
+            tenant_id,
+            &row.key.device_key,
+            row.key.window_start_ts,
+            &signature,
+        );
         let alert = AlertV1 {
             schema_version: ALERT_SCHEMA_VERSION_V1,
             alert_id,
@@ -387,7 +421,8 @@ pub fn build_alert_v1(
             device_path: device_path.to_string(),
             window_start_ts: row.key.window_start_ts,
             window_end_ts: row.key.window_end_ts,
-            window_size_s: u32::try_from(row.key.window_end_ts - row.key.window_start_ts).unwrap_or(0),
+            window_size_s: u32::try_from(row.key.window_end_ts - row.key.window_start_ts)
+                .unwrap_or(0),
             bucket: row.key.bucket,
             label: label_enum,
             confidence,
@@ -442,7 +477,9 @@ pub fn alert_primary_put_v1(alert: &AlertV1) -> Result<AlertKvV1, AlertErrorV1> 
     })
 }
 
-pub fn build_vdrop_alert_v1(candidate: &VDropCandidateV1) -> Result<VDropAlertBuildResultV1, AlertErrorV1> {
+pub fn build_vdrop_alert_v1(
+    candidate: &VDropCandidateV1,
+) -> Result<VDropAlertBuildResultV1, AlertErrorV1> {
     validate_vdrop_candidate_for_alert_v1(candidate)?;
 
     let reason = ReasonV1 {
@@ -454,7 +491,8 @@ pub fn build_vdrop_alert_v1(candidate: &VDropCandidateV1) -> Result<VDropAlertBu
     let alert_id = compute_vdrop_alert_id_v1(candidate);
     let device_key = vdrop_alert_device_key_v1(candidate);
     let device_path = vdrop_alert_device_path_v1(candidate);
-    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let window_size_s =
+        u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
     let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
 
     let alert = AlertV1 {
@@ -528,7 +566,8 @@ pub fn build_sharp_drop_alert_v1(
     let alert_id = compute_sharp_drop_alert_id_v1(candidate);
     let device_key = sharp_drop_alert_device_key_v1(candidate);
     let device_path = sharp_drop_alert_device_path_v1(candidate);
-    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let window_size_s =
+        u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
     let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
     let capped_provenance = if candidate.subject_kind_u8 == SILENCE_SUBJECT_KIND_DEVICE_V1 {
         cap_provenance_v1(provenance, PROVENANCE_CAP_DEFAULT_V1)
@@ -584,7 +623,6 @@ pub fn build_sharp_drop_alert_v1(
     })
 }
 
-
 pub fn build_source_stream_vdrop_alert_v1(
     subject: &SourceStreamSubjectV1,
     candidate: &VDropCandidateV1,
@@ -599,7 +637,8 @@ pub fn build_source_stream_vdrop_alert_v1(
     };
     let signature = compute_reason_signature_v1(VDROP_REASON_CODE_V1, &reason_details);
     let alert_id = compute_source_stream_vdrop_alert_id_v1(candidate);
-    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let window_size_s =
+        u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
     let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
 
     let alert = AlertV1 {
@@ -641,10 +680,11 @@ pub fn build_source_stream_vdrop_alert_v1(
         signature,
     };
     let primary_put = alert_primary_put_v1(&alert)?;
-    let open_silence = source_stream_open_silence_state_from_candidate_v1(subject, candidate, &alert.alert_id)
-        .map_err(|e| AlertErrorV1::InvalidVDropCandidate {
-            msg: format!("source-stream open-silence construction failed: {:?}", e),
-        })?;
+    let open_silence =
+        source_stream_open_silence_state_from_candidate_v1(subject, candidate, &alert.alert_id)
+            .map_err(|e| AlertErrorV1::InvalidVDropCandidate {
+                msg: format!("source-stream open-silence construction failed: {:?}", e),
+            })?;
 
     Ok(VDropAlertBuildResultV1 {
         alert,
@@ -667,7 +707,8 @@ pub fn build_source_stream_sharp_drop_alert_v1(
     };
     let signature = compute_reason_signature_v1(VDROP_REASON_CODE_V1, &candidate.reason_details);
     let alert_id = compute_source_stream_sharp_drop_alert_id_v1(candidate);
-    let window_size_s = u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
+    let window_size_s =
+        u32::try_from(candidate.window_end_ts_i64 - candidate.window_start_ts_i64).unwrap_or(0);
     let score_volume = candidate.drop_ratio_f32.clamp(0.0, 1.0);
     let capped_provenance = cap_provenance_v1(provenance, PROVENANCE_CAP_DEFAULT_V1);
 
@@ -710,10 +751,11 @@ pub fn build_source_stream_sharp_drop_alert_v1(
         signature,
     };
     let primary_put = alert_primary_put_v1(&alert)?;
-    let open_drop = source_stream_open_drop_state_from_candidate_v1(subject, candidate, &alert.alert_id)
-        .map_err(|e| AlertErrorV1::InvalidSharpDropCandidate {
-            msg: format!("source-stream open-drop construction failed: {:?}", e),
-        })?;
+    let open_drop =
+        source_stream_open_drop_state_from_candidate_v1(subject, candidate, &alert.alert_id)
+            .map_err(|e| AlertErrorV1::InvalidSharpDropCandidate {
+                msg: format!("source-stream open-drop construction failed: {:?}", e),
+            })?;
 
     Ok(SharpDropAlertBuildResultV1 {
         alert,
@@ -722,7 +764,9 @@ pub fn build_source_stream_sharp_drop_alert_v1(
     })
 }
 
-fn validate_sharp_drop_candidate_for_alert_v1(candidate: &SharpDropCandidateV1) -> Result<(), AlertErrorV1> {
+fn validate_sharp_drop_candidate_for_alert_v1(
+    candidate: &SharpDropCandidateV1,
+) -> Result<(), AlertErrorV1> {
     match candidate.subject_kind_u8 {
         SILENCE_SUBJECT_KIND_DEVICE_V1 | SILENCE_SUBJECT_KIND_TENANT_V1 => {}
         other => {
@@ -771,10 +815,16 @@ fn validate_sharp_drop_candidate_for_alert_v1(candidate: &SharpDropCandidateV1) 
         || candidate.observed_expected_ratio_f32 > 1.0
     {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
-            msg: format!("invalid observed/expected ratio: {}", candidate.observed_expected_ratio_f32),
+            msg: format!(
+                "invalid observed/expected ratio: {}",
+                candidate.observed_expected_ratio_f32
+            ),
         });
     }
-    if !candidate.drop_ratio_f32.is_finite() || candidate.drop_ratio_f32 < 0.0 || candidate.drop_ratio_f32 > 1.0 {
+    if !candidate.drop_ratio_f32.is_finite()
+        || candidate.drop_ratio_f32 < 0.0
+        || candidate.drop_ratio_f32 > 1.0
+    {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
             msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
         });
@@ -931,17 +981,21 @@ fn subject_kind_alert_id_part_v1(subject_kind: u8) -> &'static str {
     }
 }
 
-
 fn validate_source_stream_vdrop_candidate_for_alert_v1(
     subject: &SourceStreamSubjectV1,
     candidate: &VDropCandidateV1,
 ) -> Result<(), AlertErrorV1> {
-    validate_source_stream_subject_v1(subject).map_err(|e| AlertErrorV1::InvalidVDropCandidate {
-        msg: format!("invalid source-stream subject: {:?}", e),
+    validate_source_stream_subject_v1(subject).map_err(|e| {
+        AlertErrorV1::InvalidVDropCandidate {
+            msg: format!("invalid source-stream subject: {:?}", e),
+        }
     })?;
     if candidate.subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
         return Err(AlertErrorV1::InvalidVDropCandidate {
-            msg: format!("invalid source-stream subject kind: {}", candidate.subject_kind_u8),
+            msg: format!(
+                "invalid source-stream subject kind: {}",
+                candidate.subject_kind_u8
+            ),
         });
     }
     if candidate.tenant_id.as_str() != subject.tenant_id.as_str() {
@@ -955,11 +1009,36 @@ fn validate_source_stream_vdrop_candidate_for_alert_v1(
         });
     }
     validate_vdrop_candidate_core_for_alert_v1(candidate)?;
-    require_reason_detail_v1(&candidate.reason_details, "subject_kind", "source_stream", "vdrop")?;
-    require_reason_detail_v1(&candidate.reason_details, "tenant_id", &subject.tenant_id, "vdrop")?;
-    require_reason_detail_v1(&candidate.reason_details, "device_key", &subject.device_key, "vdrop")?;
-    require_reason_detail_v1(&candidate.reason_details, "source_stream_id", &subject.source_stream_id, "vdrop")?;
-    require_reason_detail_v1(&candidate.reason_details, "source_path", &subject.canonical_source_path, "vdrop")?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "subject_kind",
+        "source_stream",
+        "vdrop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "tenant_id",
+        &subject.tenant_id,
+        "vdrop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "device_key",
+        &subject.device_key,
+        "vdrop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "source_stream_id",
+        &subject.source_stream_id,
+        "vdrop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "source_path",
+        &subject.canonical_source_path,
+        "vdrop",
+    )?;
     Ok(())
 }
 
@@ -967,12 +1046,17 @@ fn validate_source_stream_sharp_drop_candidate_for_alert_v1(
     subject: &SourceStreamSubjectV1,
     candidate: &SharpDropCandidateV1,
 ) -> Result<(), AlertErrorV1> {
-    validate_source_stream_subject_v1(subject).map_err(|e| AlertErrorV1::InvalidSharpDropCandidate {
-        msg: format!("invalid source-stream subject: {:?}", e),
+    validate_source_stream_subject_v1(subject).map_err(|e| {
+        AlertErrorV1::InvalidSharpDropCandidate {
+            msg: format!("invalid source-stream subject: {:?}", e),
+        }
     })?;
     if candidate.subject_kind_u8 != SILENCE_SUBJECT_KIND_SOURCE_STREAM_V1 {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
-            msg: format!("invalid source-stream subject kind: {}", candidate.subject_kind_u8),
+            msg: format!(
+                "invalid source-stream subject kind: {}",
+                candidate.subject_kind_u8
+            ),
         });
     }
     if candidate.tenant_id.as_str() != subject.tenant_id.as_str() {
@@ -986,15 +1070,42 @@ fn validate_source_stream_sharp_drop_candidate_for_alert_v1(
         });
     }
     validate_sharp_drop_candidate_core_for_alert_v1(candidate)?;
-    require_reason_detail_v1(&candidate.reason_details, "subject_kind", "source_stream", "sharp_drop")?;
-    require_reason_detail_v1(&candidate.reason_details, "tenant_id", &subject.tenant_id, "sharp_drop")?;
-    require_reason_detail_v1(&candidate.reason_details, "device_key", &subject.device_key, "sharp_drop")?;
-    require_reason_detail_v1(&candidate.reason_details, "source_stream_id", &subject.source_stream_id, "sharp_drop")?;
-    require_reason_detail_v1(&candidate.reason_details, "source_path", &subject.canonical_source_path, "sharp_drop")?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "subject_kind",
+        "source_stream",
+        "sharp_drop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "tenant_id",
+        &subject.tenant_id,
+        "sharp_drop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "device_key",
+        &subject.device_key,
+        "sharp_drop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "source_stream_id",
+        &subject.source_stream_id,
+        "sharp_drop",
+    )?;
+    require_reason_detail_v1(
+        &candidate.reason_details,
+        "source_path",
+        &subject.canonical_source_path,
+        "sharp_drop",
+    )?;
     Ok(())
 }
 
-fn validate_vdrop_candidate_core_for_alert_v1(candidate: &VDropCandidateV1) -> Result<(), AlertErrorV1> {
+fn validate_vdrop_candidate_core_for_alert_v1(
+    candidate: &VDropCandidateV1,
+) -> Result<(), AlertErrorV1> {
     if candidate.tenant_id.is_empty() {
         return Err(AlertErrorV1::InvalidVDropCandidate {
             msg: "tenant_id must not be empty".to_string(),
@@ -1031,7 +1142,9 @@ fn validate_vdrop_candidate_core_for_alert_v1(candidate: &VDropCandidateV1) -> R
     Ok(())
 }
 
-fn validate_sharp_drop_candidate_core_for_alert_v1(candidate: &SharpDropCandidateV1) -> Result<(), AlertErrorV1> {
+fn validate_sharp_drop_candidate_core_for_alert_v1(
+    candidate: &SharpDropCandidateV1,
+) -> Result<(), AlertErrorV1> {
     if candidate.tenant_id.is_empty() {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
             msg: "tenant_id must not be empty".to_string(),
@@ -1072,10 +1185,16 @@ fn validate_sharp_drop_candidate_core_for_alert_v1(candidate: &SharpDropCandidat
         || candidate.observed_expected_ratio_f32 > 1.0
     {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
-            msg: format!("invalid observed/expected ratio: {}", candidate.observed_expected_ratio_f32),
+            msg: format!(
+                "invalid observed/expected ratio: {}",
+                candidate.observed_expected_ratio_f32
+            ),
         });
     }
-    if !candidate.drop_ratio_f32.is_finite() || candidate.drop_ratio_f32 < 0.0 || candidate.drop_ratio_f32 > 1.0 {
+    if !candidate.drop_ratio_f32.is_finite()
+        || candidate.drop_ratio_f32 < 0.0
+        || candidate.drop_ratio_f32 > 1.0
+    {
         return Err(AlertErrorV1::InvalidSharpDropCandidate {
             msg: format!("invalid drop ratio: {}", candidate.drop_ratio_f32),
         });
@@ -1107,10 +1226,16 @@ fn require_reason_detail_v1(
     expected_value: &str,
     context: &'static str,
 ) -> Result<(), AlertErrorV1> {
-    if details.iter().any(|(detail_key, detail_value)| detail_key == key && detail_value == expected_value) {
+    if details
+        .iter()
+        .any(|(detail_key, detail_value)| detail_key == key && detail_value == expected_value)
+    {
         return Ok(());
     }
-    let msg = format!("missing reason detail {}={} for {}", key, expected_value, context);
+    let msg = format!(
+        "missing reason detail {}={} for {}",
+        key, expected_value, context
+    );
     if context == "sharp_drop" {
         Err(AlertErrorV1::InvalidSharpDropCandidate { msg })
     } else {
@@ -1129,16 +1254,25 @@ fn source_stream_hard_silence_reason_details_v1(
         details.push(("device_key".to_string(), subject.device_key.clone()));
     }
     if !details.iter().any(|(key, _)| key == "source_stream_id") {
-        details.push(("source_stream_id".to_string(), subject.source_stream_id.clone()));
+        details.push((
+            "source_stream_id".to_string(),
+            subject.source_stream_id.clone(),
+        ));
     }
     if !details.iter().any(|(key, _)| key == "source_path") {
-        details.push(("source_path".to_string(), subject.canonical_source_path.clone()));
+        details.push((
+            "source_path".to_string(),
+            subject.canonical_source_path.clone(),
+        ));
     }
     details
 }
 
 fn source_stream_alert_device_path_v1(subject: &SourceStreamSubjectV1) -> String {
-    format!("source_stream:{}/{}", subject.device_key, subject.canonical_source_path)
+    format!(
+        "source_stream:{}/{}",
+        subject.device_key, subject.canonical_source_path
+    )
 }
 
 fn compute_source_stream_vdrop_alert_id_v1(candidate: &VDropCandidateV1) -> String {
@@ -1272,7 +1406,10 @@ pub fn decode_alert_v1(bytes: &[u8]) -> Result<AlertV1, AlertErrorV1> {
 }
 
 fn validate_alert_scoring_config_v1(cfg: &AlertScoringConfigV1) -> Result<(), AlertErrorV1> {
-    if !cfg.outlier_threshold.is_finite() || cfg.outlier_threshold < 0.0 || cfg.outlier_threshold > 1.0 {
+    if !cfg.outlier_threshold.is_finite()
+        || cfg.outlier_threshold < 0.0
+        || cfg.outlier_threshold > 1.0
+    {
         return Err(AlertErrorV1::InvalidOutlierThreshold {
             value: cfg.outlier_threshold,
         });
@@ -1288,7 +1425,9 @@ fn validate_alert_scoring_config_v1(cfg: &AlertScoringConfigV1) -> Result<(), Al
         });
     }
     if !cfg.drift_min.is_finite() || cfg.drift_min < 0.0 || cfg.drift_min > 1.0 {
-        return Err(AlertErrorV1::InvalidDriftMin { value: cfg.drift_min });
+        return Err(AlertErrorV1::InvalidDriftMin {
+            value: cfg.drift_min,
+        });
     }
     if !cfg.blob_ratio_high.is_finite() || cfg.blob_ratio_high < 0.0 || cfg.blob_ratio_high > 1.0 {
         return Err(AlertErrorV1::InvalidBlobRatioHigh {
@@ -1344,7 +1483,9 @@ fn choose_label_v1(
         && !entity_focus
     {
         ALERT_KIND_NOISE_V1
-    } else if score_total >= cfg.info_threshold || (cold_start && volume >= VOLUME_EXTREME_THRESHOLD_V1) {
+    } else if score_total >= cfg.info_threshold
+        || (cold_start && volume >= VOLUME_EXTREME_THRESHOLD_V1)
+    {
         ALERT_KIND_INFO_V1
     } else {
         ALERT_KIND_NONE_V1
@@ -1388,7 +1529,10 @@ fn build_reasons_v1(
 ) -> Vec<ReasonV1> {
     let mut reasons = Vec::new();
 
-    if top_feature_scores.iter().any(|feature| feature.df_count == 0) {
+    if top_feature_scores
+        .iter()
+        .any(|feature| feature.df_count == 0)
+    {
         reasons.push(ReasonV1 {
             code: "R_NEW_FEATURE".to_string(),
             msg: "one or more top features are new in this time bucket".to_string(),
@@ -1456,7 +1600,10 @@ fn build_reasons_v1(
     reasons
 }
 
-fn select_top_feature_scores_v1(feature_scores: &[FeatureScoreV1], cap: usize) -> Vec<FeatureScoreV1> {
+fn select_top_feature_scores_v1(
+    feature_scores: &[FeatureScoreV1],
+    cap: usize,
+) -> Vec<FeatureScoreV1> {
     let mut scores = feature_scores.to_vec();
     scores.sort_by(|a, b| {
         b.contrib
@@ -1479,7 +1626,9 @@ fn build_entities_v1(snapshot: &EntitySketchSnapshotV1) -> EntitiesV1 {
     }
 }
 
-fn counted_strings_sorted_v1(entries: &[crate::db::open_window::TopKStringEntryV1]) -> Vec<CountedStringV1> {
+fn counted_strings_sorted_v1(
+    entries: &[crate::db::open_window::TopKStringEntryV1],
+) -> Vec<CountedStringV1> {
     let mut out: Vec<CountedStringV1> = entries
         .iter()
         .map(|entry| CountedStringV1 {
@@ -1487,7 +1636,11 @@ fn counted_strings_sorted_v1(entries: &[crate::db::open_window::TopKStringEntryV
             count: entry.count,
         })
         .collect();
-    out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.as_bytes().cmp(b.value.as_bytes())));
+    out.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.value.as_bytes().cmp(b.value.as_bytes()))
+    });
     out
 }
 
@@ -1519,9 +1672,15 @@ fn build_summary_analyst_v1(
     if top_list.is_empty() && reason_list.is_empty() {
         format!("{} score {:.3}.", label_text, score_total)
     } else if reason_list.is_empty() {
-        format!("{} score {:.3}. Top features: {}.", label_text, score_total, top_list)
+        format!(
+            "{} score {:.3}. Top features: {}.",
+            label_text, score_total, top_list
+        )
     } else if top_list.is_empty() {
-        format!("{} score {:.3}. Reasons: {}.", label_text, score_total, reason_list)
+        format!(
+            "{} score {:.3}. Reasons: {}.",
+            label_text, score_total, reason_list
+        )
     } else {
         format!(
             "{} score {:.3}. Reasons: {}. Top features: {}.",
@@ -1542,8 +1701,14 @@ fn build_summary_customer_v1(
         LabelV1::Info => "A notable pattern was observed in this log window",
     };
     let lead_entity = primary_entity_text_v1(entities);
-    let lead_feature = top_features.first().map(|feature| feature.feature.as_str()).unwrap_or("");
-    let lead_reason = reasons.first().map(|reason| reason.msg.as_str()).unwrap_or("");
+    let lead_feature = top_features
+        .first()
+        .map(|feature| feature.feature.as_str())
+        .unwrap_or("");
+    let lead_reason = reasons
+        .first()
+        .map(|reason| reason.msg.as_str())
+        .unwrap_or("");
 
     let mut parts = vec![label_text.to_string()];
     if !lead_reason.is_empty() {
@@ -1639,8 +1804,16 @@ fn compute_alert_signature_v1(top_features: &[TopFeatureV1]) -> String {
     stable_hash_hex128_v1(&input)
 }
 
-fn compute_alert_id_v1(tenant_id: &str, device_key: &str, window_start_ts: i64, signature: &str) -> String {
-    let input = format!("{}\t{}\t{}\t{}", tenant_id, device_key, window_start_ts, signature);
+fn compute_alert_id_v1(
+    tenant_id: &str,
+    device_key: &str,
+    window_start_ts: i64,
+    signature: &str,
+) -> String {
+    let input = format!(
+        "{}\t{}\t{}\t{}",
+        tenant_id, device_key, window_start_ts, signature
+    );
     stable_hash_hex128_v1(&input)
 }
 
@@ -1725,7 +1898,6 @@ fn l2_norm_v1(map: &BTreeMap<u32, f32>) -> f64 {
         .sum::<f64>()
         .sqrt()
 }
-
 
 fn family_from_feature_v1(feature: &str) -> FeatureFamilyV1 {
     if feature.starts_with("k=") {

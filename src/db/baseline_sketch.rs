@@ -198,7 +198,8 @@ pub fn encode_dfm_v1(pairs: &[DfCountPairV1]) -> Result<Vec<u8>, BaselineSketchE
 
 pub fn decode_dfm_v1(bytes: &[u8]) -> Result<Vec<DfCountPairV1>, BaselineSketchErrorV1> {
     let (pair_count_u32, mut offset) = decode_varint_u32_prefix(bytes)?;
-    let pair_count = usize::try_from(pair_count_u32).map_err(|_| BaselineSketchErrorV1::VarintOverflow)?;
+    let pair_count =
+        usize::try_from(pair_count_u32).map_err(|_| BaselineSketchErrorV1::VarintOverflow)?;
     let mut out = Vec::with_capacity(pair_count);
     let mut prev_feature_id: Option<u32> = None;
 
@@ -266,7 +267,8 @@ pub fn encode_centroid_v1(pairs: &[CentroidValuePairV1]) -> Result<Vec<u8>, Base
 
 pub fn decode_centroid_v1(bytes: &[u8]) -> Result<Vec<CentroidValuePairV1>, BaselineSketchErrorV1> {
     let (pair_count_u32, mut offset) = decode_varint_u32_prefix(bytes)?;
-    let pair_count = usize::try_from(pair_count_u32).map_err(|_| BaselineSketchErrorV1::VarintOverflow)?;
+    let pair_count =
+        usize::try_from(pair_count_u32).map_err(|_| BaselineSketchErrorV1::VarintOverflow)?;
     let mut out = Vec::with_capacity(pair_count);
     let mut prev_feature_id: Option<u32> = None;
 
@@ -274,7 +276,9 @@ pub fn decode_centroid_v1(bytes: &[u8]) -> Result<Vec<CentroidValuePairV1>, Base
         let (feature_id, used_feature_id) = decode_varint_u32_prefix(&bytes[offset..])?;
         offset += used_feature_id;
 
-        let end = offset.checked_add(4).ok_or(BaselineSketchErrorV1::VarintOverflow)?;
+        let end = offset
+            .checked_add(4)
+            .ok_or(BaselineSketchErrorV1::VarintOverflow)?;
         if end > bytes.len() {
             return Err(BaselineSketchErrorV1::UnexpectedEof);
         }

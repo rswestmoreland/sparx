@@ -14,18 +14,22 @@ use std::path::Path;
 use crate::config::ConfigV1;
 use crate::db::fjall::{FjallKvDbV1, KvWriteOpV1};
 use crate::db::keys::{
-    key_global_alert_out_root_v1, key_global_metrics_counter_v1, key_global_metrics_gauge_v1, key_global_migrate_journal_v1, key_global_process_last_run_end_ts_v1,
+    key_global_alert_out_root_v1, key_global_metrics_counter_v1, key_global_metrics_gauge_v1,
+    key_global_migrate_journal_v1, key_global_process_last_run_end_ts_v1,
     key_global_process_last_run_exit_code_v1, key_global_process_last_run_host_v1,
     key_global_process_last_run_start_ts_v1, key_global_schema_created_ts_v1,
     key_global_schema_last_migrate_ts_v1, key_global_schema_version_v1,
-    key_global_tenant_created_ts_v1, key_global_tenant_db_path_v1,
-    key_global_tenant_idx_active_v1, key_global_tenant_last_seen_ts_v1,
-    key_global_tenant_purge_v1, key_global_tenant_root_rel_v1, key_global_tenant_status_v1,
-    key_prefix_global_migrate_journal_v1, key_prefix_global_tenant_idx_active_v1,
-    key_prefix_global_tenant_purge_v1, key_prefix_global_tenant_v1,
+    key_global_tenant_created_ts_v1, key_global_tenant_db_path_v1, key_global_tenant_idx_active_v1,
+    key_global_tenant_last_seen_ts_v1, key_global_tenant_purge_v1, key_global_tenant_root_rel_v1,
+    key_global_tenant_status_v1, key_prefix_global_migrate_journal_v1,
+    key_prefix_global_tenant_idx_active_v1, key_prefix_global_tenant_purge_v1,
+    key_prefix_global_tenant_v1,
 };
 use crate::db::layout::{filesystem_layout_v1, FilesystemLayoutV1};
-use crate::db::tenant_values::{decode_metrics_counter_v1, decode_metrics_gauge_v1, encode_metrics_counter_v1, encode_metrics_gauge_v1};
+use crate::db::tenant_values::{
+    decode_metrics_counter_v1, decode_metrics_gauge_v1, encode_metrics_counter_v1,
+    encode_metrics_gauge_v1,
+};
 use crate::db::DbErrorV1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -126,7 +130,10 @@ impl GlobalDbV1 {
     }
 
     pub fn write_metric_counter_v1(&self, name: &str, value: u64) -> Result<(), DbErrorV1> {
-        self.put_raw_v1(key_global_metrics_counter_v1(name).as_bytes(), &encode_metrics_counter_v1(value))
+        self.put_raw_v1(
+            key_global_metrics_counter_v1(name).as_bytes(),
+            &encode_metrics_counter_v1(value),
+        )
     }
 
     pub fn read_metric_counter_v1(&self, name: &str) -> Result<Option<u64>, DbErrorV1> {
@@ -134,8 +141,12 @@ impl GlobalDbV1 {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
-        let value = decode_metrics_counter_v1(&bytes)
-            .map_err(|e| DbErrorV1::new_v1(format!("failed to decode global metric counter {}: {}", name, e.msg)))?;
+        let value = decode_metrics_counter_v1(&bytes).map_err(|e| {
+            DbErrorV1::new_v1(format!(
+                "failed to decode global metric counter {}: {:?}",
+                name, e
+            ))
+        })?;
         Ok(Some(value))
     }
 
@@ -144,7 +155,10 @@ impl GlobalDbV1 {
     }
 
     pub fn write_metric_gauge_v1(&self, name: &str, value: f64) -> Result<(), DbErrorV1> {
-        self.put_raw_v1(key_global_metrics_gauge_v1(name).as_bytes(), &encode_metrics_gauge_v1(value))
+        self.put_raw_v1(
+            key_global_metrics_gauge_v1(name).as_bytes(),
+            &encode_metrics_gauge_v1(value),
+        )
     }
 
     pub fn read_metric_gauge_v1(&self, name: &str) -> Result<Option<f64>, DbErrorV1> {
@@ -152,8 +166,12 @@ impl GlobalDbV1 {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
-        let value = decode_metrics_gauge_v1(&bytes)
-            .map_err(|e| DbErrorV1::new_v1(format!("failed to decode global metric gauge {}: {}", name, e.msg)))?;
+        let value = decode_metrics_gauge_v1(&bytes).map_err(|e| {
+            DbErrorV1::new_v1(format!(
+                "failed to decode global metric gauge {}: {:?}",
+                name, e
+            ))
+        })?;
         Ok(Some(value))
     }
 
@@ -189,9 +207,10 @@ impl GlobalDbV1 {
             return Ok(None);
         }
 
-        let version = version.ok_or_else(|| DbErrorV1::new_v1("global schema state missing version"))?;
-        let created_ts =
-            created_ts.ok_or_else(|| DbErrorV1::new_v1("global schema state missing created_ts"))?;
+        let version =
+            version.ok_or_else(|| DbErrorV1::new_v1("global schema state missing version"))?;
+        let created_ts = created_ts
+            .ok_or_else(|| DbErrorV1::new_v1("global schema state missing created_ts"))?;
         let last_migrate_ts = last_migrate_ts
             .ok_or_else(|| DbErrorV1::new_v1("global schema state missing last_migrate_ts"))?;
 
@@ -229,11 +248,15 @@ impl GlobalDbV1 {
 
     pub fn read_process_state_v1(&self) -> Result<GlobalProcessStateV1, DbErrorV1> {
         Ok(GlobalProcessStateV1 {
-            last_run_start_ts: match self.get_raw_v1(key_global_process_last_run_start_ts_v1().as_bytes())? {
+            last_run_start_ts: match self
+                .get_raw_v1(key_global_process_last_run_start_ts_v1().as_bytes())?
+            {
                 Some(bytes) => Some(decode_i64_v1(&bytes, "global process last_run_start_ts")?),
                 None => None,
             },
-            last_run_end_ts: match self.get_raw_v1(key_global_process_last_run_end_ts_v1().as_bytes())? {
+            last_run_end_ts: match self
+                .get_raw_v1(key_global_process_last_run_end_ts_v1().as_bytes())?
+            {
                 Some(bytes) => Some(decode_i64_v1(&bytes, "global process last_run_end_ts")?),
                 None => None,
             },
@@ -243,7 +266,9 @@ impl GlobalDbV1 {
                 Some(bytes) => Some(decode_i32_v1(&bytes, "global process last_run_exit_code")?),
                 None => None,
             },
-            last_run_host: match self.get_raw_v1(key_global_process_last_run_host_v1().as_bytes())? {
+            last_run_host: match self
+                .get_raw_v1(key_global_process_last_run_host_v1().as_bytes())?
+            {
                 Some(bytes) => Some(decode_string_v1(&bytes, "global process last_run_host")?),
                 None => None,
             },
@@ -288,28 +313,44 @@ impl GlobalDbV1 {
         tenant_id: &str,
     ) -> Result<Option<GlobalTenantRecordV1>, DbErrorV1> {
         let created_ts = self.get_raw_v1(key_global_tenant_created_ts_v1(tenant_id).as_bytes())?;
-        let last_seen_ts = self.get_raw_v1(key_global_tenant_last_seen_ts_v1(tenant_id).as_bytes())?;
+        let last_seen_ts =
+            self.get_raw_v1(key_global_tenant_last_seen_ts_v1(tenant_id).as_bytes())?;
         let status = self.get_raw_v1(key_global_tenant_status_v1(tenant_id).as_bytes())?;
         let has_any = created_ts.is_some() || last_seen_ts.is_some() || status.is_some();
         if !has_any {
             return Ok(None);
         }
 
-        let created_ts = created_ts
-            .ok_or_else(|| DbErrorV1::new_v1(format!("tenant {} record missing created_ts", tenant_id)))?;
-        let last_seen_ts = last_seen_ts
-            .ok_or_else(|| DbErrorV1::new_v1(format!("tenant {} record missing last_seen_ts", tenant_id)))?;
-        let status =
-            status.ok_or_else(|| DbErrorV1::new_v1(format!("tenant {} record missing status", tenant_id)))?;
+        let created_ts = created_ts.ok_or_else(|| {
+            DbErrorV1::new_v1(format!("tenant {} record missing created_ts", tenant_id))
+        })?;
+        let last_seen_ts = last_seen_ts.ok_or_else(|| {
+            DbErrorV1::new_v1(format!("tenant {} record missing last_seen_ts", tenant_id))
+        })?;
+        let status = status.ok_or_else(|| {
+            DbErrorV1::new_v1(format!("tenant {} record missing status", tenant_id))
+        })?;
 
         Ok(Some(GlobalTenantRecordV1 {
             tenant_id: tenant_id.to_string(),
             created_ts: decode_i64_v1(&created_ts, "tenant created_ts")?,
             last_seen_ts: decode_i64_v1(&last_seen_ts, "tenant last_seen_ts")?,
             status: decode_u8_v1(&status, "tenant status")?,
-            tenant_root_rel: read_optional_string_v1(self, key_global_tenant_root_rel_v1(tenant_id).as_bytes(), "tenant tenant_root_rel")?,
-            tenant_db_path: read_optional_string_v1(self, key_global_tenant_db_path_v1(tenant_id).as_bytes(), "tenant tenant_db_path")?,
-            alert_out_root: read_optional_string_v1(self, key_global_alert_out_root_v1(tenant_id).as_bytes(), "tenant alert_out_root")?,
+            tenant_root_rel: read_optional_string_v1(
+                self,
+                key_global_tenant_root_rel_v1(tenant_id).as_bytes(),
+                "tenant tenant_root_rel",
+            )?,
+            tenant_db_path: read_optional_string_v1(
+                self,
+                key_global_tenant_db_path_v1(tenant_id).as_bytes(),
+                "tenant tenant_db_path",
+            )?,
+            alert_out_root: read_optional_string_v1(
+                self,
+                key_global_alert_out_root_v1(tenant_id).as_bytes(),
+                "tenant alert_out_root",
+            )?,
         }))
     }
 
@@ -317,14 +358,22 @@ impl GlobalDbV1 {
         self.put_raw_v1(key_global_tenant_status_v1(tenant_id).as_bytes(), &[status])
     }
 
-    pub fn set_tenant_last_seen_ts_v1(&self, tenant_id: &str, last_seen_ts: i64) -> Result<(), DbErrorV1> {
+    pub fn set_tenant_last_seen_ts_v1(
+        &self,
+        tenant_id: &str,
+        last_seen_ts: i64,
+    ) -> Result<(), DbErrorV1> {
         self.put_raw_v1(
             key_global_tenant_last_seen_ts_v1(tenant_id).as_bytes(),
             &encode_i64_v1(last_seen_ts),
         )
     }
 
-    pub fn set_tenant_active_index_v1(&self, tenant_id: &str, is_active: bool) -> Result<(), DbErrorV1> {
+    pub fn set_tenant_active_index_v1(
+        &self,
+        tenant_id: &str,
+        is_active: bool,
+    ) -> Result<(), DbErrorV1> {
         if is_active {
             self.put_raw_v1(key_global_tenant_idx_active_v1(tenant_id).as_bytes(), &[])
         } else {
@@ -337,7 +386,11 @@ impl GlobalDbV1 {
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, _) in entries {
-            out.push(parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "active tenant index")?);
+            out.push(parse_suffix_after_prefix_v1(
+                &key,
+                prefix.as_bytes(),
+                "active tenant index",
+            )?);
         }
         Ok(out)
     }
@@ -360,7 +413,10 @@ impl GlobalDbV1 {
         ts: i64,
         status: &str,
     ) -> Result<(), DbErrorV1> {
-        self.put_raw_v1(key_global_tenant_purge_v1(tenant_id, ts).as_bytes(), status.as_bytes())
+        self.put_raw_v1(
+            key_global_tenant_purge_v1(tenant_id, ts).as_bytes(),
+            status.as_bytes(),
+        )
     }
 
     pub fn scan_tenant_purge_entries_v1(
@@ -371,7 +427,8 @@ impl GlobalDbV1 {
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, value) in entries {
-            let ts_text = parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "tenant purge journal")?;
+            let ts_text =
+                parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "tenant purge journal")?;
             out.push(GlobalTenantPurgeEntryV1 {
                 tenant_id: tenant_id.to_string(),
                 ts: parse_i64_ascii_v1(&ts_text, "tenant purge ts")?,
@@ -397,7 +454,8 @@ impl GlobalDbV1 {
         let entries = self.scan_prefix_raw_v1(prefix.as_bytes())?;
         let mut out = Vec::with_capacity(entries.len());
         for (key, payload) in entries {
-            let suffix = parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "migration journal")?;
+            let suffix =
+                parse_suffix_after_prefix_v1(&key, prefix.as_bytes(), "migration journal")?;
             let (ts_text, name) = split_once_v1(&suffix, '/', "migration journal key")?;
             out.push(GlobalMigrateJournalEntryV1 {
                 ts: parse_i64_ascii_v1(ts_text, "migration journal ts")?,
@@ -521,12 +579,15 @@ fn decode_u8_v1(bytes: &[u8], label: &str) -> Result<u8, DbErrorV1> {
 }
 
 fn decode_string_v1(bytes: &[u8], label: &str) -> Result<String, DbErrorV1> {
-    String::from_utf8(bytes.to_vec()).map_err(|e| {
-        DbErrorV1::new_v1(format!("{} is not valid UTF-8: {}", label, e))
-    })
+    String::from_utf8(bytes.to_vec())
+        .map_err(|e| DbErrorV1::new_v1(format!("{} is not valid UTF-8: {}", label, e)))
 }
 
-fn parse_suffix_after_prefix_v1(key: &[u8], prefix: &[u8], label: &str) -> Result<String, DbErrorV1> {
+fn parse_suffix_after_prefix_v1(
+    key: &[u8],
+    prefix: &[u8],
+    label: &str,
+) -> Result<String, DbErrorV1> {
     if !key.starts_with(prefix) {
         return Err(DbErrorV1::new_v1(format!(
             "{} key does not match expected prefix",
@@ -546,7 +607,11 @@ fn parse_suffix_after_prefix_v1(key: &[u8], prefix: &[u8], label: &str) -> Resul
     decode_string_v1(suffix, label)
 }
 
-fn split_once_v1<'a>(text: &'a str, delim: char, label: &str) -> Result<(&'a str, &'a str), DbErrorV1> {
+fn split_once_v1<'a>(
+    text: &'a str,
+    delim: char,
+    label: &str,
+) -> Result<(&'a str, &'a str), DbErrorV1> {
     text.split_once(delim)
         .ok_or_else(|| DbErrorV1::new_v1(format!("{} is missing separator '{}'", label, delim)))
 }
