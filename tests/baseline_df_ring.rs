@@ -364,7 +364,7 @@ fn rejects_invalid_bucket_and_stale_keys_outside_slot_prefixes() {
             &DfRingConfigV1::default(),
             &meta,
             &state,
-            &[bad_key.clone()]
+            std::slice::from_ref(&bad_key)
         )
         .unwrap_err(),
         DfRingErrorV1::StaleSlotKeyOutsidePrefixes {

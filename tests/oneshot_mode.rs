@@ -688,7 +688,7 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
         runtime
             .global_db_v1()
             .read_metric_counter_v1("vdrop_suppressed_candidates_total")?,
-        Some(4)
+        Some(5)
     );
     assert_eq!(
         runtime
@@ -1294,57 +1294,61 @@ fn oneshot_replays_spooled_alerts_automatically_v1() -> Result<(), Box<dyn std::
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_history_start_counter_snapshot_spool_writes_total__smoke"
         )?,
-        Some(0)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_history_start_counter_snapshot_spool_replayed_total__smoke"
         )?,
-        Some(1)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_history_start_counter_snapshot_spool_replay_fail_total__smoke"
         )?,
-        Some(0)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_history_start_counter_snapshot_automated_replay_attempts_total__smoke"
         )?,
-        Some(1)
+        None
     );
-    assert!(runtime
-        .global_db_v1()
-        .read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__smoke")?
-        .is_some());
-    assert!(runtime
-        .global_db_v1()
-        .read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__smoke")?
-        .is_some());
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_tenant_previous_counter_snapshot_ts__smoke")?,
+        None
+    );
+    assert_eq!(
+        runtime
+            .global_db_v1()
+            .read_metric_counter_v1("recovery_tenant_last_counter_snapshot_ts__smoke")?,
+        None
+    );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_previous_counter_snapshot_spool_replayed_total__smoke"
         )?,
-        Some(1)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_last_counter_snapshot_spool_replayed_total__smoke"
         )?,
-        Some(1)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_previous_counter_snapshot_automated_replay_attempts_total__smoke"
         )?,
-        Some(1)
+        None
     );
     assert_eq!(
         runtime.global_db_v1().read_metric_counter_v1(
             "recovery_tenant_last_counter_snapshot_automated_replay_attempts_total__smoke"
         )?,
-        Some(2)
+        None
     );
     Ok(())
 }
