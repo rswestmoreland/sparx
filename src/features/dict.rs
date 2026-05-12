@@ -264,12 +264,12 @@ impl FeatureDictionaryV1 {
                 inserted: true,
                 writes: vec![
                     FeatureDictionaryKvV1 {
-                        key: key_tenant_feature_dict_str_v1(*feature_string),
+                        key: key_tenant_feature_dict_str_v1(feature_string),
                         value: encode_feat_dict_str_to_id_v1(feature_id),
                     },
                     FeatureDictionaryKvV1 {
                         key: key_tenant_feature_dict_id_v1(feature_id),
-                        value: encode_feat_dict_id_to_str_v1(*feature_string),
+                        value: encode_feat_dict_id_to_str_v1(feature_string),
                     },
                     FeatureDictionaryKvV1 {
                         key: key_tenant_feature_dict_next_id_v1(),
@@ -409,7 +409,10 @@ mod tests {
         let err = dict
             .resolve_or_insert_batch_v1(&["k=one", "k=two", "k=three", "k=four", "k=five"])
             .unwrap_err();
-        assert_eq!(err, FeatureDictionaryErrorV1::DictionaryFull { max_entries: 4 });
+        assert_eq!(
+            err,
+            FeatureDictionaryErrorV1::DictionaryFull { max_entries: 4 }
+        );
         assert_eq!(dict.meta_v1().entries, 0);
         assert_eq!(dict.meta_v1().next_id, 1);
         assert!(dict.lookup_feature_id_v1("k=one").is_none());
