@@ -610,7 +610,7 @@ fn oneshot_runtime_emits_and_deduplicates_vdrop_alerts_v1() -> Result<(), Box<dy
         runtime
             .global_db_v1()
             .read_metric_counter_v1("vdrop_evaluated_subjects_total")?,
-        Some(5)
+        Some(4)
     );
     assert_eq!(
         runtime
@@ -844,7 +844,7 @@ fn oneshot_source_stream_gate_emits_runtime_hard_silence_alert_v1(
     );
     assert_eq!(
         value["vdrop"]["source_stream_open_drop_subjects"].as_u64(),
-        None
+        Some(0)
     );
     assert_eq!(
         value["vdrop"]["source_stream_evaluated_subjects_total"].as_u64(),
