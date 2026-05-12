@@ -148,5 +148,6 @@ logs remain green for the release candidate, and release packaging is complete.
 
 - [x] README includes illustrative alert CLI and AlertV1 diagram assets.
 - [x] README includes the log-ingestion-to-sparse-matrix visual near the top of the project overview.
+- [x] README includes a concise technical model for sparse vectors, DF-ring, centroid, and fixed-layout stats baselines.
 - [x] Public HOWTO added for build, tenant/device log layout, configuration, oneshot/run, status, alert inspection, replay, and benchmark usage.
 - [ ] Repeat validation flow if release process requires a fresh check after documentation asset changes.

@@ -22,6 +22,15 @@ Current major completed areas:
 
 Historical checkpoint notes are archived under `docs/roadmap/`.
 
+## README technical model checkpoint
+
+- Added a README technical model section for sparse vectors, DF-ring, centroid,
+  and fixed-layout stats baselines.
+- Explained rarity, drift, and volume scoring evidence in concise mathematical
+  terms.
+- No runtime source, tests, fixtures, storage layout, alert schema, benchmark
+  target, or contract changes were made.
+
 ## Security/performance/test coverage hardening checkpoint
 
 - Hardened alert drill/extract path resolution against traversal and unsafe provenance data.

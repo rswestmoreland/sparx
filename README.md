@@ -40,6 +40,53 @@ multi-tenant telemetry practical while still supporting rarity scoring, drift
 scoring, spike/extreme volume scoring, hard-silence detection, sharp-drop
 detection, source-stream volume-loss detection, and explainable alerting.
 
+## Technical model: sparse rows, rarity, drift, and volume
+
+sparx represents each finalized device window as a sparse vector:
+
+```text
+x(t, d) = { feature_id -> count }
+```
+
+where `t` is the time window, `d` is the device, and only observed
+features are stored. A missing feature is treated as zero, but no dense
+zero-filled vector is materialized. This keeps memory and storage
+proportional to the number of observed behaviors rather than the total
+possible feature space.
+
+When a sparse row is finalized, sparx updates several lightweight online
+baselines:
+
+- **DF-ring baseline**: tracks recent document frequency for features across
+  windows. This helps estimate rarity. A feature that rarely appears in recent
+  history contributes more signal than a feature that appears constantly.
+- **Centroid baseline**: tracks the normal sparse behavior profile for a tenant
+  or device. New rows can be compared against this profile to detect drift in
+  behavior mix.
+- **Fixed-layout stats baseline**: tracks compact rolling statistics for volume
+  and scoring fields, such as count, mean, variance, minimums, maximums, and
+  score totals. This supports spike, drop, silence, and confidence
+  calculations without storing full historical rows.
+
+Conceptually, scoring combines three kinds of evidence:
+
+```text
+rarity: are unusual features appearing?
+drift:  is the feature mix moving away from normal?
+volume: did the amount of activity spike, drop, or disappear?
+```
+
+The update cost is approximately `O(k log k)` or better for a finalized row,
+where `k` is the number of nonzero features in that row. It does not scale with
+the total number of known features. This is the key advantage of using sparse
+matrix techniques for log analysis: the feature universe can grow large, but
+each tenant/device/window usually touches only a small portion of it.
+
+This gives sparx a streaming mathematical model for heterogeneous logs: every
+log line updates a sparse behavioral vector, every finalized window updates
+compact baselines, and every alert can explain which features, counts, scores,
+and original log spans contributed to the decision.
+
 ## Why sparse rows help log analysis
 
 Enterprise logs are wide and inconsistent. A single environment can contain
