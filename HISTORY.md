@@ -137,3 +137,12 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - No new Rust toolchain validation is claimed for this documentation-only
   checkpoint; the retained phase33f report remains the current validation
   baseline.
+
+## Alert visualization and HOWTO documentation checkpoint
+
+- Added a realistic illustrative CLI-style alert screenshot asset and linked it from the README.
+- Added the annotated AlertV1 diagram asset to the repository and linked it from the README.
+- Added a public `docs/HOWTO.md` covering build, log directory layout, configuration, oneshot/run usage, alert inspection, replay, and benchmarks.
+- Updated documentation indexes and the current checklist to reflect the new public usage guide.
+- No runtime source, tests, fixtures, storage layout, alert schema, or benchmark target changes are made by this checkpoint.
+- No new Rust toolchain validation is claimed for this documentation-only checkpoint; the retained phase33f report remains the current validation baseline.

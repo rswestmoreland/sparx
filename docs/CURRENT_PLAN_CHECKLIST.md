@@ -60,6 +60,7 @@
    - provide tenant-policy examples
    - provide migration and purge examples
    - provide known limitations
+   - maintain public HOWTO instructions for build, layout, run, alerts, replay, and benchmarks
    - create final v1 checkpoint or release artifact
 
 ## v1 completion definition
@@ -142,3 +143,9 @@ logs remain green for the release candidate, and release packaging is complete.
   hot-path changes.
 - [x] New benchmark output compared against the Phase 33d/33e baseline.
 - [ ] Evaluate parallel or async pipeline strategies only after the single-threaded hot path is measured and stable.
+
+## Public usage documentation addendum
+
+- [x] README includes illustrative alert CLI and AlertV1 diagram assets.
+- [x] Public HOWTO added for build, tenant/device log layout, configuration, oneshot/run, status, alert inspection, replay, and benchmark usage.
+- [ ] Repeat validation flow if release process requires a fresh check after documentation asset changes.

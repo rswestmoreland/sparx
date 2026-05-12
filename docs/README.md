@@ -6,6 +6,7 @@ phase plans, validation fix reviews, and handoff prompts are archived under
 
 ## Active guides
 
+- `HOWTO.md`: build, directory layout, configuration, ingest, alert, replay, and benchmark usage
 - `ARCHITECTURE.md`: high-level system model and data flow
 - `INGEST_AND_TOKENIZATION.md`: supported log inputs and normalization behavior
 - `SPARSE_MATRIX_MODEL.md`: how sparse rows, features, and baselines work

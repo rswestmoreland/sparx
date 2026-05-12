@@ -111,6 +111,27 @@ Active alert and health signals include:
 - alert query/export/drill/extract workflows backed by persisted `AlertV1`
   records and secondary alert indexes
 
+
+## What an alert looks like
+
+The compact CLI view is designed for quick operator triage. This illustrative
+example shows a tenant alert list followed by the compact alert detail view:
+
+![CLI-style sparx alert view](docs/images/sparx_alert_cli_screenshot.png)
+
+The example is illustrative; exact identifiers and timestamps depend on the
+deployment, tenant layout, and stable key generation.
+
+The full alert object is available through JSON output and JSONL sinks. The
+object keeps analyst and customer summaries, score components, reason codes, top
+features, entity sketches, and source provenance together without storing dense
+zero-filled rows. `AlertV1.provenance` remains the authoritative drilldown model.
+
+![Annotated AlertV1 object diagram](docs/images/sparx_alertv1_annotated_diagram.png)
+
+See `docs/ALERTING_AND_EXPLANATIONS.md` for alerting details and `docs/HOWTO.md`
+for command examples.
+
 ## Storage and runtime model
 
 - Fjall is the active embedded DB backend.
@@ -135,7 +156,7 @@ The current CLI/runtime surface includes:
 - `tenant policy check`
 - `purge`
 - `migrate`
-- `alerts query/search/show/export`
+- `alerts list/search/show/export`
 - `alert drill/extract`
 - `replay-spool`
 
@@ -171,8 +192,8 @@ interpretation guidance.
 ## Repository guide
 
 - `contracts/`: locked v0.1 contracts and behavior boundaries
-- `docs/`: user-facing architecture, operations, configuration, alerting, and
-  validation guidance
+- `docs/`: user-facing architecture, HOWTO, operations, configuration,
+  alerting, and validation guidance
 - `docs/roadmap/`: archived historical checkpoint notes, retained for project
   traceability
 - `fixtures/`: minimal fixture corpus and expected outputs
