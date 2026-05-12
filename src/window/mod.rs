@@ -334,13 +334,18 @@ impl WindowAccumulatorV1 {
             });
         }
 
-        let mut next = self.clone();
-        let mut dict_work = dict.clone();
+        let feature_strings: Vec<&str> = line
+            .features
+            .iter()
+            .filter(|emitted| emitted.count > 0)
+            .map(|emitted| emitted.feature.s.as_str())
+            .collect();
+        let resolved_features = dict.resolve_or_insert_batch_v1(&feature_strings)?;
 
-        next.meta.lines = next.meta.lines.saturating_add(1);
+        self.meta.lines = self.meta.lines.saturating_add(1);
         let line_bytes_u64 = u64::try_from(line_bytes).unwrap_or(u64::MAX);
-        next.meta.bytes = next.meta.bytes.saturating_add(line_bytes_u64);
-        next.entity_sketches.ingest_line_v1(line);
+        self.meta.bytes = self.meta.bytes.saturating_add(line_bytes_u64);
+        self.entity_sketches.ingest_line_v1(line);
 
         let mut result = WindowIngestResultV1 {
             dict_writes: Vec::new(),
@@ -349,30 +354,33 @@ impl WindowAccumulatorV1 {
             dropped_shapes: 0,
         };
 
+        let mut resolved_iter = resolved_features.into_iter();
         for emitted in &line.features {
             if emitted.count == 0 {
                 continue;
             }
 
-            let resolved = dict_work.resolve_or_insert_v1(&emitted.feature.s)?;
+            let resolved = resolved_iter
+                .next()
+                .ok_or(WindowErrorV1::FeatureDictionary(
+                    FeatureDictionaryErrorV1::NextIdExhausted,
+                ))?;
             result.dict_writes.extend(resolved.writes.into_iter());
 
-            if let Some(existing) = next.counts.get_mut(&resolved.feature_id) {
+            if let Some(existing) = self.counts.get_mut(&resolved.feature_id) {
                 *existing = existing.saturating_add(emitted.count);
                 continue;
             }
 
-            if next.can_admit_new_feature_v1(&emitted.feature.s, emitted.family) {
-                next.note_admitted_feature_v1(&emitted.feature.s, emitted.family);
-                next.counts.insert(resolved.feature_id, emitted.count);
+            if self.can_admit_new_feature_v1(&emitted.feature.s, emitted.family) {
+                self.note_admitted_feature_v1(&emitted.feature.s, emitted.family);
+                self.counts.insert(resolved.feature_id, emitted.count);
             } else {
-                next.note_dropped_feature_v1(&emitted.feature.s, emitted.count, &mut result);
+                self.note_dropped_feature_v1(&emitted.feature.s, emitted.count, &mut result);
             }
         }
 
-        next.active.last_update_ts = update_ts;
-        *self = next;
-        *dict = dict_work;
+        self.active.last_update_ts = update_ts;
         Ok(WindowApplyLineResultV1::Applied(result))
     }
 

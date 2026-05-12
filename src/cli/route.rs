@@ -156,7 +156,7 @@ use crate::sink::{
     spool_backlog_summary_v1, JsonlAlertSinkV1, JsonlSinkConfigV1, SpoolConfigV1, SpoolCountersV1,
     SpoolEmitOutcomeV1, SpoolReplayReportV1, SpoolingJsonlAlertSinkV1, StdoutAlertSinkV1,
 };
-use crate::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
+use crate::tokenize::{parse_syslog_envelope_v1, tokenize_message_events_v1};
 use crate::window::{
     align_window_start_ts_v1, WindowAccumulatorV1, WindowApplyLineResultV1, WindowCapsV1,
 };
@@ -4945,7 +4945,7 @@ fn process_file_oneshot_v1(
         .max(1);
     // Keep malformed or delimiter-free input bounded. The first capped slice is
     // processed, then the rest of the physical line is skipped until newline.
-    let mut line_buf = Vec::new();
+    let mut line_buf = Vec::with_capacity(max_line_bytes.min(8 * 1024));
     let mut line_start_offset = cursor_plan.start_offset;
     let mut current_offset = cursor_plan.start_offset;
     let mut dropping_overlong_line = false;
@@ -5084,36 +5084,66 @@ fn process_buffered_line_oneshot_v1(
     alert_cfg: &AlertScoringConfigV1,
     now_ts: i64,
 ) -> Result<usize, String> {
-    // Invalid UTF-8 is treated as lossy text so malformed logs cannot panic the runtime.
-    let line = String::from_utf8_lossy(line_buf).into_owned();
-    process_line_oneshot_v1(
-        runtime,
-        cfg,
-        dict,
-        acc_opt,
-        active_spans,
-        active_source_streams,
-        sharp_drop_windows,
-        source_stream_windows,
-        cursor,
-        sink,
-        tenant_recovery_metrics_cache,
-        device,
-        file,
-        line.trim_end_matches('\n').trim_end_matches('\r'),
-        line_start_offset,
-        line_end,
-        line_buf.len() as u64,
-        since,
-        until,
-        source_stream_enabled,
-        df_cfg,
-        centroid_cfg,
-        alert_cfg,
-        now_ts,
-    )
+    // Valid UTF-8 lines use a borrowed fast path. Malformed UTF-8 is treated as
+    // lossy text so malformed logs cannot panic the runtime.
+    match std::str::from_utf8(line_buf) {
+        Ok(line) => process_line_oneshot_v1(
+            runtime,
+            cfg,
+            dict,
+            acc_opt,
+            active_spans,
+            active_source_streams,
+            sharp_drop_windows,
+            source_stream_windows,
+            cursor,
+            sink,
+            tenant_recovery_metrics_cache,
+            device,
+            file,
+            line.trim_end_matches('\n').trim_end_matches('\r'),
+            line_start_offset,
+            line_end,
+            line_buf.len() as u64,
+            since,
+            until,
+            source_stream_enabled,
+            df_cfg,
+            centroid_cfg,
+            alert_cfg,
+            now_ts,
+        ),
+        Err(_) => {
+            let line = String::from_utf8_lossy(line_buf);
+            process_line_oneshot_v1(
+                runtime,
+                cfg,
+                dict,
+                acc_opt,
+                active_spans,
+                active_source_streams,
+                sharp_drop_windows,
+                source_stream_windows,
+                cursor,
+                sink,
+                tenant_recovery_metrics_cache,
+                device,
+                file,
+                line.trim_end_matches('\n').trim_end_matches('\r'),
+                line_start_offset,
+                line_end,
+                line_buf.len() as u64,
+                since,
+                until,
+                source_stream_enabled,
+                df_cfg,
+                centroid_cfg,
+                alert_cfg,
+                now_ts,
+            )
+        }
+    }
 }
-
 #[allow(clippy::too_many_arguments)]
 fn process_line_oneshot_v1(
     runtime: &mut SparxRuntimeV1,
@@ -5154,8 +5184,8 @@ fn process_line_oneshot_v1(
         return Ok(0);
     }
 
-    let tokenized = tokenize_message_v1(&parsed.msg, None);
-    let emitted = emit_line_features_v1(&parsed.envelope, &tokenized.events);
+    let events = tokenize_message_events_v1(&parsed.msg, None);
+    let emitted = emit_line_features_v1(&parsed.envelope, &events);
     let window_start_ts = align_window_start_ts_v1(line_ts, cfg.ingest.window_size_s)
         .map_err(|e| format!("align window failed: {:?}", e))?;
 
@@ -5187,19 +5217,19 @@ fn process_line_oneshot_v1(
         .map_err(|e| format!("apply line failed: {:?}", e))?;
     match result {
         WindowApplyLineResultV1::Applied(applied) => {
-            runtime
-                .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                    apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
-                    apply_window_checkpoint_writes_to_db_v1(
-                        db,
-                        &acc.checkpoint_writes_v1().map_err(|e| {
-                            DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
-                        })?,
-                    )
-                })
-                .map_err(|e| e.to_string())?;
-            update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
             if source_stream_enabled {
+                runtime
+                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                        apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
+                        apply_window_checkpoint_writes_to_db_v1(
+                            db,
+                            &acc.checkpoint_writes_v1().map_err(|e| {
+                                DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
+                            })?,
+                        )
+                    })
+                    .map_err(|e| e.to_string())?;
+                update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
                 update_active_source_stream_observation_v1(
                     active_source_streams,
                     device,
@@ -5209,13 +5239,29 @@ fn process_line_oneshot_v1(
                     offset_end,
                     byte_len,
                 )?;
+                *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
+                runtime
+                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                        db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
+                    })
+                    .map_err(|e| e.to_string())?;
+            } else {
+                let next_cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
+                runtime
+                    .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
+                        apply_feature_dict_writes_to_db_v1(db, &applied.dict_writes)?;
+                        apply_window_checkpoint_writes_to_db_v1(
+                            db,
+                            &acc.checkpoint_writes_v1().map_err(|e| {
+                                DbErrorV1::new_v1(format!("window checkpoint failed: {:?}", e))
+                            })?,
+                        )?;
+                        db.write_cursor_v1(&device.device_key, &file.file_key, &next_cursor)
+                    })
+                    .map_err(|e| e.to_string())?;
+                update_active_spans_v1(active_spans, file, cursor.inode, offset_start, offset_end);
+                *cursor = next_cursor;
             }
-            *cursor = apply_cursor_read_progress_v1(cursor, offset_end, line_ts);
-            runtime
-                .with_tenant_db_v1(&device.tenant_id, now_ts, |db| {
-                    db.write_cursor_v1(&device.device_key, &file.file_key, cursor)
-                })
-                .map_err(|e| e.to_string())?;
             Ok(0)
         }
         WindowApplyLineResultV1::DifferentWindow {

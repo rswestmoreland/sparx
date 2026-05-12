@@ -131,6 +131,9 @@ validation logs are green, and release packaging is complete.
 ## Ingest performance addendum
 
 - [x] Ingest performance tuning plan added.
-- [ ] Use benchmark output to identify hot spots before changing runtime architecture.
-- [ ] Review parser allocation patterns, sparse-row update costs, durable write batching, and detection evaluation flow.
+- [x] Review parser allocation patterns, sparse-row update costs, durable write batching, and detection evaluation flow.
+- [x] Add benchmark fields for dictionary size, sparse row width, row density, and byte throughput.
+- [x] Apply narrow ingest hot-path optimizations for cloning, allocation, and default durable write overhead.
+- [ ] Re-run Codex validation and benchmarks after ingest hot-path changes.
+- [ ] Compare new benchmark output against the Phase 33d/33e baseline before making performance claims.
 - [ ] Evaluate parallel or async pipeline strategies only after the single-threaded hot path is measured and stable.

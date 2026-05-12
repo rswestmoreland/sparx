@@ -75,38 +75,41 @@ pub fn tokenize_message_v1(
     msg: &str,
     csv_header_mode: Option<&CsvHeaderModeV1>,
 ) -> TokenizeResultV1 {
-    let mut builder = EventBuilderV1::default();
+    let (events, stats) = tokenize_message_core_v1(msg, csv_header_mode);
+    TokenizeResultV1 {
+        msg: msg.to_string(),
+        events,
+        stats,
+    }
+}
+
+pub fn tokenize_message_events_v1(
+    msg: &str,
+    csv_header_mode: Option<&CsvHeaderModeV1>,
+) -> Vec<TokenEventV1> {
+    tokenize_message_core_v1(msg, csv_header_mode).0
+}
+
+fn tokenize_message_core_v1(
+    msg: &str,
+    csv_header_mode: Option<&CsvHeaderModeV1>,
+) -> (Vec<TokenEventV1>, TokenizeStatsV1) {
+    let mut builder = EventBuilderV1::new_v1();
     let trimmed = msg.trim();
 
     match try_tokenize_cef_v1(trimmed, &mut builder) {
-        Ok(true) => {
-            return TokenizeResultV1 {
-                msg: msg.to_string(),
-                events: builder.events,
-                stats: builder.stats,
-            };
-        }
+        Ok(true) => return (builder.events, builder.stats),
         Ok(false) => {}
         Err(()) => {
             builder.stats.cef_parse_errors_total_delta = 1;
             emit_words_v1(msg, &mut builder, false);
-            return TokenizeResultV1 {
-                msg: msg.to_string(),
-                events: builder.events,
-                stats: builder.stats,
-            };
+            return (builder.events, builder.stats);
         }
     }
 
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         match try_tokenize_json_object_v1(trimmed, &mut builder) {
-            Ok(true) => {
-                return TokenizeResultV1 {
-                    msg: msg.to_string(),
-                    events: builder.events,
-                    stats: builder.stats,
-                };
-            }
+            Ok(true) => return (builder.events, builder.stats),
             Ok(false) => {}
             Err(()) => {
                 builder.stats.json_parse_errors_total_delta = 1;
@@ -116,11 +119,7 @@ pub fn tokenize_message_v1(
 
     if let Some(csv_header_mode) = csv_header_mode {
         if try_tokenize_csv_row_v1(msg, csv_header_mode, &mut builder) {
-            return TokenizeResultV1 {
-                msg: msg.to_string(),
-                events: builder.events,
-                stats: builder.stats,
-            };
+            return (builder.events, builder.stats);
         }
     }
 
@@ -129,11 +128,7 @@ pub fn tokenize_message_v1(
         emit_words_v1(msg, &mut builder, false);
     }
 
-    TokenizeResultV1 {
-        msg: msg.to_string(),
-        events: builder.events,
-        stats: builder.stats,
-    }
+    (builder.events, builder.stats)
 }
 
 #[derive(Default)]
@@ -145,6 +140,15 @@ struct EventBuilderV1 {
 }
 
 impl EventBuilderV1 {
+    fn new_v1() -> Self {
+        Self {
+            events: Vec::with_capacity(32),
+            stats: TokenizeStatsV1::default(),
+            kv_count: 0,
+            quoted_word_count: 0,
+        }
+    }
+
     fn can_emit_token_v1(&self) -> bool {
         self.events.len() < MAX_TOKENS_PER_LINE_V1
     }
@@ -427,7 +431,7 @@ fn tokenize_generic_kv_v1(msg: &str, builder: &mut EventBuilderV1) -> bool {
     let mut i = 0usize;
     let mut found_any = false;
     let mut residual_start = 0usize;
-    let mut residuals: Vec<String> = Vec::new();
+    let mut residual_ranges: Vec<(usize, usize)> = Vec::new();
     let mut quoted_texts: Vec<String> = Vec::new();
 
     while i < len {
@@ -481,28 +485,34 @@ fn tokenize_generic_kv_v1(msg: &str, builder: &mut EventBuilderV1) -> bool {
         }
 
         if residual_start < key_start {
-            residuals.push(msg[residual_start..key_start].to_string());
+            residual_ranges.push((residual_start, key_start));
         }
 
+        let next_index = parsed_value.next_index;
+        let quoted_text = if parsed_value.was_quoted
+            && parsed_value
+                .value_raw
+                .contains(|ch: char| ch.is_ascii_whitespace())
+        {
+            Some(parsed_value.value_raw.clone())
+        } else {
+            None
+        };
         if builder.push_kv_v1(
             TokenEventV1::Kv {
                 key_norm,
-                value_raw: parsed_value.value_raw.clone(),
+                value_raw: parsed_value.value_raw,
             },
             false,
         ) {
             found_any = true;
         }
-        if parsed_value.was_quoted
-            && parsed_value
-                .value_raw
-                .contains(|ch: char| ch.is_ascii_whitespace())
-        {
-            quoted_texts.push(parsed_value.value_raw.clone());
+        if let Some(quoted_text) = quoted_text {
+            quoted_texts.push(quoted_text);
         }
 
-        residual_start = parsed_value.next_index;
-        i = skip_pair_separators_v1(msg, parsed_value.next_index);
+        residual_start = next_index;
+        i = skip_pair_separators_v1(msg, next_index);
     }
 
     if !found_any {
@@ -510,11 +520,11 @@ fn tokenize_generic_kv_v1(msg: &str, builder: &mut EventBuilderV1) -> bool {
     }
 
     if residual_start < len {
-        residuals.push(msg[residual_start..].to_string());
+        residual_ranges.push((residual_start, len));
     }
 
-    for residual in residuals {
-        emit_words_v1(&residual, builder, false);
+    for (start, end) in residual_ranges {
+        emit_words_v1(&msg[start..end], builder, false);
     }
     for quoted in quoted_texts {
         emit_words_v1(&quoted, builder, true);
@@ -811,9 +821,6 @@ fn normalize_key_like_v1(s: &str) -> String {
     }
     while out.ends_with('_') {
         out.pop();
-    }
-    while out.starts_with('_') {
-        out.remove(0);
     }
     out
 }

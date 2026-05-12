@@ -4,7 +4,6 @@
 // Canonical feature emission from parsed events.
 // See: contracts/01_semantic_keys_v0_1.md and contracts/24_feature_emission_catalog_v0_1.md
 
-use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
@@ -152,25 +151,29 @@ pub fn normalize_key_v1(raw_key: &str) -> String {
         return String::new();
     }
 
-    let mut with_boundaries = String::with_capacity(trimmed.len() + 8);
-    let chars: Vec<char> = trimmed.chars().collect();
-    for (idx, ch) in chars.iter().enumerate() {
-        if idx > 0 && is_camel_boundary_v1(&chars, idx) {
-            with_boundaries.push('_');
-        }
-        with_boundaries.push(*ch);
-    }
-
-    let mut out = String::with_capacity(with_boundaries.len());
+    let mut out = String::with_capacity(trimmed.len() + 8);
     let mut last_was_us = false;
-    for ch in with_boundaries.chars() {
+    let mut prev: Option<char> = None;
+    let mut chars = trimmed.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if let Some(prev_ch) = prev {
+            if is_camel_boundary_chars_v1(prev_ch, ch, chars.peek().copied())
+                && !last_was_us
+                && !out.is_empty()
+            {
+                out.push('_');
+                last_was_us = true;
+            }
+        }
+
         let mapped = if ch.is_ascii_alphanumeric() {
             ch.to_ascii_lowercase()
         } else {
             '_'
         };
         if mapped == '_' {
-            if !last_was_us {
+            if !last_was_us && !out.is_empty() {
                 out.push('_');
                 last_was_us = true;
             }
@@ -178,8 +181,13 @@ pub fn normalize_key_v1(raw_key: &str) -> String {
             out.push(mapped);
             last_was_us = false;
         }
+        prev = Some(ch);
     }
-    out.trim_matches('_').to_string()
+
+    while out.ends_with('_') {
+        out.pop();
+    }
+    out
 }
 
 pub fn classify_key_v1(raw_key: &str) -> Option<SemanticMatchV1> {
@@ -670,18 +678,28 @@ fn is_structured_pair_v1(event: &TokenEventV1) -> bool {
 
 #[derive(Default)]
 struct FeatureAccumulatorV1 {
-    counts: BTreeMap<(u8, String), u32>,
+    counts: Vec<(u8, String, u32)>,
 }
 
 impl FeatureAccumulatorV1 {
     fn push_v1(&mut self, family: FeatureFamilyV1, feature: String) {
-        let order = family_order_v1(family);
-        *self.counts.entry((order, feature)).or_insert(0) += 1;
+        self.counts.push((family_order_v1(family), feature, 1));
     }
 
-    fn into_sorted_vec_v1(self) -> Vec<EmittedFeatureV1> {
-        let mut out = Vec::with_capacity(self.counts.len());
-        for ((_, feature), count) in self.counts {
+    fn into_sorted_vec_v1(mut self) -> Vec<EmittedFeatureV1> {
+        self.counts.sort_by(|a, b| match a.0.cmp(&b.0) {
+            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+            other => other,
+        });
+
+        let mut out: Vec<EmittedFeatureV1> = Vec::with_capacity(self.counts.len());
+        for (order, feature, count) in self.counts {
+            if let Some(last) = out.last_mut() {
+                if family_order_v1(last.family) == order && last.feature.s == feature {
+                    last.count = last.count.saturating_add(count);
+                    continue;
+                }
+            }
             let family = family_from_feature_v1(&feature);
             out.push(EmittedFeatureV1 {
                 feature: FeatureStringV1 { s: feature },
@@ -720,9 +738,7 @@ fn family_from_feature_v1(feature: &str) -> FeatureFamilyV1 {
     }
 }
 
-fn is_camel_boundary_v1(chars: &[char], idx: usize) -> bool {
-    let prev = chars[idx - 1];
-    let cur = chars[idx];
+fn is_camel_boundary_chars_v1(prev: char, cur: char, next: Option<char>) -> bool {
     if prev.is_ascii_lowercase() && cur.is_ascii_uppercase() {
         return true;
     }
@@ -732,10 +748,9 @@ fn is_camel_boundary_v1(chars: &[char], idx: usize) -> bool {
     if prev.is_ascii_digit() && cur.is_ascii_alphabetic() {
         return true;
     }
-    if idx + 1 < chars.len()
-        && prev.is_ascii_uppercase()
+    if prev.is_ascii_uppercase()
         && cur.is_ascii_uppercase()
-        && chars[idx + 1].is_ascii_lowercase()
+        && next.is_some_and(|ch| ch.is_ascii_lowercase())
     {
         return true;
     }

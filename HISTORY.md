@@ -106,3 +106,19 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Updated documentation indexes and the current checklist to keep `/docs` focused on public-facing guides.
 - No Rust toolchain validation is claimed for this checkpoint; external Codex revalidation remains required before signal-processing implementation.
 
+## Ingest path review and benchmark field checkpoint
+
+- Reviewed the oneshot ingestion path for bottleneck candidates before signal-processing implementation.
+- Added benchmark-only output fields for dictionary size, sparse row width, row density, and byte throughput.
+- Updated benchmarking documentation and roadmap notes for the new fields.
+- No product runtime behavior, storage layout, alert schema, or signal-processing behavior is changed by this checkpoint.
+- No Rust toolchain validation is claimed for this checkpoint; external Codex revalidation remains required because the benchmark target changed.
+
+## Ingest hot-path optimization checkpoint
+
+- Added atomic batch dictionary resolution and removed full per-line accumulator and dictionary cloning from window apply.
+- Added an events-only tokenizer path for runtime ingest and benchmarks.
+- Reduced tokenizer residual allocations, feature emission accumulator overhead, valid UTF-8 line allocation, and gzip scratch allocation.
+- Combined default source-stream-disabled line checkpoint and cursor writes into one tenant DB closure.
+- Preserved storage layouts, alert schemas, provenance semantics, sparse row semantics, and signal-processing scope.
+- No Rust toolchain validation is claimed for this checkpoint; external Codex revalidation and benchmarks are required.

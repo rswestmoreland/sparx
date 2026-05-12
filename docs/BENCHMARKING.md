@@ -35,7 +35,14 @@ source_stream_enabled=false
 durable_oneshot_enabled=false
 ingest_events=10000
 ingest_bytes=2200000
+ingest_bytes_per_second=17820980.56
 ingest_sparse_rows=10
+dictionary_features=250
+total_sparse_features=1000
+avg_sparse_features_per_row=100.00
+max_sparse_features_per_row=100
+avg_events_per_sparse_row=1000.00
+max_events_per_sparse_row=1000
 ingest_elapsed_s=0.123456
 ingest_eps=81000.00
 detection_events=10000
@@ -51,6 +58,14 @@ detection_alert_eps=810.00
 `ingest_eps` is the primary ingestion throughput metric. It measures how fast
 sparx can poll/read generated files, parse lines, tokenize, emit canonical
 features, resolve feature ids, and populate sparse rows in memory.
+
+The benchmark also reports ingestion shape fields that help explain throughput
+changes. `dictionary_features` is the number of distinct feature strings resolved
+by the benchmark dictionary. `avg_sparse_features_per_row` and
+`max_sparse_features_per_row` show how wide the finalized sparse rows became.
+`avg_events_per_sparse_row` and `max_events_per_sparse_row` show how densely raw
+lines were packed into finalized rows. `ingest_bytes_per_second` is a companion
+I/O-normalized throughput measure.
 
 `detection_event_eps` is the primary detection throughput metric. It measures
 how fast alert scoring/build/encoding can use the finalized sparse rows produced

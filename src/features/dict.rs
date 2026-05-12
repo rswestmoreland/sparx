@@ -210,6 +210,89 @@ impl FeatureDictionaryV1 {
             .collect()
     }
 
+    pub fn resolve_or_insert_batch_v1(
+        &mut self,
+        feature_strings: &[&str],
+    ) -> Result<Vec<FeatureDictionaryResolveV1>, FeatureDictionaryErrorV1> {
+        let mut planned_ids: BTreeMap<String, FeatureId> = BTreeMap::new();
+        let mut insert_order: Vec<(String, FeatureId)> = Vec::new();
+        let mut resolves = Vec::with_capacity(feature_strings.len());
+        let mut next_id = self.meta.next_id;
+        let mut entries = self.meta.entries;
+
+        for feature_string in feature_strings {
+            if let Some(feature_id) = self.lookup_feature_id_v1(feature_string) {
+                resolves.push(FeatureDictionaryResolveV1 {
+                    feature_id,
+                    inserted: false,
+                    writes: Vec::new(),
+                });
+                continue;
+            }
+
+            if let Some(feature_id) = planned_ids.get(*feature_string).copied() {
+                resolves.push(FeatureDictionaryResolveV1 {
+                    feature_id,
+                    inserted: false,
+                    writes: Vec::new(),
+                });
+                continue;
+            }
+
+            if !self.cfg.dict_enabled {
+                return Err(FeatureDictionaryErrorV1::DictionaryDisabled);
+            }
+
+            if entries >= self.cfg.dict_max_entries {
+                return Err(FeatureDictionaryErrorV1::DictionaryFull {
+                    max_entries: self.cfg.dict_max_entries,
+                });
+            }
+
+            let feature_id = next_id;
+            next_id = feature_id
+                .checked_add(1)
+                .ok_or(FeatureDictionaryErrorV1::NextIdExhausted)?;
+            entries += 1;
+
+            let owned = (*feature_string).to_string();
+            planned_ids.insert(owned.clone(), feature_id);
+            insert_order.push((owned, feature_id));
+
+            resolves.push(FeatureDictionaryResolveV1 {
+                feature_id,
+                inserted: true,
+                writes: vec![
+                    FeatureDictionaryKvV1 {
+                        key: key_tenant_feature_dict_str_v1(*feature_string),
+                        value: encode_feat_dict_str_to_id_v1(feature_id),
+                    },
+                    FeatureDictionaryKvV1 {
+                        key: key_tenant_feature_dict_id_v1(feature_id),
+                        value: encode_feat_dict_id_to_str_v1(*feature_string),
+                    },
+                    FeatureDictionaryKvV1 {
+                        key: key_tenant_feature_dict_next_id_v1(),
+                        value: encode_feat_dict_meta_next_id_v1(next_id),
+                    },
+                    FeatureDictionaryKvV1 {
+                        key: key_tenant_feature_dict_entries_v1(),
+                        value: encode_feat_dict_meta_entries_v1(entries),
+                    },
+                ],
+            });
+        }
+
+        for (feature_string, feature_id) in insert_order {
+            self.str_to_id.insert(feature_string.clone(), feature_id);
+            self.id_to_str.insert(feature_id, feature_string);
+        }
+        self.meta.next_id = next_id;
+        self.meta.entries = entries;
+
+        Ok(resolves)
+    }
+
     pub fn resolve_or_insert_v1(
         &mut self,
         feature_string: &str,
@@ -300,5 +383,35 @@ mod tests {
         assert!(second.writes.is_empty());
         assert_eq!(dict.meta_v1().entries, 1);
         assert_eq!(dict.meta_v1().next_id, 2);
+    }
+
+    #[test]
+    fn batch_resolve_inserts_new_features_in_input_order() {
+        let mut dict = FeatureDictionaryV1::new_empty_v1(base_cfg(), 10, 0);
+        let resolved = dict
+            .resolve_or_insert_batch_v1(&["k=src_ip", "k=dst_ip", "k=src_ip"])
+            .unwrap();
+        assert_eq!(resolved.len(), 3);
+        assert_eq!(resolved[0].feature_id, 10);
+        assert!(resolved[0].inserted);
+        assert_eq!(resolved[1].feature_id, 11);
+        assert!(resolved[1].inserted);
+        assert_eq!(resolved[2].feature_id, 10);
+        assert!(!resolved[2].inserted);
+        assert!(resolved[2].writes.is_empty());
+        assert_eq!(dict.meta_v1().entries, 2);
+        assert_eq!(dict.meta_v1().next_id, 12);
+    }
+
+    #[test]
+    fn batch_resolve_is_atomic_on_capacity_error() {
+        let mut dict = FeatureDictionaryV1::new_empty_v1(base_cfg(), 1, 0);
+        let err = dict
+            .resolve_or_insert_batch_v1(&["k=one", "k=two", "k=three", "k=four", "k=five"])
+            .unwrap_err();
+        assert_eq!(err, FeatureDictionaryErrorV1::DictionaryFull { max_entries: 4 });
+        assert_eq!(dict.meta_v1().entries, 0);
+        assert_eq!(dict.meta_v1().next_id, 1);
+        assert!(dict.lookup_feature_id_v1("k=one").is_none());
     }
 }

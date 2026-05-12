@@ -89,6 +89,7 @@ pub struct GzipFileReaderV1 {
     source_len: u64,
     chunk_bytes: usize,
     next_offset: u64,
+    scratch: Vec<u8>,
 }
 
 impl GzipFileReaderV1 {
@@ -103,6 +104,7 @@ impl GzipFileReaderV1 {
             source_len,
             chunk_bytes,
             next_offset: start_offset.min(source_len),
+            scratch: vec![0_u8; chunk_bytes],
         };
         out.skip_to_compressed_offset_v1(start_offset)?;
         Ok(out)
@@ -115,21 +117,23 @@ impl GzipFileReaderV1 {
     pub fn read_chunk_v1(&mut self) -> io::Result<Option<ReadChunkV1>> {
         let start = self.next_offset;
         let mut out = Vec::with_capacity(self.chunk_bytes);
-        let mut scratch = vec![0_u8; self.chunk_bytes];
 
         loop {
-            let n = self.read_decoder_v1(&mut scratch)?;
+            let n = self
+                .decoder
+                .read(&mut self.scratch)
+                .map_err(normalize_gzip_error_v1)?;
             if n == 0 {
                 if out.is_empty() {
                     return Ok(None);
                 }
                 break;
             }
-            out.extend_from_slice(&scratch[..n]);
+            out.extend_from_slice(&self.scratch[..n]);
             let now = self.current_source_offset_v1();
             if now > start {
                 if now >= self.source_len {
-                    self.drain_to_eof_v1(&mut out, &mut scratch)?;
+                    self.drain_to_eof_v1(&mut out)?;
                     break;
                 }
                 if out.len() >= self.chunk_bytes {
@@ -153,32 +157,36 @@ impl GzipFileReaderV1 {
             return Ok(());
         }
 
-        let mut discard = vec![0_u8; self.chunk_bytes];
         while self.current_source_offset_v1() < start_offset {
-            let n = self.read_decoder_v1(&mut discard)?;
+            let n = self
+                .decoder
+                .read(&mut self.scratch)
+                .map_err(normalize_gzip_error_v1)?;
             if n == 0 {
                 return Ok(());
             }
         }
 
         if start_offset >= self.source_len {
-            self.drain_to_eof_v1(&mut Vec::new(), &mut discard)?;
+            self.drain_to_eof_v1(&mut Vec::new())?;
         }
 
         Ok(())
     }
 
-    fn drain_to_eof_v1(&mut self, out: &mut Vec<u8>, scratch: &mut [u8]) -> io::Result<()> {
+    fn drain_to_eof_v1(&mut self, out: &mut Vec<u8>) -> io::Result<()> {
         loop {
-            let n = self.read_decoder_v1(scratch)?;
+            let n = self
+                .decoder
+                .read(&mut self.scratch)
+                .map_err(normalize_gzip_error_v1)?;
             if n == 0 {
                 return Ok(());
             }
-            out.extend_from_slice(&scratch[..n]);
+            out.extend_from_slice(&self.scratch[..n]);
         }
     }
 }
-
 pub fn open_file_reader_v1(
     path: &Path,
     is_gzip: bool,
@@ -227,12 +235,6 @@ impl<R: Read> Read for CountingReaderV1<R> {
         let n = self.inner.read(&mut buf[..limit])?;
         self.bytes_read += n as u64;
         Ok(n)
-    }
-}
-
-impl GzipFileReaderV1 {
-    fn read_decoder_v1(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.decoder.read(buf).map_err(normalize_gzip_error_v1)
     }
 }
 

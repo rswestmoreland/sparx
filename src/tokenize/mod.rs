@@ -10,7 +10,7 @@ mod syslog;
 
 pub use cef::parse_cef_message_v1;
 pub use generic::{
-    tokenize_message_bytes_v1, tokenize_message_v1, CsvHeaderModeV1, TokenizeResultV1,
+    tokenize_message_bytes_v1, tokenize_message_events_v1, tokenize_message_v1, CsvHeaderModeV1, TokenizeResultV1,
     TokenizeStatsV1,
 };
 pub use syslog::{parse_syslog_envelope_v1, peel_syslog_envelope_v1};

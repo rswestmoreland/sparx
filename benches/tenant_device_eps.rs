@@ -29,7 +29,7 @@ use sparx::config::load::default_config_v1;
 use sparx::config::validate::validate_config_v1;
 use sparx::features::{emit_line_features_v1, FeatureDictionaryConfigV1, FeatureDictionaryV1};
 use sparx::ingest::device_key_v1;
-use sparx::tokenize::{parse_syslog_envelope_v1, tokenize_message_v1};
+use sparx::tokenize::{parse_syslog_envelope_v1, tokenize_message_events_v1};
 use sparx::window::{
     align_window_start_ts_v1, FinalizedWindowRowV1, WindowAccumulatorV1, WindowApplyLineResultV1,
     WindowCapsV1,
@@ -126,6 +126,16 @@ struct TimingV1 {
     eps: f64,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct IngestionShapeStatsV1 {
+    dictionary_features: u32,
+    total_sparse_features: usize,
+    avg_sparse_features_per_row: f64,
+    max_sparse_features_per_row: usize,
+    avg_events_per_sparse_row: f64,
+    max_events_per_sparse_row: u32,
+}
+
 #[derive(Clone, Debug)]
 struct DetectionProbeResultV1 {
     rows_evaluated: usize,
@@ -168,6 +178,8 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     let ingest_start = Instant::now();
     let ingest_result = run_ingestion_probe_v1(&cfg, &bench_cfg)?;
     let ingest_timing = timing_v1(ingest_result.events, ingest_start.elapsed().as_secs_f64());
+    let ingest_bytes_per_second = eps_v1(ingest_result.bytes as usize, ingest_timing.elapsed_s);
+    let ingest_shape_stats = ingestion_shape_stats_v1(&ingest_result);
 
     let detect_start = Instant::now();
     let detect_result = run_detection_probe_v1(&cfg, &ingest_result)?;
@@ -208,7 +220,32 @@ fn run_tenant_device_eps_bench_v1() -> Result<(), String> {
     );
     println!("ingest_events={}", ingest_result.events);
     println!("ingest_bytes={}", ingest_result.bytes);
+    println!("ingest_bytes_per_second={:.2}", ingest_bytes_per_second);
     println!("ingest_sparse_rows={}", ingest_result.sparse_rows.len());
+    println!(
+        "dictionary_features={}",
+        ingest_shape_stats.dictionary_features
+    );
+    println!(
+        "total_sparse_features={}",
+        ingest_shape_stats.total_sparse_features
+    );
+    println!(
+        "avg_sparse_features_per_row={:.2}",
+        ingest_shape_stats.avg_sparse_features_per_row
+    );
+    println!(
+        "max_sparse_features_per_row={}",
+        ingest_shape_stats.max_sparse_features_per_row
+    );
+    println!(
+        "avg_events_per_sparse_row={:.2}",
+        ingest_shape_stats.avg_events_per_sparse_row
+    );
+    println!(
+        "max_events_per_sparse_row={}",
+        ingest_shape_stats.max_events_per_sparse_row
+    );
     println!("ingest_elapsed_s={:.6}", ingest_timing.elapsed_s);
     println!("ingest_eps={:.2}", ingest_timing.eps);
     println!("detection_events={}", detect_result.events_represented);
@@ -348,8 +385,8 @@ fn apply_ingest_probe_line_v1(
 ) -> Result<(), String> {
     let parsed = parse_syslog_envelope_v1(line, 0);
     let line_ts = parsed.envelope.ts_guess.unwrap_or(0);
-    let tokenized = tokenize_message_v1(&parsed.msg, None);
-    let emitted = emit_line_features_v1(&parsed.envelope, &tokenized.events);
+    let events = tokenize_message_events_v1(&parsed.msg, None);
+    let emitted = emit_line_features_v1(&parsed.envelope, &events);
     let window_start_ts = align_window_start_ts_v1(line_ts, window_size_s)
         .map_err(|e| format!("align window failed: {:?}", e))?;
 
@@ -393,6 +430,41 @@ fn apply_ingest_probe_line_v1(
                 *acc = Some(next);
             }
         }
+    }
+}
+
+fn ingestion_shape_stats_v1(ingest: &IngestionProbeResultV1) -> IngestionShapeStatsV1 {
+    let row_count = ingest.sparse_rows.len();
+    let total_sparse_features = ingest
+        .sparse_rows
+        .iter()
+        .map(|sparse_row| sparse_row.row.sparse_counts.len())
+        .sum::<usize>();
+    let max_sparse_features_per_row = ingest
+        .sparse_rows
+        .iter()
+        .map(|sparse_row| sparse_row.row.sparse_counts.len())
+        .max()
+        .unwrap_or(0);
+    let total_row_events = ingest
+        .sparse_rows
+        .iter()
+        .map(|sparse_row| sparse_row.row.meta.lines as usize)
+        .sum::<usize>();
+    let max_events_per_sparse_row = ingest
+        .sparse_rows
+        .iter()
+        .map(|sparse_row| sparse_row.row.meta.lines)
+        .max()
+        .unwrap_or(0);
+
+    IngestionShapeStatsV1 {
+        dictionary_features: ingest.dictionary.meta_v1().entries,
+        total_sparse_features,
+        avg_sparse_features_per_row: avg_v1(total_sparse_features, row_count),
+        max_sparse_features_per_row,
+        avg_events_per_sparse_row: avg_v1(total_row_events, row_count),
+        max_events_per_sparse_row,
     }
 }
 
@@ -508,6 +580,14 @@ fn timing_v1(events: usize, elapsed_s: f64) -> TimingV1 {
 fn eps_v1(events: usize, elapsed_s: f64) -> f64 {
     if elapsed_s > 0.0 {
         events as f64 / elapsed_s
+    } else {
+        0.0
+    }
+}
+
+fn avg_v1(total: usize, count: usize) -> f64 {
+    if count > 0 {
+        total as f64 / count as f64
     } else {
         0.0
     }
