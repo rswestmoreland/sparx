@@ -23,6 +23,7 @@ readiness information.
 - `PHASE33F_INGEST_HOT_PATH_OPTIMIZATION_CHECKPOINT.md`: ingest hot-path optimization checkpoint
 - `PHASE33G_PERFORMANCE_DOCS_RECONCILIATION_CHECKPOINT.md`: performance documentation reconciliation checkpoint
 - `PHASE33H_ALERT_VISUALS_AND_HOWTO_CHECKPOINT.md`: alert screenshot/diagram README update and public HOWTO checkpoint
+- `PHASE33I_SPARSE_MATRIX_VISUAL_README_CHECKPOINT.md`: sparse matrix ingestion visual README checkpoint
 - `PHASE34_SIGNAL_PROCESSING_MVP_KICKOFF_PROMPT.md`: signal-processing MVP handoff prompt
 
 Older files preserve their original phase names and wording for historical

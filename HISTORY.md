@@ -146,3 +146,10 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Updated documentation indexes and the current checklist to reflect the new public usage guide.
 - No runtime source, tests, fixtures, storage layout, alert schema, or benchmark target changes are made by this checkpoint.
 - No new Rust toolchain validation is claimed for this documentation-only checkpoint; the retained phase33f report remains the current validation baseline.
+
+## Sparse matrix visual README checkpoint
+
+- Added the log-ingestion-to-sparse-matrix visual to the public README near the top of the project overview.
+- Updated the inspiration sentence to use "a friend's enthusiasm" wording.
+- No runtime source, tests, fixtures, storage layout, alert schema, or benchmark target changes are made by this checkpoint.
+- No new Rust toolchain validation is claimed for this documentation/image-only checkpoint; the retained phase33f report remains the current validation baseline.

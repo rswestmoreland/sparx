@@ -5,9 +5,15 @@ heterogeneous log collections across many tenants and devices, builds stable
 behavioral baselines, and emits explainable alerts with retained source
 provenance for analyst and customer review.
 
-This project was inspired by a friend's love of sparse matrices and signal
-processing. It is an intersection between data science, log management, and
+This project was inspired by a friend's enthusiasm for sparse matrices
+and signal processing. It is an intersection between data science, log management, and
 cybersecurity.
+
+The visual below shows the core sparx flow: raw heterogeneous logs are parsed
+into normalized behavior signals, then counted into sparse rows by tenant,
+device, and time window.
+
+![sparx log ingestion to sparse matrix flow](docs/images/sparx_sparse_matrix_ingestion_flow.png)
 
 ## What a sparse matrix is
 
