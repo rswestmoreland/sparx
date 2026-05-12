@@ -47,19 +47,24 @@ include the signal-processing documentation and contracts:
 - contracts/40_signal_processing_baselines_v0_1.md
 - contracts/41_deferred_signal_processing_candidates_v0_1.md
 
-Important prerequisite
+Current validation and performance baseline
 
-Before implementing signal-processing additions, finish the current Rust 1.90
-validation and EPS benchmark cleanup in Codex. The latest Codex report showed
-that the EPS benchmark ran successfully, but tests and clippy still had small
-failures. Those must be resolved first.
+The current checkpoint carries forward a retained Rust 1.90 validation report
+showing green formatting, check, test, clippy, and benchmark runs. The public
+docs now include conservative planning estimates from that report: roughly
+58000 to 70000 split-path ingestion EPS, 740000 to 1390000 detection event EPS,
+and about 3100 durable oneshot total EPS on the documented workloads.
+
+Do not re-run validation unless source, tests, benches, docs, or contracts are
+changed during the session. If validation is re-run, report only results that
+come from actual tool output.
 
 Required first task
 
 Start with a full review of the codebase, contracts, docs, tests, fixtures,
 benchmarks, and validation reports. Identify any drift, stale wording,
-consistency issues, test failures reported by Codex, and benchmark-result gaps.
-Do not modify files until the review and plan are provided.
+consistency issues, validation gaps, and benchmark-result gaps. Do not modify
+files until the review and plan are provided.
 
 Review these areas especially:
 
@@ -90,7 +95,7 @@ Guardrails
 - No cargo/build/test/rustfmt/clippy claims unless the user provides logs.
 - Do not use ripgrep.
 - Do not make broad refactors.
-- Fix reported build/test/clippy failures before adding features.
+- Fix any newly reported build/test/clippy failures before adding features.
 - Do not change product design without approval.
 - Do not change locked storage layouts or alert schemas.
 - Do not change AlertV1.provenance semantics.
@@ -132,42 +137,34 @@ Updated plan/checklist
    - review codebase, docs, contracts, tests, fixtures, benchmarks, and saved
      validation reports
    - identify drift or stale wording
-   - confirm current test/clippy failures from Codex
+   - confirm that the retained validation report is still the latest benchmark
+     baseline
    - provide plan before editing
 
-2. Finish Codex validation and EPS benchmark cleanup
-   - fix remaining tests and clippy findings
-   - rerun Rust 1.90 validation in Codex
-   - capture default benchmark results
-   - capture 100000-event benchmark results
-   - capture optional durable oneshot timing if session time allows
+2. Lock EWMA and periodic baseline contracts before coding
+   - lock exact state shape, key families, config defaults, maturity thresholds,
+     and fallback behavior
+   - update contracts/docs first if new implementation details are decided
 
-3. Update README signal-processing explanation
-   - explain sparse rows as sampled signal frames
-   - describe current signal-like scoring behavior
-   - describe EWMA and periodic volume baselines as the lean next baseline
-     extension
-   - keep public README focused on current capabilities and concise design
-
-4. Begin EWMA baseline work after validation is clean
+3. Begin EWMA baseline work after contract lock
    - lock exact state shape and keys before coding
    - add state primitives and encoding tests
    - do not change detection behavior in the primitives step
 
-5. Add periodic volume baseline primitives
+4. Add periodic volume baseline primitives
    - lock hour-of-week slot calculation
    - add compact fixed-layout stats state
    - add key builders and tenant DB helpers
    - add tests for maturity and fallback
 
-6. Integrate periodic expected volume conservatively
+5. Integrate periodic expected volume conservatively
    - use mature periodic slot only when available
    - fall back to current general baseline when immature
    - target spike, extreme volume, sharp-drop, and relevant hard-silence
      expected-volume checks
    - preserve AlertV1 schema and ratio semantics
 
-7. Explore ingestion and detection performance
+6. Continue ingestion and detection performance review only after MVP primitives
    - use benchmark evidence before optimizing
    - review parser allocations, sparse-row map updates, durable writes, and
      detection evaluation flow
@@ -181,10 +178,10 @@ Provide:
 
 - concise review summary
 - current status confirmation
-- reported validation blockers that remain
+- whether any validation blockers remain
 - drift or stale wording found
 - whether the benchmark results are usable
-- proposed immediate fix plan
+- proposed immediate implementation plan
 - proposed signal-processing MVP work sequence
 - exact files likely to change
 - risks and open questions

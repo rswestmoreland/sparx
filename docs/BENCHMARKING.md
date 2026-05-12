@@ -146,6 +146,29 @@ To retain the generated temporary corpus for inspection, enable:
 SPARX_BENCH_KEEP_ROOT=1 cargo bench --bench tenant_device_eps
 ```
 
+
+## Current checkpoint planning estimates
+
+The latest externally run Rust 1.90 validation pass for this checkpoint recorded
+green formatting, check, test, and clippy results before running the benchmark
+commands. On that modest single-node Linux validation environment with local
+storage and a release/bench build, the current checkpoint measured:
+
+- default 10000-event split ingestion: `ingest_eps=58344.36`
+- default 10000-event split detection: `detection_event_eps=741165.35`
+- 100000-event split ingestion: `ingest_eps=70171.05`
+- 100000-event split detection: `detection_event_eps=1393851.54`
+- default 10000-event durable oneshot: `durable_oneshot_total_eps=3157.84`
+- default 10000-event source-stream durable oneshot:
+  `durable_oneshot_total_eps=3373.27`
+
+Use these as planning estimates for a minimum practical single-node environment,
+not as guaranteed throughput. Real deployments vary with CPU, storage,
+filesystem, compression mix, source-stream settings, row width, tenant/device
+mix, output sinks, and log format complexity. The durable oneshot number is the
+closest benchmark in this target to an end-to-end storage-inclusive runtime
+throughput estimate.
+
 ## Safety bounds
 
 The benchmark rejects a generated corpus larger than 5000000 total events by

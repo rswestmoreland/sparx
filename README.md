@@ -139,7 +139,7 @@ The current CLI/runtime surface includes:
 - `alert drill/extract`
 - `replay-spool`
 
-## Benchmarking
+## Benchmarking and expected performance
 
 sparx includes a dependency-free tenant/device EPS benchmark:
 
@@ -149,11 +149,24 @@ cargo bench --bench tenant_device_eps
 
 The benchmark generates a deterministic multi-tenant, multi-device corpus and
 reports separate throughput metrics for ingestion and detection. `ingest_eps`
-measures file scanning, parsing, tokenization, feature emission, and sparse-row
-population. `detection_event_eps` measures alert scoring/build/encoding over the
-finalized sparse rows. The default workload is 10000 events; a documented
-100000-event run is available for larger validation. See `docs/BENCHMARKING.md`
-for workload controls and interpretation guidance.
+measures file scanning, parsing, tokenization, feature emission, dictionary
+resolution, and sparse-row population. `detection_event_eps` measures alert
+scoring/build/encoding over the finalized sparse rows.
+
+On a modest single-node Linux validation environment with local storage and a
+Rust 1.90 release/bench build, the current checkpoint measured roughly:
+
+- 58000 to 70000 split-path ingestion events per second for the documented
+  10000-event and 100000-event workloads
+- 740000 to 1390000 detection events per second over finalized sparse rows
+- about 3100 storage-inclusive durable oneshot events per second for the
+  default 10000-event workload
+
+These figures should be treated as planning estimates, not guarantees. Actual
+throughput depends on CPU, local storage, filesystem, log shape, gzip share,
+source-stream mode, configured read chunks, tenant/device mix, row width, and
+active output sinks. See `docs/BENCHMARKING.md` for workload controls and
+interpretation guidance.
 
 ## Repository guide
 

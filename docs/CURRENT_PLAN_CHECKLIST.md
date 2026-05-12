@@ -37,28 +37,25 @@
 
 ## Remaining work order
 
-1. Finish external Rust validation and EPS benchmark cleanup
-   - run formatting, build, test, clippy, and benchmark checks under Rust 1.90 or newer
-   - fix reported test and clippy failures before adding signal-processing code
-   - record default and 100000-event ingest/detection EPS results
-
-2. Review active docs, contracts, tests, and supporting files
-   - confirm active docs match current behavior
+1. Review active docs, contracts, tests, and supporting files
+   - confirm active docs match current behavior after the Rust 1.90 validation
+     and performance checkpoint
    - keep historical checkpoint notes archived under `docs/roadmap/`
-   - keep public README focused on current behavior and concise design explanations
+   - keep public README focused on current behavior, concise design
+     explanations, and conservative performance estimates
 
-3. Begin lean signal-processing MVP
+2. Begin lean signal-processing MVP
    - add EWMA volume state primitives
    - add hour-of-week periodic volume baseline primitives
    - integrate mature periodic expected volume conservatively into existing spike/drop evaluation
    - keep sparse rows, AlertV1, DeviceStatsV1, and SourceStreamStatsV1 unchanged
 
-4. Explore ingest and detection performance tuning
-   - identify parser, sparse-row, durable-write, and detection hot spots using benchmark evidence
+3. Continue ingest and detection performance tuning only when benchmark evidence supports it
+   - treat phase33f hot-path results as the current performance baseline
    - prefer small measured changes before parallel or async pipeline work
    - preserve deterministic behavior and fail-closed path handling
 
-5. Release packaging
+4. Release packaging
    - provide example configuration
    - provide tenant-policy examples
    - provide migration and purge examples
@@ -68,8 +65,8 @@
 ## v1 completion definition
 
 sparx v1 is complete when the current source-stream scope is either validated or
-explicitly deferred, all active docs/contracts are reconciled, external Rust
-validation logs are green, and release packaging is complete.
+explicitly deferred, all active docs/contracts are reconciled, Rust validation
+logs remain green for the release candidate, and release packaging is complete.
 
 ## Pre-validation hardening addendum
 
@@ -78,12 +75,13 @@ validation logs are green, and release packaging is complete.
 - [x] Spool path construction validates filesystem components and spool inventory skips symlinks.
 - [x] Plain-text runtime reading uses configured chunks and line buffering is capped.
 - [x] Ingest resource cap validation added for configured CPU/memory controls.
-- [ ] User-run Rust toolchain validation remains required before release packaging.
-- [ ] Fresh external Rust 1.90 validation remains required after the current cleanup checkpoint.
-
-- malformed but readable log records do not crash runtime processing
-- source modules have concise headers and comments at non-obvious safety boundaries
-- data-facing runtime helpers return explicit errors instead of panic-prone assumptions
+- [x] Rust 1.90 formatting, check, test, and clippy validation was reported
+  green for the phase33f checkpoint.
+- [ ] Repeat Rust validation for any later release-candidate checkpoint that
+  changes source, tests, benches, docs, or contracts.
+- [x] Malformed but readable log records do not crash runtime processing.
+- [x] Source modules have concise headers and comments at non-obvious safety boundaries.
+- [x] Data-facing runtime helpers return explicit errors instead of panic-prone assumptions.
 
 
 ## Open-source metadata
@@ -98,7 +96,8 @@ validation logs are green, and release packaging is complete.
 
 - [x] Tenant/device EPS benchmark target added.
 - [x] EPS benchmark default workload adjusted for dense high-EPS logging.
-- [ ] User-run benchmark output remains required before publishing performance claims.
+- [x] Benchmark output recorded for default, 100000-event, durable oneshot,
+  source-stream, and source-stream durable oneshot runs.
 
 
 ## Benchmark follow-up
@@ -107,22 +106,27 @@ validation logs are green, and release packaging is complete.
 - Default workload target: 10000 events.
 - Larger validation workload target: 100000 events.
 - Optional durable oneshot timing remains available through `SPARX_BENCH_DURABLE_ONESHOT=1`.
-- Saved benchmark reports in `validation_results/` are historical diagnostics until Codex produces a fresh green validation run from the current checkpoint.
+- Current planning estimates from the phase33f report are roughly 58000 to
+  70000 split ingestion EPS, 740000 to 1390000 detection event EPS, and about
+  3100 durable oneshot total EPS on the documented validation workloads.
 
 ## Validation cleanup addendum
 
 - [x] Alert query fallback path tightened for incomplete or unreadable secondary indexes.
 - [x] Task/review documents moved under `docs/roadmap/` with phase-oriented filenames.
 - [x] Active docs index reconciled so `/docs` contains public-facing guides only.
-- [ ] Codex must rerun formatting, check, test, clippy, default EPS, and 100000-event EPS validation on this checkpoint.
-- [ ] Treat saved benchmark logs as historical diagnostics until fresh green validation is available.
+- [x] Formatting, check, test, clippy, default EPS, 100000-event EPS, durable
+  oneshot, source-stream, and source-stream durable oneshot validation were
+  reported green for phase33f.
+- [ ] Repeat the validation flow after this documentation reconciliation
+  checkpoint if required by release process.
 
 ## Signal-processing MVP addendum
 
 - [x] Signal-processing MVP design contract added.
 - [x] Sparse matrix plus signal-processing guide added.
 - [x] Autocorrelation-lite recorded as deferred scope.
-- [ ] Finish current Rust validation and EPS benchmark cleanup before implementation.
+- [x] Rust validation and EPS benchmark cleanup completed for the phase33f checkpoint.
 - [ ] Add EWMA volume state primitives.
 - [ ] Add hour-of-week periodic volume baseline primitives.
 - [ ] Integrate mature periodic expected volume into existing spike/drop evaluation.
@@ -134,6 +138,7 @@ validation logs are green, and release packaging is complete.
 - [x] Review parser allocation patterns, sparse-row update costs, durable write batching, and detection evaluation flow.
 - [x] Add benchmark fields for dictionary size, sparse row width, row density, and byte throughput.
 - [x] Apply narrow ingest hot-path optimizations for cloning, allocation, and default durable write overhead.
-- [ ] Re-run Codex validation and benchmarks after ingest hot-path changes.
-- [ ] Compare new benchmark output against the Phase 33d/33e baseline before making performance claims.
+- [x] Rust 1.90 validation and benchmarks were reported green after ingest
+  hot-path changes.
+- [x] New benchmark output compared against the Phase 33d/33e baseline.
 - [ ] Evaluate parallel or async pipeline strategies only after the single-threaded hot path is measured and stable.

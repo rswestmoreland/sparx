@@ -47,7 +47,9 @@
 
 Source-stream V_DROP is included in v1 scope behind the default-off source-stream
 gate. Parser-class and vendor-event-family V_DROP subjects remain deferred.
-External Rust validation logs are still required before release closure.
+Rust 1.90 validation logs are retained for the current phase33f checkpoint.
+Repeat validation remains required for later release-candidate checkpoints that
+change source, tests, benches, docs, or contracts.
 
 Security/performance hardening note: active contracts now require fail-closed drill/extract path resolution, validated output path components, symlink-resistant spool inventory, and bounded ingest resource caps.
 

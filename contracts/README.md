@@ -39,7 +39,7 @@ Signal-processing extensions are auxiliary baseline state over sampled window
 signals. They must preserve sparse row encoding, AlertV1 schema, DeviceStatsV1,
 SourceStreamStatsV1, and the Fjall adapter boundary. The planned MVP direction
 is EWMA volume smoothing plus hour-of-week periodic volume baselines after
-validation cleanup is complete.
+the validated performance checkpoint.
 Autocorrelation-lite and DFT/FFT-style analysis are deferred.
 
 ## Sparse matrix model

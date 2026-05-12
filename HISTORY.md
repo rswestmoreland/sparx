@@ -122,3 +122,18 @@ Historical checkpoint notes are archived under `docs/roadmap/`.
 - Combined default source-stream-disabled line checkpoint and cursor writes into one tenant DB closure.
 - Preserved storage layouts, alert schemas, provenance semantics, sparse row semantics, and signal-processing scope.
 - No Rust toolchain validation is claimed for this checkpoint; external Codex revalidation and benchmarks are required.
+
+## Performance documentation reconciliation checkpoint
+
+- Updated README performance wording with conservative ingestion, detection, and
+  durable oneshot EPS planning estimates from the retained Rust 1.90 phase33f
+  benchmark report.
+- Reconciled active docs and contracts so they no longer describe phase33f
+  validation and benchmark work as pending.
+- Added a roadmap checkpoint note for the performance documentation reconciliation.
+- Updated the signal-processing MVP kickoff prompt to start from the validated performance checkpoint.
+- No runtime source, test, fixture, storage layout, alert schema, or benchmark
+  target changes are made by this checkpoint.
+- No new Rust toolchain validation is claimed for this documentation-only
+  checkpoint; the retained phase33f report remains the current validation
+  baseline.

@@ -16,16 +16,23 @@ The tenant/device EPS benchmark reports separate metrics for:
 
 The benchmark is the primary tool for measuring improvements.
 
-## Immediate validation work
+## Current validated performance baseline
 
-Before optimization work begins, complete the current Rust validation loop and
-record clean benchmark output:
+The current checkpoint has a retained Rust 1.90 validation report with green
+formatting, check, test, and clippy results before benchmarks were recorded. The
+current planning baseline is:
 
-- default workload around 10000 events
-- larger workload at 100000 events
-- optional durable oneshot timing
+- default 10000-event split ingestion: about 58000 events per second
+- 100000-event split ingestion: about 70000 events per second
+- split-path detection: about 740000 to 1390000 events per second over finalized sparse rows
+- default 10000-event durable oneshot: about 3100 events per second
 
-Any failing tests or clippy diagnostics should be fixed before optimizing.
+These values are estimates from one modest single-node validation environment,
+not guaranteed deployment throughput. Treat durable oneshot as the closest
+storage-inclusive runtime estimate in the current benchmark target.
+
+Further optimization should start from benchmark evidence and should keep the
+current validation flow green before and after changes.
 
 ## Optimization candidates
 

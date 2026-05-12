@@ -6,31 +6,25 @@ sparse matrix model and existing storage contracts.
 
 ## Work order
 
-1. Finish Rust validation and EPS benchmark cleanup.
-2. Update public README language for the sparse matrix plus signal-processing
-   model.
-3. Add EWMA state primitives.
-4. Add periodic volume stats primitives.
-5. Integrate mature-slot periodic expected volume into existing spike/drop
+1. Lock exact EWMA and periodic state details before coding.
+2. Add EWMA state primitives.
+3. Add periodic volume stats primitives.
+4. Integrate mature-slot periodic expected volume into existing spike/drop
    evaluation.
-6. Add bounded diagnostics and validation coverage.
-7. Review performance impact with the ingest/detection EPS benchmark.
+5. Add bounded diagnostics and validation coverage.
+6. Review performance impact with the ingest/detection EPS benchmark.
 
-## Prerequisite: finish benchmark validation
+## Current validation and benchmark baseline
 
-Before implementing signal-processing additions, the project should finish the
-current Rust validation loop:
+The current checkpoint carries forward a retained Rust 1.90 report with green
+formatting, check, test, clippy, and tenant/device benchmark results. The
+current planning estimates are about 58000 to 70000 split-path ingestion EPS,
+about 740000 to 1390000 detection event EPS over finalized sparse rows, and
+about 3100 durable oneshot total EPS on the documented default workload.
 
-- `cargo fmt --check`
-- `cargo check`
-- `cargo test`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-- `cargo bench --bench tenant_device_eps`
-- 100000-event EPS benchmark run
-
-The benchmark should report separate ingestion and detection metrics. The
-initial signal-processing implementation should not begin until the current test
-and clippy failures are resolved or clearly isolated.
+Any signal-processing implementation checkpoint should repeat the validation
+flow after source or test changes and compare default plus 100000-event EPS
+results against this baseline.
 
 ## MVP scope
 

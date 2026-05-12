@@ -1,13 +1,14 @@
 # Validation and Release Readiness
 
-This environment does not run the Rust toolchain. Release readiness depends on
-external user-run validation logs.
+Release readiness depends on retained Rust validation logs for the release
+candidate. The phase33f checkpoint has a retained Rust 1.90 validation report
+showing green formatting, check, test, clippy, and benchmark runs.
 
 Rust version requirement: **Rust 1.90 or newer** (repo-pinned via `rust-toolchain.toml`).
 
-## Required external validation
+## Required validation
 
-Run and retain logs for:
+For each release-candidate checkpoint, run and retain logs for:
 
 - `cargo fmt --check`
 - `cargo check`
@@ -32,6 +33,7 @@ Representative validation should include:
 - source comment and maintainability consistency review
 - replay-spool success and fail-closed behavior
 - tenant/device EPS benchmark output retained for release-performance comparison
+- performance estimates updated only from green validation and benchmark runs
 
 ## Release readiness gates
 
@@ -43,7 +45,7 @@ v1 is ready only when:
 - DB-backed flows fail closed
 - diagnostics remain bounded and low-cardinality
 - release packaging and operator guides are complete
-- external Rust validation logs are green or all reported failures are fixed
+- Rust validation logs are green or all reported failures are fixed
 
 ## Security and resource-use hardening checks
 
@@ -77,4 +79,4 @@ The tenant/device EPS benchmark should report separate `ingest_eps` and `detecti
 SPARX_BENCH_TENANTS=2 SPARX_BENCH_DEVICES_PER_TENANT=10 SPARX_BENCH_FILES_PER_DEVICE=5 SPARX_BENCH_EVENTS_PER_FILE=1000 cargo bench --bench tenant_device_eps
 ```
 
-Optional durable oneshot timing can be enabled with `SPARX_BENCH_DURABLE_ONESHOT=1`, but that storage-inclusive timing is not the primary ingestion or detection EPS metric.
+Optional durable oneshot timing can be enabled with `SPARX_BENCH_DURABLE_ONESHOT=1`, but that storage-inclusive timing is not the primary split-path ingestion or detection EPS metric. The current checkpoint uses the phase33f report as the planning baseline: about 58000 to 70000 split-path ingestion EPS, 740000 to 1390000 detection event EPS, and about 3100 durable oneshot total EPS on the documented workloads.
