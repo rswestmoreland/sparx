@@ -12,8 +12,8 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::alert::{AlertV1, FileSpanV1};
 use crate::config::ConfigV1;
-use crate::ingest::{discover_tenant_devices_v1, is_zlg_name_v1};
 use crate::ingest::reader::open_file_reader_v1;
+use crate::ingest::{discover_tenant_devices_v1, is_zlg_name_v1};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DrillSpanResultV1 {
@@ -366,7 +366,11 @@ fn read_reader_span_lines_v1(
             if *lines_remaining == 0 {
                 break;
             }
-            lines.push(line.trim_end_matches('\n').trim_end_matches('\r').to_string());
+            lines.push(
+                line.trim_end_matches('\n')
+                    .trim_end_matches('\r')
+                    .to_string(),
+            );
             *lines_remaining = (*lines_remaining).saturating_sub(1);
             lines_emitted += 1;
         }

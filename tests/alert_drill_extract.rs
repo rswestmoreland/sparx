@@ -217,7 +217,8 @@ fn push_zlg_u64_v1(out: &mut Vec<u8>, value: u64) {
 }
 
 #[test]
-fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>> {
+fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>>
+{
     let cfg = temp_cfg_v1();
     let body = "alpha\nbravo\ncharlie\n";
     let bravo_start = body.find("bravo").unwrap() as u64;

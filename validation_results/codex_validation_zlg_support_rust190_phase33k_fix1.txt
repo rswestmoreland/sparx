@@ -1,0 +1,112 @@
+Sparx zlg support validation report - phase33k fix1
+
+Rust version: rustc 1.90.0 (1159e78c4 2025-09-14)
+Cargo version: cargo 1.90.0 (840b83a10 2025-07-30)
+Branch: work
+Starting commit SHA: dc3bb7c972f2aac4357e33d2ee1dd83f94d2ded5
+Post-change commit SHA: 5b2af38267316e6cdd87938d9b8bcd372bb9c06c
+
+Review scope:
+- README.md, HISTORY.md, docs/README.md, docs/HOWTO.md, docs/CURRENT_PLAN_CHECKLIST.md, docs/BENCHMARKING.md, docs/ARCHITECTURE.md, docs/INGEST_PERFORMANCE_TUNING_PLAN.md, docs/SPARSE_MATRIX_MODEL.md, docs/roadmap/, contracts/, src/ingest/, src/cli/route.rs, src/db/, src/alerts equivalent alert code paths, tests/, benches/tenant_device_eps.rs, and validation_results/ were reviewed for zlg support impact.
+- Confirmed README.md has a Supported input model section naming plain text logs, gzip-compressed logs, zlg searchable compressed log archives, and https://github.com/rswestmoreland/zlg.
+- Confirmed docs/HOWTO.md mentions .zlg input in the sample tenant tree and accepted suffix list.
+- Confirmed task-specific zlg notes remain under docs/roadmap/.
+
+Fixes made:
+1. src/ingest/reader.rs
+   - Changed zlg record magic reading to distinguish clean EOF before a record from a partial 1-to-3-byte magic marker.
+   - Partial record magic now returns UnexpectedEof from read_exact instead of being treated as clean archive termination.
+2. tests/ingest_reader.rs
+   - Added tests for final line with newline and final line without newline.
+   - Added malformed archive coverage for invalid global magic, unsupported version, unsupported global header length, truncated chunk header, truncated payload, bad decoded length, CRC mismatch, and partial record magic.
+   - Added directory/footer-only termination coverage.
+   - Kept all .zlg archives generated at test runtime in temporary directories; no binary fixtures were committed.
+3. docs/roadmap/PHASE33K_ZLG_INPUT_SUPPORT_CHECKPOINT.md
+   - Added validation fix1 closeout notes.
+4. Formatting and lockfile maintenance
+   - Ran cargo fmt; existing unformatted zlg checkpoint edits in src/drilldown.rs, src/ingest/mod.rs, tests/alert_drill_extract.rs, and tests/ingest_reader.rs were formatted.
+   - Cargo.lock was refreshed for the dependency graph used by this checkpoint.
+
+Validation commands and results:
+- cargo fmt --check: PASS
+- cargo check: PASS
+- cargo test: PASS
+- cargo clippy --all-targets --all-features -- -D warnings: PASS
+
+Focused zlg and ingest test commands:
+- cargo test zlg: PASS
+  - zlg-focused tests passed, including alert drill/extract zlg tests and six zlg reader tests.
+- cargo test alert_drill: PASS
+  - 6 matching alert drill tests passed, including alert_drill_reads_zlg_span_v1.
+- cargo test alert_extract: PASS
+  - 3 matching alert extract tests passed, including alert_extract_writes_zlg_span_v1.
+- cargo test ingest: PASS
+  - Matching ingest tests passed, including ingest discovery/cursor/reader related filters.
+
+Cross-project zlg compatibility check:
+- Network access was available.
+- Temporary clone command: git clone --depth 1 https://github.com/rswestmoreland/zlg /tmp/tmp.ObKsXr06FR/zlg
+- Build command: cd /tmp/tmp.ObKsXr06FR/zlg && cargo build --release
+- Archive creation command: /tmp/tmp.ObKsXr06FR/zlg/target/release/zlg compress -y /tmp/tmp.SdJZ9Q7I8h/plain.log /tmp/tmp.SdJZ9Q7I8h/watch/tenant_a/device_a/compat.zlg
+- Sparx ingest command: ./target/debug/sparx --config /tmp/tmp.SdJZ9Q7I8h/config.toml oneshot --tenant tenant_a --migrate auto
+- Result: PASS. sparx reported devices_total: 1, devices_failed: 0, alerts_emitted: 0.
+
+Benchmark commands and numeric results:
+1. cargo bench --bench tenant_device_eps
+   - total_events: 10000
+   - ingest_eps: 64574.82
+   - detection_event_eps: 731246.35
+2. SPARX_BENCH_TENANTS=2 SPARX_BENCH_DEVICES_PER_TENANT=10 SPARX_BENCH_FILES_PER_DEVICE=5 SPARX_BENCH_EVENTS_PER_FILE=1000 cargo bench --bench tenant_device_eps
+   - total_events: 100000
+   - ingest_eps: 68070.52
+   - detection_event_eps: 1359426.45
+3. SPARX_BENCH_DURABLE_ONESHOT=1 cargo bench --bench tenant_device_eps
+   - total_events: 10000
+   - ingest_eps: 65911.05
+   - detection_event_eps: 750321.17
+   - durable_oneshot_total_eps: 3302.01
+4. SPARX_BENCH_SOURCE_STREAM=1 cargo bench --bench tenant_device_eps
+   - total_events: 10000
+   - ingest_eps: 65887.41
+   - detection_event_eps: 759684.46
+5. SPARX_BENCH_SOURCE_STREAM=1 SPARX_BENCH_DURABLE_ONESHOT=1 cargo bench --bench tenant_device_eps
+   - total_events: 10000
+   - ingest_eps: 66845.97
+   - detection_event_eps: 734362.45
+   - durable_oneshot_total_eps: 3461.61
+
+Comparison against phase33f baseline:
+- Default 10000-event ingest_eps baseline 58344.36, current 64574.82: +10.68%.
+- Default 10000-event detection_event_eps baseline 741165.35, current 731246.35: -1.34%.
+- Large 100000-event ingest_eps baseline 70171.05, current 68070.52: -2.99%.
+- Large 100000-event detection_event_eps baseline 1393851.54, current 1359426.45: -2.47%.
+- Durable oneshot total EPS baseline 3157.84, current 3302.01: +4.57%.
+- No measured regression exceeded about 10 percent.
+
+Zlg behavior validation summary:
+- .zlg files are accepted by the suffix allowlist and discovery path.
+- Plain text and .gz reader behavior remained covered and unchanged.
+- Unsupported suffixes remain filtered by discovery tests.
+- Stored and zstd zlg chunks, multiple chunks, final lines with and without newline, malformed global/chunk/payload records, decoded length mismatch, CRC mismatch, and directory/footer stop behavior are covered by runtime-generated tests.
+- Zlg cursor/resume uses archive byte offsets. Tests confirm resume from a saved zlg archive offset returns remaining data deterministically without duplicating the first chunk.
+- Plain and gzip cursor tests still pass, confirming zlg cursor handling does not corrupt those paths.
+- Alert drill and extract support zlg-backed spans through AlertV1.provenance without schema changes.
+- FileSpanV1.is_gzip remains false for zlg spans by design; zlg detection is suffix-based and gzip-specific fields remain gzip-specific.
+
+Files changed:
+- Cargo.lock
+- docs/roadmap/PHASE33K_ZLG_INPUT_SUPPORT_CHECKPOINT.md
+- src/drilldown.rs
+- src/ingest/mod.rs
+- src/ingest/reader.rs
+- tests/alert_drill_extract.rs
+- tests/ingest_reader.rs
+- validation_results/codex_validation_zlg_support_rust190_phase33k_fix1.txt
+
+Validation green: yes.
+Benchmark results usable: yes.
+Zlg support safe to promote: yes, with the remaining follow-up noted below.
+
+Remaining risks or follow-up items:
+- Optional zlg-specific EPS benchmark mode was not added in this pass to avoid broad benchmark refactoring. Recommended follow-up: add a narrow SPARX_BENCH_INPUT_KIND=zlg mode that creates zlg archives in the benchmark temp directory.
+- Compatibility was checked against the current public zlg CLI at validation time; future zlg format changes should be tracked with compatibility tests before promotion to a new supported format version.
