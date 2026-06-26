@@ -50,14 +50,14 @@ include the signal-processing documentation and contracts:
 Current validation and performance baseline
 
 The current checkpoint carries forward a retained Rust 1.90 validation report
-showing green formatting, check, test, clippy, and benchmark runs. The public
-docs now include conservative planning estimates from that report: roughly
-58000 to 70000 split-path ingestion EPS, 740000 to 1390000 detection event EPS,
-and about 3100 durable oneshot total EPS on the documented workloads.
+showing green formatting, check, test, clippy, and benchmark runs for the
+phase33f performance baseline. Later README/docs-only changes did not affect
+runtime validation. The zlg input support checkpoint changes source, tests,
+Cargo metadata, docs, and contracts, so fresh Rust validation is required before
+treating it as the new release-candidate runtime baseline.
 
-Do not re-run validation unless source, tests, benches, docs, or contracts are
-changed during the session. If validation is re-run, report only results that
-come from actual tool output.
+When validation is re-run, report only results that come from actual tool
+output.
 
 Required first task
 

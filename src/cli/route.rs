@@ -62,8 +62,8 @@ use crate::features::{
 };
 use crate::ingest::{
     apply_cursor_read_progress_v1, device_key_v1, discover_device_inventory_v1,
-    open_file_reader_v1, reconcile_cursor_v1, CursorPlanV1, DiscoveredFileV1, FileCursorV1,
-    ObservedFileStateV1, TenantDeviceV1,
+    open_file_reader_v1, reconcile_cursor_v1, uses_compressed_archive_cursor_v1, CursorPlanV1,
+    DiscoveredFileV1, FileCursorV1, ObservedFileStateV1, TenantDeviceV1,
 };
 use crate::observability::{
     build_status_snapshot_from_runtime_v1, format_status_text_v1,
@@ -4811,8 +4811,11 @@ fn process_device_oneshot_v1(
             .join(&device.tenant_id)
             .join(&device.device_dir_rel)
             .join(&file.file_rel);
-        let observed =
-            observed_file_state_for_path_v1(&file_path, file.is_gzip).map_err(|e| e.to_string())?;
+        let observed = observed_file_state_for_path_v1(
+            &file_path,
+            uses_compressed_archive_cursor_v1(&file.file_rel, file.is_gzip),
+        )
+        .map_err(|e| e.to_string())?;
         let previous_cursor = runtime
             .with_tenant_db_v1(&tenant_id, now_ts, |db| {
                 db.read_cursor_v1(&device.device_key, &file.file_key)
@@ -4926,6 +4929,7 @@ fn process_file_oneshot_v1(
     alert_cfg: &AlertScoringConfigV1,
     now_ts: i64,
 ) -> Result<usize, String> {
+    let uses_coarse_offsets = uses_compressed_archive_cursor_v1(&file.file_rel, file.is_gzip);
     let reader_chunk_bytes = if file.is_gzip {
         1
     } else {
@@ -4990,7 +4994,7 @@ fn process_file_oneshot_v1(
 
         current_offset = chunk.offset_end;
         for (idx, byte) in chunk.data.iter().enumerate() {
-            let byte_end = if file.is_gzip {
+            let byte_end = if uses_coarse_offsets {
                 chunk.offset_end
             } else {
                 chunk
@@ -5007,7 +5011,7 @@ fn process_file_oneshot_v1(
             }
 
             if line_buf.is_empty() {
-                line_start_offset = if file.is_gzip {
+                line_start_offset = if uses_coarse_offsets {
                     chunk.offset_start
                 } else {
                     chunk.offset_start.saturating_add(idx as u64)

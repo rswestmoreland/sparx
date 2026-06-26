@@ -25,6 +25,7 @@ readiness information.
 - `PHASE33H_ALERT_VISUALS_AND_HOWTO_CHECKPOINT.md`: alert screenshot/diagram README update and public HOWTO checkpoint
 - `PHASE33I_SPARSE_MATRIX_VISUAL_README_CHECKPOINT.md`: sparse matrix ingestion visual README checkpoint
 - `PHASE33J_README_TECHNICAL_MODEL_CHECKPOINT.md`: README sparse matrix technical model checkpoint
+- `PHASE33K_ZLG_INPUT_SUPPORT_CHECKPOINT.md`: zlg archive input support checkpoint
 - `PHASE34_SIGNAL_PROCESSING_MVP_KICKOFF_PROMPT.md`: signal-processing MVP handoff prompt
 
 Older files preserve their original phase names and wording for historical

@@ -145,6 +145,7 @@ FileSpanV1:
 
 Notes:
 - For gzip, offsets are in compressed byte stream.
+- For zlg, offsets are archive chunk byte ranges and `is_gzip` remains false because the field is gzip-specific.
 - These spans allow drilldown later without storing full raw lines.
 - Future `V_DROP` absence-of-data alerts may have empty provenance because there may be no raw source span for missing data; drill/extract must fail closed with a clear explanation for that case.
 

@@ -15,7 +15,7 @@ Minimum practical requirements for a small deployment or validation host:
 
 The current benchmark planning estimates in the README assume a release/bench
 build on a modest single-node Linux validation environment with local storage.
-Actual throughput depends on CPU, storage, log shape, gzip share, row width,
+Actual throughput depends on CPU, storage, log shape, gzip/zlg share, row width,
 output sink, and tenant/device mix.
 
 ## Build from source
@@ -51,6 +51,7 @@ Default production-style layout:
       messages.log
       traffic.cef
       archive.log.gz
+      archive.zlg
     domain-controller-01/
       security.json
 ```
@@ -62,8 +63,9 @@ Rules:
 - regular files only
 - symlinks are ignored by default
 - hidden files are ignored
-- default accepted suffixes include `.log`, `.txt`, `.json`, `.csv`, `.cef`, and `.gz`
+- default accepted suffixes include `.log`, `.txt`, `.json`, `.csv`, `.cef`, `.gz`, and `.zlg`
 - gzip handling is enabled by default for configured gzip suffixes
+- `.zlg` archives are read as finalized zstd-backed log archives and should be replaced atomically rather than edited in place
 
 A small local test layout can be created without root privileges:
 

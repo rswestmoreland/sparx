@@ -9,7 +9,7 @@ Current major completed areas:
 - configuration and CLI plumbing
 - Fjall-backed embedded storage adapters
 - tenant and device discovery
-- cursor tracking and plain/gzip reading
+- cursor tracking and plain/gzip/zlg reading
 - heterogeneous tokenization
 - sparse feature emission and entity sketches
 - window checkpointing and finalization
@@ -21,6 +21,18 @@ Current major completed areas:
 - hard-silence, sharp-drop, and source-stream `V_DROP` behavior
 
 Historical checkpoint notes are archived under `docs/roadmap/`.
+
+
+## zlg input support checkpoint
+
+- Added `.zlg` archive support to the ingest reader abstraction and supported
+  suffix allowlist.
+- Implemented zlg v1 global/chunk parsing, stored and zstd payload decode,
+  decoded-length checks, CRC checks, and directory/footer stop handling.
+- Kept AlertV1 and storage layouts unchanged; zlg provenance uses archive byte
+  ranges with `is_gzip=false`.
+- Updated README, HOWTO, active docs, contracts, and focused ingest tests.
+- No Rust toolchain validation is claimed for this checkpoint.
 
 ## README technical model checkpoint
 

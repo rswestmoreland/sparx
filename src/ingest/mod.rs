@@ -14,7 +14,9 @@ use std::path::{Path, PathBuf};
 use crate::stable_hash::stable_hash_hex128_v1;
 use crate::types::{DeviceKey, TenantId, UnixSec};
 
-pub const DEFAULT_FILE_SUFFIXES_V1: [&str; 6] = [".log", ".txt", ".json", ".csv", ".cef", ".gz"];
+pub const DEFAULT_FILE_SUFFIXES_V1: [&str; 7] = [
+    ".log", ".txt", ".json", ".csv", ".cef", ".gz", ".zlg",
+];
 
 pub use cursor::{
     apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorPlanV1, CursorResetReasonV1,
@@ -23,6 +25,7 @@ pub use cursor::{
 
 pub use reader::{
     open_file_reader_v1, FileReaderV1, GzipFileReaderV1, PlainFileReaderV1, ReadChunkV1,
+    ZlgFileReaderV1,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -179,6 +182,14 @@ pub fn has_allowed_suffix_v1(file_name: &str) -> bool {
 
 pub fn is_gzip_name_v1(file_name: &str) -> bool {
     file_name.ends_with(".gz")
+}
+
+pub fn is_zlg_name_v1(file_name: &str) -> bool {
+    file_name.ends_with(".zlg")
+}
+
+pub fn uses_compressed_archive_cursor_v1(file_name: &str, is_gzip: bool) -> bool {
+    is_gzip || is_zlg_name_v1(file_name)
 }
 
 fn sorted_dir_entries(dir: &Path) -> io::Result<Vec<fs::DirEntry>> {

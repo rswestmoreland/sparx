@@ -16,7 +16,7 @@ and explainable alert creation.
 ## Runtime flow
 
 1. Discover active tenants and device directories.
-2. Read plain-text or gzip logs using stable cursor handling.
+2. Read plain-text, gzip, or zlg logs using stable cursor handling.
 3. Tokenize supported formats and emit canonical features plus entity sketches.
 4. Aggregate events into open windows.
 5. Finalize mature windows into sparse rows.

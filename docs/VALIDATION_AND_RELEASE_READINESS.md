@@ -2,7 +2,9 @@
 
 Release readiness depends on retained Rust validation logs for the release
 candidate. The phase33f checkpoint has a retained Rust 1.90 validation report
-showing green formatting, check, test, clippy, and benchmark runs.
+showing green formatting, check, test, clippy, and benchmark runs for the
+performance baseline. Source changes after that baseline, including zlg input
+support, require fresh validation before release claims.
 
 Rust version requirement: **Rust 1.90 or newer** (repo-pinned via `rust-toolchain.toml`).
 
@@ -22,7 +24,7 @@ For each release-candidate checkpoint, run and retain logs for:
 Representative validation should include:
 
 - syslog, key/value, JSON, CSV, CEF, and plaintext fixtures
-- plain-text and gzip input paths
+- plain-text, gzip, and zlg input paths
 - restart recovery and cursor advancement
 - open-window checkpoint restore/finalize behavior
 - baseline update and scoring behavior

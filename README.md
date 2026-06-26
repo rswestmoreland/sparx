@@ -127,8 +127,12 @@ for normal recurring spikes and drops.
 ## Supported input model
 
 sparx reads per-tenant watch roots with per-device log directories. It supports
-plain text and gzip where applicable, and tokenizes heterogeneous formats:
+several line-oriented input containers and tokenizes heterogeneous formats:
 
+- plain text log files
+- gzip-compressed log files (`.gz`)
+- [zlg](https://github.com/rswestmoreland/zlg) searchable zstd-backed log
+  archives (`.zlg`)
 - syslog envelope variants
 - key/value logs
 - JSON logs
@@ -237,7 +241,7 @@ Rust 1.90 release/bench build, the current checkpoint measured roughly:
   default 10000-event workload
 
 These figures should be treated as planning estimates, not guarantees. Actual
-throughput depends on CPU, local storage, filesystem, log shape, gzip share,
+throughput depends on CPU, local storage, filesystem, log shape, gzip/zlg share,
 source-stream mode, configured read chunks, tenant/device mix, row width, and
 active output sinks. See `docs/BENCHMARKING.md` for workload controls and
 interpretation guidance.

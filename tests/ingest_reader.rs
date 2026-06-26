@@ -9,7 +9,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
-use sparx::ingest::{open_file_reader_v1, FileReaderV1, GzipFileReaderV1, PlainFileReaderV1};
+use sparx::ingest::{
+    open_file_reader_v1, FileReaderV1, GzipFileReaderV1, PlainFileReaderV1, ZlgFileReaderV1,
+};
 
 fn temp_case_dir(name: &str) -> PathBuf {
     let mut p = std::env::temp_dir();
@@ -178,13 +180,76 @@ fn invalid_gzip_surfaces_read_error() {
 }
 
 #[test]
+fn zlg_reader_streams_stored_chunks_and_dispatches_by_suffix() {
+    let root = temp_case_dir("reader_zlg_stored");
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join("events.zlg");
+    write_zlg_archive(&path, &[(b"alpha\n", true), (b"beta\ngamma\n", true)]);
+    let source_len = fs::metadata(&path).unwrap().len();
+
+    let mut reader = open_file_reader_v1(&path, false, 0, 8).unwrap();
+    let mut text = String::new();
+    let mut spans = Vec::new();
+    while let Some(chunk) = reader.read_chunk_v1().unwrap() {
+        assert!(!chunk.is_gzip);
+        text.push_str(&String::from_utf8_lossy(&chunk.data));
+        spans.push((chunk.offset_start, chunk.offset_end));
+    }
+
+    assert_eq!(text, "alpha\nbeta\ngamma\n");
+    assert_eq!(spans.len(), 2);
+    assert_eq!(spans[0].0, 32);
+    assert_eq!(reader.current_source_offset_v1(), source_len);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn zlg_reader_decodes_zstd_chunks_and_resumes_from_archive_offset() {
+    let root = temp_case_dir("reader_zlg_zstd_resume");
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join("events.zlg");
+    write_zlg_archive(&path, &[(b"one\ntwo\n", false), (b"three\nfour\n", false)]);
+
+    let mut first = ZlgFileReaderV1::open_v1(&path, 0, 8).unwrap();
+    let c1 = first.read_chunk_v1().unwrap().unwrap();
+    let saved_offset = c1.offset_end;
+    assert_eq!(String::from_utf8_lossy(&c1.data), "one\ntwo\n");
+
+    let resumed = ZlgFileReaderV1::open_v1(&path, saved_offset, 8).unwrap();
+    let mut resumed_reader = FileReaderV1::Zlg(Box::new(resumed));
+    let (suffix, spans) = read_all_chunks_text(&mut resumed_reader);
+
+    assert_eq!(suffix, "three\nfour\n");
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].0, saved_offset);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn invalid_zlg_surfaces_read_error() {
+    let root = temp_case_dir("reader_zlg_invalid");
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join("broken.zlg");
+    write_plain(&path, "not-a-zlg-archive");
+
+    let err = ZlgFileReaderV1::open_v1(&path, 0, 8).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn zero_chunk_bytes_are_rejected() {
     let root = temp_case_dir("reader_zero_chunk");
     fs::create_dir_all(&root).unwrap();
     let plain = root.join("events.log");
     let gzip = root.join("events.gz");
+    let zlg = root.join("events.zlg");
     write_plain(&plain, "abc");
     write_gzip(&gzip, "abc");
+    write_zlg_archive(&zlg, &[(b"abc", true)]);
 
     assert_eq!(
         PlainFileReaderV1::open_v1(&plain, 0, 0).unwrap_err().kind(),
@@ -194,6 +259,128 @@ fn zero_chunk_bytes_are_rejected() {
         GzipFileReaderV1::open_v1(&gzip, 0, 0).unwrap_err().kind(),
         std::io::ErrorKind::InvalidInput
     );
+    assert_eq!(
+        ZlgFileReaderV1::open_v1(&zlg, 0, 0).unwrap_err().kind(),
+        std::io::ErrorKind::InvalidInput
+    );
 
     fs::remove_dir_all(root).unwrap();
+}
+
+const TEST_ZLG_GLOBAL_MAGIC: &[u8; 8] = b"ZLG1P0\0\0";
+const TEST_ZLG_CHUNK_MAGIC: &[u8; 4] = b"ZCH1";
+const TEST_ZLG_DIR_MAGIC: &[u8; 4] = b"ZDR1";
+const TEST_ZLG_FOOTER_MAGIC: &[u8; 4] = b"ZFT1";
+const TEST_ZLG_CHUNK_FLAG_STORED: u16 = 0x8000;
+
+struct TestZlgEntry {
+    chunk_offset: u64,
+    summary_offset: u64,
+    summary_len: u32,
+    flags: u32,
+    compressed_offset: u64,
+    compressed_len: u64,
+    uncompressed_len: u64,
+    first_line_number: u64,
+    line_count: u64,
+}
+
+fn write_zlg_archive(path: &Path, chunks: &[(&[u8], bool)]) {
+    fs::write(path, build_zlg_archive_bytes(chunks)).unwrap();
+}
+
+fn build_zlg_archive_bytes(chunks: &[(&[u8], bool)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(TEST_ZLG_GLOBAL_MAGIC);
+    push_u16(&mut out, 1);
+    push_u16(&mut out, 32);
+    push_u32(&mut out, 0);
+    push_u32(&mut out, 20);
+    push_u32(&mut out, 6);
+    out.extend_from_slice(&[0_u8; 8]);
+
+    let mut entries = Vec::new();
+    let mut first_line = 1_u64;
+    let mut total_lines = 0_u64;
+    let mut total_uncompressed = 0_u64;
+
+    for (idx, (data, stored)) in chunks.iter().enumerate() {
+        let chunk_offset = out.len() as u64;
+        let payload = if *stored {
+            data.to_vec()
+        } else {
+            zstd::stream::encode_all(*data, 3).unwrap()
+        };
+        let flags = if *stored { TEST_ZLG_CHUNK_FLAG_STORED } else { 0 };
+        let line_count = data.iter().filter(|b| **b == b'\n').count() as u64;
+        let summary_len = 0_u32;
+        let crc = crc32fast::hash(*data);
+
+        out.extend_from_slice(TEST_ZLG_CHUNK_MAGIC);
+        push_u16(&mut out, 64);
+        push_u16(&mut out, flags);
+        push_u64(&mut out, idx as u64);
+        push_u64(&mut out, first_line);
+        push_u64(&mut out, line_count);
+        push_u64(&mut out, data.len() as u64);
+        push_u64(&mut out, payload.len() as u64);
+        push_u32(&mut out, summary_len);
+        push_u32(&mut out, crc);
+        push_u64(&mut out, 0);
+        let summary_offset = out.len() as u64;
+        let compressed_offset = summary_offset + summary_len as u64;
+        out.extend_from_slice(&payload);
+
+        entries.push(TestZlgEntry {
+            chunk_offset,
+            summary_offset,
+            summary_len,
+            flags: flags as u32,
+            compressed_offset,
+            compressed_len: payload.len() as u64,
+            uncompressed_len: data.len() as u64,
+            first_line_number: first_line,
+            line_count,
+        });
+        first_line += line_count;
+        total_lines += line_count;
+        total_uncompressed += data.len() as u64;
+    }
+
+    let directory_offset = out.len() as u64;
+    out.extend_from_slice(TEST_ZLG_DIR_MAGIC);
+    push_u32(&mut out, 64);
+    push_u64(&mut out, entries.len() as u64);
+    for entry in &entries {
+        push_u64(&mut out, entry.chunk_offset);
+        push_u64(&mut out, entry.summary_offset);
+        push_u32(&mut out, entry.summary_len);
+        push_u32(&mut out, entry.flags);
+        push_u64(&mut out, entry.compressed_offset);
+        push_u64(&mut out, entry.compressed_len);
+        push_u64(&mut out, entry.uncompressed_len);
+        push_u64(&mut out, entry.first_line_number);
+        push_u64(&mut out, entry.line_count);
+    }
+    let directory_len = out.len() as u64 - directory_offset;
+    out.extend_from_slice(TEST_ZLG_FOOTER_MAGIC);
+    push_u32(&mut out, 48);
+    push_u64(&mut out, entries.len() as u64);
+    push_u64(&mut out, total_lines);
+    push_u64(&mut out, total_uncompressed);
+    push_u64(&mut out, directory_offset);
+    push_u64(&mut out, directory_len);
+    out
+}
+
+fn push_u16(out: &mut Vec<u8>, value: u16) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_u32(out: &mut Vec<u8>, value: u32) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_u64(out: &mut Vec<u8>, value: u64) {
+    out.extend_from_slice(&value.to_le_bytes());
 }

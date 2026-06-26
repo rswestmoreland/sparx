@@ -26,5 +26,11 @@ Multiline:
 Gzip:
 - streamed; drilldown limitations as per drilldown contract
 
+Zlg:
+- `.zlg` archives are supported as line-oriented zstd-backed log archives
+- zlg chunk payloads are decoded and fed through the same tokenization path as plain text
+- zlg provenance offsets refer to archive chunk byte ranges rather than decoded-line byte positions
+- zlg files are expected to be finalized archives; replace atomically rather than editing in place
+
 Degrade gracefully:
 - if specialized parse fails: fallback to plaintext + increment counters

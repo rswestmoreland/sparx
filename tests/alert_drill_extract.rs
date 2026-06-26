@@ -137,9 +137,87 @@ fn write_gzip_log_v1(
     Ok(path)
 }
 
+fn write_zlg_log_v1(
+    cfg: &sparx::config::ConfigV1,
+    rel_name: &str,
+    body: &str,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    let path = std::path::Path::new(&cfg.sparx.tenant_root)
+        .join("tenant-a")
+        .join("device-a")
+        .join(rel_name);
+    fs::create_dir_all(path.parent().unwrap())?;
+    fs::write(&path, build_stored_zlg_archive_v1(body.as_bytes()))?;
+    Ok(path)
+}
+
+fn build_stored_zlg_archive_v1(body: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(b"ZLG1P0\0\0");
+    push_zlg_u16_v1(&mut out, 1);
+    push_zlg_u16_v1(&mut out, 32);
+    push_zlg_u32_v1(&mut out, 0);
+    push_zlg_u32_v1(&mut out, 20);
+    push_zlg_u32_v1(&mut out, 6);
+    out.extend_from_slice(&[0_u8; 8]);
+
+    let chunk_offset = out.len() as u64;
+    let line_count = body.iter().filter(|byte| **byte == b'\n').count() as u64;
+    let crc = crc32fast::hash(body);
+    out.extend_from_slice(b"ZCH1");
+    push_zlg_u16_v1(&mut out, 64);
+    push_zlg_u16_v1(&mut out, 0x8000);
+    push_zlg_u64_v1(&mut out, 0);
+    push_zlg_u64_v1(&mut out, 1);
+    push_zlg_u64_v1(&mut out, line_count);
+    push_zlg_u64_v1(&mut out, body.len() as u64);
+    push_zlg_u64_v1(&mut out, body.len() as u64);
+    push_zlg_u32_v1(&mut out, 0);
+    push_zlg_u32_v1(&mut out, crc);
+    push_zlg_u64_v1(&mut out, 0);
+    let summary_offset = out.len() as u64;
+    let compressed_offset = summary_offset;
+    out.extend_from_slice(body);
+
+    let directory_offset = out.len() as u64;
+    out.extend_from_slice(b"ZDR1");
+    push_zlg_u32_v1(&mut out, 64);
+    push_zlg_u64_v1(&mut out, 1);
+    push_zlg_u64_v1(&mut out, chunk_offset);
+    push_zlg_u64_v1(&mut out, summary_offset);
+    push_zlg_u32_v1(&mut out, 0);
+    push_zlg_u32_v1(&mut out, 0x8000);
+    push_zlg_u64_v1(&mut out, compressed_offset);
+    push_zlg_u64_v1(&mut out, body.len() as u64);
+    push_zlg_u64_v1(&mut out, body.len() as u64);
+    push_zlg_u64_v1(&mut out, 1);
+    push_zlg_u64_v1(&mut out, line_count);
+    let directory_len = out.len() as u64 - directory_offset;
+
+    out.extend_from_slice(b"ZFT1");
+    push_zlg_u32_v1(&mut out, 48);
+    push_zlg_u64_v1(&mut out, 1);
+    push_zlg_u64_v1(&mut out, line_count);
+    push_zlg_u64_v1(&mut out, body.len() as u64);
+    push_zlg_u64_v1(&mut out, directory_offset);
+    push_zlg_u64_v1(&mut out, directory_len);
+    out
+}
+
+fn push_zlg_u16_v1(out: &mut Vec<u8>, value: u16) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_zlg_u32_v1(out: &mut Vec<u8>, value: u32) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_zlg_u64_v1(out: &mut Vec<u8>, value: u64) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
 #[test]
-fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>>
-{
+fn alert_drill_reads_plain_span_and_enforces_max_lines_v1() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = temp_cfg_v1();
     let body = "alpha\nbravo\ncharlie\n";
     let bravo_start = body.find("bravo").unwrap() as u64;
@@ -205,6 +283,77 @@ fn alert_drill_skips_gzip_span_v1() -> Result<(), Box<dyn std::error::Error>> {
     let out = result.msg_stdout.unwrap();
     assert!(out.contains("gzip_spans_skipped: 1"));
     assert!(out.contains("gzip_skipped: true"));
+    Ok(())
+}
+
+#[test]
+fn alert_drill_reads_zlg_span_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = temp_cfg_v1();
+    let zlg_path = write_zlg_log_v1(&cfg, "messages.zlg", "zlg-one\nzlg-two\n")?;
+    let alert = sample_alert_v1(
+        "alert-zlg-drill",
+        vec![FileSpanV1 {
+            file_rel: "messages.zlg".to_string(),
+            file_key: "f-zlg".to_string(),
+            inode: 6,
+            offset_start: 32,
+            offset_end: zlg_path.metadata()?.len(),
+            is_gzip: false,
+        }],
+    );
+    seed_alert_v1(&cfg, &alert)?;
+
+    let result = route_command_v1(
+        &CommandV1::AlertDrill {
+            tenant_id: "tenant-a".to_string(),
+            alert_id: "alert-zlg-drill".to_string(),
+            max_bytes: None,
+            max_lines: Some(1),
+        },
+        &cfg,
+    );
+    assert_eq!(0, result.exit_code);
+    let out = result.msg_stdout.unwrap();
+    assert!(out.contains("spans_emitted: 1"));
+    assert!(out.contains("lines_emitted: 1"));
+    assert!(out.contains("zlg-one"));
+    assert!(!out.contains("zlg-two"));
+    Ok(())
+}
+
+#[test]
+fn alert_extract_writes_zlg_span_v1() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = temp_cfg_v1();
+    let zlg_path = write_zlg_log_v1(&cfg, "extract.zlg", "zlg-alpha\nzlg-beta\n")?;
+    let alert = sample_alert_v1(
+        "alert-zlg-extract",
+        vec![FileSpanV1 {
+            file_rel: "extract.zlg".to_string(),
+            file_key: "f-zlg-extract".to_string(),
+            inode: 7,
+            offset_start: 32,
+            offset_end: zlg_path.metadata()?.len(),
+            is_gzip: false,
+        }],
+    );
+    seed_alert_v1(&cfg, &alert)?;
+    let out_path = std::path::Path::new(&cfg.sparx.data_root).join("extracts/zlg.log");
+
+    let result = route_command_v1(
+        &CommandV1::AlertExtract {
+            tenant_id: "tenant-a".to_string(),
+            alert_id: "alert-zlg-extract".to_string(),
+            out_path: out_path.display().to_string(),
+            max_bytes: None,
+            max_lines: None,
+        },
+        &cfg,
+    );
+    assert_eq!(0, result.exit_code);
+    assert!(result.msg_stdout.unwrap().contains("spans_written: 1"));
+    let data = fs::read_to_string(&out_path)?;
+    assert!(data.contains("zlg-alpha"));
+    assert!(data.contains("zlg-beta"));
     Ok(())
 }
 

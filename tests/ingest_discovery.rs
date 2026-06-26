@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sparx::ingest::{
     device_key_v1, discover_device_files_at_v1, discover_device_inventory_v1,
     discover_tenant_devices_v1, file_key_v1, has_allowed_suffix_v1, is_gzip_name_v1,
+    is_zlg_name_v1, uses_compressed_archive_cursor_v1,
 };
 use sparx::stable_hash::STABLE_HASH_HEX128_LEN_V1;
 
@@ -101,6 +102,7 @@ fn discover_device_files_filters_hidden_unsupported_and_non_files() {
     write_file(&root.join("b.csv"), "a,b");
     write_file(&root.join("a.log"), "hello");
     write_file(&root.join("c.gz"), "compressed-name-only");
+    write_file(&root.join("d.zlg"), "zlg-name-only");
     write_file(&root.join(".hidden.log"), "ignore");
     write_file(&root.join("notes.md"), "ignore");
     fs::create_dir_all(root.join("nested")).unwrap();
@@ -117,6 +119,7 @@ fn discover_device_files_filters_hidden_unsupported_and_non_files() {
             ("a.log".to_string(), false, file_key_v1("a.log"),),
             ("b.csv".to_string(), false, file_key_v1("b.csv"),),
             ("c.gz".to_string(), true, file_key_v1("c.gz"),),
+            ("d.zlg".to_string(), false, file_key_v1("d.zlg"),),
         ]
     );
 
@@ -150,10 +153,16 @@ fn suffix_helpers_match_contract_allowlist() {
     assert!(has_allowed_suffix_v1("a.csv"));
     assert!(has_allowed_suffix_v1("a.cef"));
     assert!(has_allowed_suffix_v1("a.gz"));
+    assert!(has_allowed_suffix_v1("a.zlg"));
     assert!(!has_allowed_suffix_v1("a.jsonl"));
     assert!(!has_allowed_suffix_v1("a.gzip"));
     assert!(is_gzip_name_v1("a.gz"));
     assert!(!is_gzip_name_v1("a.log"));
+    assert!(is_zlg_name_v1("a.zlg"));
+    assert!(!is_zlg_name_v1("a.gz"));
+    assert!(uses_compressed_archive_cursor_v1("a.gz", true));
+    assert!(uses_compressed_archive_cursor_v1("a.zlg", false));
+    assert!(!uses_compressed_archive_cursor_v1("a.log", false));
 }
 
 #[cfg(unix)]

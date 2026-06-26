@@ -17,7 +17,7 @@
 - config loading, validation, and CLI parsing
 - Fjall-backed global and tenant DB adapters
 - deterministic key builders and value encodings
-- directory discovery, cursors, and plain/gzip readers
+- directory discovery, cursors, and plain/gzip/zlg readers
 - syslog, key/value, JSON, CSV, CEF, and plaintext tokenization
 - feature dictionaries, feature emission, and entity sketches
 - open-window checkpointing and finalization
@@ -38,8 +38,8 @@
 ## Remaining work order
 
 1. Review active docs, contracts, tests, and supporting files
-   - confirm active docs match current behavior after the Rust 1.90 validation
-     and performance checkpoint
+   - confirm active docs match current behavior after the Rust 1.90 validation, performance checkpoint,
+     and zlg input support checkpoint
    - keep historical checkpoint notes archived under `docs/roadmap/`
    - keep public README focused on current behavior, concise design
      explanations, and conservative performance estimates
@@ -78,6 +78,7 @@ logs remain green for the release candidate, and release packaging is complete.
 - [x] Ingest resource cap validation added for configured CPU/memory controls.
 - [x] Rust 1.90 formatting, check, test, and clippy validation was reported
   green for the phase33f checkpoint.
+- [ ] Re-run Rust validation after the zlg input support source changes.
 - [ ] Repeat Rust validation for any later release-candidate checkpoint that
   changes source, tests, benches, docs, or contracts.
 - [x] Malformed but readable log records do not crash runtime processing.

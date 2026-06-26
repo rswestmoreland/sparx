@@ -19,7 +19,7 @@ that must remain covered before release.
 3. Ingest and tokenization
    - tenant/device discovery
    - cursor tracking
-   - plain-text and gzip readers
+   - plain-text, gzip, and zlg readers
    - syslog, key/value, JSON, CSV, CEF, and plaintext fallback tokenization
 
 4. Sparse row and baseline pipeline
@@ -87,7 +87,7 @@ that must remain covered before release.
 - Fjall adapter and layout behavior
 - tenant cache lifecycle behavior
 - ingest discovery and cursor behavior
-- plain-text and gzip reader behavior
+- plain-text, gzip, and zlg reader behavior
 - tokenizer behavior for supported formats
 - feature dictionary, feature emission, and sketch behavior
 - window aggregation and checkpoint behavior

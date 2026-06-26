@@ -8,6 +8,7 @@ order and tracks cursors so repeated processing is stable.
 
 - plain text input
 - gzip input where applicable
+- zlg archive input for `.zlg` files
 - deterministic cursor restore and advancement
 - restart-safe open-window checkpointing
 - fail-closed behavior for invalid runtime state

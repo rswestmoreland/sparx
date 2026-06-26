@@ -97,6 +97,7 @@ Cursor values are stored as fixed-size fields per key (no struct packing across 
 
 Notes:
 - Offsets for gzip are compressed-stream offsets.
+- Offsets for zlg are archive byte offsets; zlg files use the existing cursor fields and should be replaced atomically rather than edited in place.
 - On inode change, offset resets to 0 and `cursor_resets_total` increments.
 
 ---

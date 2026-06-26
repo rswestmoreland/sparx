@@ -12,7 +12,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::alert::{AlertV1, FileSpanV1};
 use crate::config::ConfigV1;
-use crate::ingest::discover_tenant_devices_v1;
+use crate::ingest::{discover_tenant_devices_v1, is_zlg_name_v1};
 use crate::ingest::reader::open_file_reader_v1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -201,13 +201,24 @@ pub fn drill_alert_v1(
             continue;
         }
 
-        let (lines, span_bytes, span_lines) = read_plain_span_lines_v1(
-            &path,
-            span.offset_start,
-            span.offset_end,
-            &mut bytes_remaining,
-            &mut lines_remaining,
-        )?;
+        let (lines, span_bytes, span_lines) = if is_zlg_path_v1(&path) {
+            read_reader_span_lines_v1(
+                &path,
+                span.offset_start,
+                span.offset_end,
+                &mut bytes_remaining,
+                &mut lines_remaining,
+                (cfg.ingest.read_chunk_bytes as usize).max(1),
+            )?
+        } else {
+            read_plain_span_lines_v1(
+                &path,
+                span.offset_start,
+                span.offset_end,
+                &mut bytes_remaining,
+                &mut lines_remaining,
+            )?
+        };
         if span_bytes > 0 || span_lines > 0 {
             spans_emitted += 1;
             bytes_emitted += span_bytes;
@@ -262,6 +273,7 @@ pub fn extract_alert_v1(
         }
 
         let path = resolve_provenance_path_v1(cfg, alert, span)?;
+        let path_is_zlg = is_zlg_path_v1(&path);
         let mut reader = open_file_reader_v1(&path, span.is_gzip, span.offset_start, chunk_bytes)?;
         let mut wrote_this_span = false;
 
@@ -277,7 +289,7 @@ pub fn extract_alert_v1(
             }
 
             let mut data = chunk.data;
-            if !span.is_gzip && chunk.offset_end > span.offset_end {
+            if !span.is_gzip && !path_is_zlg && chunk.offset_end > span.offset_end {
                 let keep_len = (span.offset_end.saturating_sub(chunk.offset_start)) as usize;
                 data.truncate(keep_len.min(data.len()));
             }
@@ -323,6 +335,59 @@ pub fn extract_alert_v1(
     })
 }
 
+fn read_reader_span_lines_v1(
+    path: &Path,
+    offset_start: u64,
+    offset_end: u64,
+    bytes_remaining: &mut u64,
+    lines_remaining: &mut u64,
+    chunk_bytes: usize,
+) -> io::Result<(Vec<String>, u64, u64)> {
+    let mut reader = open_file_reader_v1(path, false, offset_start, chunk_bytes)?;
+    let mut lines = Vec::new();
+    let mut bytes_emitted = 0_u64;
+    let mut lines_emitted = 0_u64;
+
+    while *bytes_remaining > 0 && *lines_remaining > 0 {
+        let Some(chunk) = reader.read_chunk_v1()? else {
+            break;
+        };
+        if chunk.offset_start >= offset_end {
+            break;
+        }
+
+        let write_len = capped_len_v1(&chunk.data, *bytes_remaining, *lines_remaining);
+        if write_len == 0 {
+            break;
+        }
+        let data = &chunk.data[..write_len];
+        let text = String::from_utf8_lossy(data);
+        for line in text.split_inclusive('\n') {
+            if *lines_remaining == 0 {
+                break;
+            }
+            lines.push(line.trim_end_matches('\n').trim_end_matches('\r').to_string());
+            *lines_remaining = (*lines_remaining).saturating_sub(1);
+            lines_emitted += 1;
+        }
+        *bytes_remaining = (*bytes_remaining).saturating_sub(write_len as u64);
+        bytes_emitted += write_len as u64;
+
+        if write_len < chunk.data.len() || chunk.offset_end >= offset_end {
+            break;
+        }
+    }
+
+    Ok((lines, bytes_emitted, lines_emitted))
+}
+
+fn is_zlg_path_v1(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(is_zlg_name_v1)
+        .unwrap_or(false)
+}
+
 fn read_plain_span_lines_v1(
     path: &Path,
     offset_start: u64,
@@ -359,7 +424,7 @@ fn read_plain_span_lines_v1(
     let lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
     let line_count = lines.len() as u64;
     *bytes_remaining -= keep_len as u64;
-    *lines_remaining = lines_remaining.saturating_sub(line_count);
+    *lines_remaining = (*lines_remaining).saturating_sub(line_count);
     Ok((lines, keep_len as u64, line_count))
 }
 
