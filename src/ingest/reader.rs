@@ -501,10 +501,13 @@ fn read_zlg_global_header_v1<R: Read>(reader: &mut R) -> io::Result<()> {
 
 fn read_zlg_record_magic_v1<R: Read>(reader: &mut R) -> io::Result<Option<[u8; 4]>> {
     let mut magic = [0_u8; 4];
-    match reader.read_exact(&mut magic) {
-        Ok(()) => Ok(Some(magic)),
-        Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
-        Err(err) => Err(err),
+    match reader.read(&mut magic[..1])? {
+        0 => Ok(None),
+        1 => {
+            reader.read_exact(&mut magic[1..])?;
+            Ok(Some(magic))
+        }
+        _ => unreachable!("single-byte read returned more than one byte"),
     }
 }
 

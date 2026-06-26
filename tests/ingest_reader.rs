@@ -228,6 +228,26 @@ fn zlg_reader_decodes_zstd_chunks_and_resumes_from_archive_offset() {
 }
 
 #[test]
+fn zlg_reader_preserves_final_line_with_and_without_newline() {
+    let root = temp_case_dir("reader_zlg_final_lines");
+    fs::create_dir_all(&root).unwrap();
+    let with_newline = root.join("with.zlg");
+    let without_newline = root.join("without.zlg");
+    write_zlg_archive(&with_newline, &[(b"last-with-newline\n", true)]);
+    write_zlg_archive(&without_newline, &[(b"last-without-newline", true)]);
+
+    let mut reader = open_file_reader_v1(&with_newline, false, 0, 8).unwrap();
+    let (body, _) = read_all_chunks_text(&mut reader);
+    assert_eq!(body, "last-with-newline\n");
+
+    let mut reader = open_file_reader_v1(&without_newline, false, 0, 8).unwrap();
+    let (body, _) = read_all_chunks_text(&mut reader);
+    assert_eq!(body, "last-without-newline");
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn invalid_zlg_surfaces_read_error() {
     let root = temp_case_dir("reader_zlg_invalid");
     fs::create_dir_all(&root).unwrap();
@@ -236,6 +256,111 @@ fn invalid_zlg_surfaces_read_error() {
 
     let err = ZlgFileReaderV1::open_v1(&path, 0, 8).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn malformed_zlg_archives_fail_closed() {
+    let root = temp_case_dir("reader_zlg_malformed");
+    fs::create_dir_all(&root).unwrap();
+    let valid = build_zlg_archive_bytes(&[(b"alpha\n", true), (b"beta\n", false)]);
+
+    let invalid_magic = root.join("invalid_magic.zlg");
+    let mut bytes = valid.clone();
+    bytes[0] = b'X';
+    fs::write(&invalid_magic, bytes).unwrap();
+    assert_eq!(
+        ZlgFileReaderV1::open_v1(&invalid_magic, 0, 8)
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidData
+    );
+
+    let unsupported_version = root.join("unsupported_version.zlg");
+    let mut bytes = valid.clone();
+    bytes[8..10].copy_from_slice(&2_u16.to_le_bytes());
+    fs::write(&unsupported_version, bytes).unwrap();
+    assert_eq!(
+        ZlgFileReaderV1::open_v1(&unsupported_version, 0, 8)
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidData
+    );
+
+    let unsupported_global_header = root.join("unsupported_global_header.zlg");
+    let mut bytes = valid.clone();
+    bytes[10..12].copy_from_slice(&64_u16.to_le_bytes());
+    fs::write(&unsupported_global_header, bytes).unwrap();
+    assert_eq!(
+        ZlgFileReaderV1::open_v1(&unsupported_global_header, 0, 8)
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidData
+    );
+
+    let truncated_chunk_header = root.join("truncated_chunk_header.zlg");
+    fs::write(&truncated_chunk_header, &valid[..40]).unwrap();
+    let mut reader = ZlgFileReaderV1::open_v1(&truncated_chunk_header, 0, 8).unwrap();
+    assert_eq!(
+        reader.read_chunk_v1().unwrap_err().kind(),
+        std::io::ErrorKind::UnexpectedEof
+    );
+
+    let truncated_payload = root.join("truncated_payload.zlg");
+    fs::write(&truncated_payload, &valid[..95]).unwrap();
+    let mut reader = ZlgFileReaderV1::open_v1(&truncated_payload, 0, 8).unwrap();
+    assert_eq!(
+        reader.read_chunk_v1().unwrap_err().kind(),
+        std::io::ErrorKind::UnexpectedEof
+    );
+
+    let bad_decoded_length = root.join("bad_decoded_length.zlg");
+    let mut bytes = valid.clone();
+    bytes[64..72].copy_from_slice(&999_u64.to_le_bytes());
+    fs::write(&bad_decoded_length, bytes).unwrap();
+    let mut reader = ZlgFileReaderV1::open_v1(&bad_decoded_length, 0, 8).unwrap();
+    assert_eq!(
+        reader.read_chunk_v1().unwrap_err().kind(),
+        std::io::ErrorKind::InvalidData
+    );
+
+    let crc_mismatch = root.join("crc_mismatch.zlg");
+    let mut bytes = valid.clone();
+    bytes[84..88].copy_from_slice(&0_u32.to_le_bytes());
+    fs::write(&crc_mismatch, bytes).unwrap();
+    let mut reader = ZlgFileReaderV1::open_v1(&crc_mismatch, 0, 8).unwrap();
+    assert_eq!(
+        reader.read_chunk_v1().unwrap_err().kind(),
+        std::io::ErrorKind::InvalidData
+    );
+
+    let partial_record_magic = root.join("partial_record_magic.zlg");
+    let mut bytes = valid[..32].to_vec();
+    bytes.extend_from_slice(b"ZC");
+    fs::write(&partial_record_magic, bytes).unwrap();
+    let mut reader = ZlgFileReaderV1::open_v1(&partial_record_magic, 0, 8).unwrap();
+    assert_eq!(
+        reader.read_chunk_v1().unwrap_err().kind(),
+        std::io::ErrorKind::UnexpectedEof
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn zlg_directory_footer_terminates_without_emitting_payload() {
+    let root = temp_case_dir("reader_zlg_directory_only");
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join("empty.zlg");
+    write_zlg_archive(&path, &[]);
+
+    let mut reader = ZlgFileReaderV1::open_v1(&path, 0, 8).unwrap();
+    assert!(reader.read_chunk_v1().unwrap().is_none());
+    assert_eq!(
+        reader.current_source_offset_v1(),
+        fs::metadata(&path).unwrap().len()
+    );
 
     fs::remove_dir_all(root).unwrap();
 }
@@ -311,10 +436,14 @@ fn build_zlg_archive_bytes(chunks: &[(&[u8], bool)]) -> Vec<u8> {
         } else {
             zstd::stream::encode_all(*data, 3).unwrap()
         };
-        let flags = if *stored { TEST_ZLG_CHUNK_FLAG_STORED } else { 0 };
+        let flags = if *stored {
+            TEST_ZLG_CHUNK_FLAG_STORED
+        } else {
+            0
+        };
         let line_count = data.iter().filter(|b| **b == b'\n').count() as u64;
         let summary_len = 0_u32;
-        let crc = crc32fast::hash(*data);
+        let crc = crc32fast::hash(data);
 
         out.extend_from_slice(TEST_ZLG_CHUNK_MAGIC);
         push_u16(&mut out, 64);

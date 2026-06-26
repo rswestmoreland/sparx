@@ -14,9 +14,8 @@ use std::path::{Path, PathBuf};
 use crate::stable_hash::stable_hash_hex128_v1;
 use crate::types::{DeviceKey, TenantId, UnixSec};
 
-pub const DEFAULT_FILE_SUFFIXES_V1: [&str; 7] = [
-    ".log", ".txt", ".json", ".csv", ".cef", ".gz", ".zlg",
-];
+pub const DEFAULT_FILE_SUFFIXES_V1: [&str; 7] =
+    [".log", ".txt", ".json", ".csv", ".cef", ".gz", ".zlg"];
 
 pub use cursor::{
     apply_cursor_read_progress_v1, reconcile_cursor_v1, CursorPlanV1, CursorResetReasonV1,
